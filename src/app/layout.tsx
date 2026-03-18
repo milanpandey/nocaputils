@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "nocaputils | Free In-Browser Video Editor & Developer Tools",
-  description: "Free, zero-backend, ultra-fast utilitarian tools. Edit videos directly in your browser without uploading files.",
+  title: "nocaputils | Free Privacy-First Utility Tools",
+  description:
+    "Free creator utility tools that run entirely in your browser. No uploads, zero servers, total control.",
 };
 
 export default function RootLayout({
@@ -19,38 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased min-h-screen bg-canvas text-content selection:bg-neo-yellow selection:text-black`}>
-        {/* Navigation Bar */}
-        <nav className="border-b-[3px] border-black bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-black tracking-tight uppercase">
-              <a href="/" className="text-black dark:text-white">nocap<span className="text-neo-blue">utils</span></a>
-            </h1>
-            <span className="hidden sm:inline-block px-2 py-1 text-xs font-bold border-2 border-brutal-border bg-neo-yellow text-black shadow-brutal-hover">
-              No Cap: 100% Private!
-            </span>
-          </div>
-          <div>
-            <a href="https://play.google.com/store/apps/details?id=com.triptea.app" target="_blank" rel="noreferrer" className="hidden md:inline-flex px-4 py-2 font-black uppercase text-sm border-2 border-black bg-neo-pink text-white shadow-[3px_3px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#000] transition-all">
-              Download TripTea
-            </a>
-          </div>
-        </nav>
-
-        <main>{children}</main>
-
-        <footer className="border-t-[3px] border-brutal-border mt-20 p-8 bg-bg-secondary">
-          <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
-            <h2 className="text-2xl font-black uppercase mb-4">A project by TripTea</h2>
-            <p className="max-w-2xl text-sm font-medium opacity-80 mb-6">
-              nocaputils is a suite of utility tools designed to just work. Everything happens locally in your browser.
-            </p>
-            {/* Horizontal Adsense Placeholder */}
-            <div className="w-full max-w-[728px] h-[90px] border-[3px] border-brutal-border bg-bg-primary flex items-center justify-center font-bold text-gray-500 mb-8 shadow-brutal">
-              [AdSense Horizontal Banner 728x90]
-            </div>
-          </div>
-        </footer>
+      <body
+        className={`${spaceGrotesk.variable} min-h-screen bg-[var(--bg-page)] font-[family-name:var(--font-space-grotesk)] text-[var(--text-main)] antialiased selection:bg-[var(--accent)] selection:text-black`}
+      >
+        {children}
       </body>
     </html>
   );
