@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const tools = [
   {
@@ -34,27 +32,11 @@ const tools = [
 ];
 
 export default function Home() {
-  const [darkMode, setDarkMode] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkMode);
-  }, [darkMode]);
-
   return (
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-12 flex justify-end">
-          <button
-            type="button"
-            onClick={() => setDarkMode((value) => !value)}
-            className="neo-button flex items-center gap-3 bg-[var(--bg-panel)] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.22em]"
-            aria-label="Toggle dark mode"
-          >
-            <span>{darkMode ? "light mode" : "dark mode"}</span>
-            <span className="flex h-6 w-6 items-center justify-center border-[3px] border-[var(--border-main)] bg-white text-black">
-              {darkMode ? "L" : "D"}
-            </span>
-          </button>
+          <ThemeToggle />
         </div>
 
         <main className="flex flex-1 flex-col items-center">
@@ -231,16 +213,14 @@ export default function Home() {
               <a href="#">Twitter</a>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setDarkMode((value) => !value)}
-              className="neo-button flex items-center gap-3 bg-[var(--bg-panel)] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
-            >
-              <span>{darkMode ? "light mode" : "dark mode"}</span>
-              <span className="flex h-6 w-6 items-center justify-center border-[3px] border-[var(--border-main)] bg-white text-black">
-                {darkMode ? "L" : "D"}
-              </span>
-            </button>
+            <div className="flex gap-3">
+              <div className="neo-button flex h-10 w-10 items-center justify-center bg-[var(--bg-panel)] text-lg">
+                {"\u2197"}
+              </div>
+              <div className="neo-button flex h-10 w-10 items-center justify-center bg-[var(--bg-panel)] text-lg">
+                {"\u25CE"}
+              </div>
+            </div>
           </div>
         </footer>
       </div>
