@@ -68,21 +68,21 @@ export default function Home() {
             <a
               key={tool.id}
               href={`/${tool.id}`}
-              className={`block bg-white border-[4px] border-black p-6 shadow-[8px_8px_0px_#000] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-[4px_4px_0px_#000] transition-all relative overflow-hidden group`}
+              className="brutal-card block p-6 relative overflow-hidden group"
             >
               {/* Decorative background shape */}
-              <div className={`absolute -right-16 -top-16 w-40 h-40 ${tool.color} rounded-full border-4 border-black opacity-20 group-hover:scale-150 transition-transform duration-500`}></div>
+              <div className={`absolute -right-16 -top-16 w-40 h-40 ${tool.color} rounded-full border-4 border-brutal-border opacity-20 group-hover:scale-150 transition-transform duration-500`}></div>
 
               <div className="relative z-10">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-3xl font-black uppercase tracking-tight">{tool.name}</h3>
                   {tool.status === "Coming Soon" && (
-                    <span className="text-xs font-bold uppercase bg-gray-200 border-2 border-black px-2 py-1">
+                    <span className="text-xs font-bold uppercase bg-bg-secondary border-2 border-brutal-border px-2 py-1">
                       Soon
                     </span>
                   )}
                   {tool.status === "Available" && (
-                    <span className={`text-xs font-bold uppercase ${tool.color} border-2 border-black px-2 py-1`}>
+                    <span className={`text-xs font-bold uppercase ${tool.color} text-black border-2 border-brutal-border px-2 py-1`}>
                       Live
                     </span>
                   )}

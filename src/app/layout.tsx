@@ -24,9 +24,9 @@ export default function RootLayout({
         <nav className="border-b-[3px] border-black bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-black tracking-tight uppercase">
-              <a href="/">nocap<span className="text-neo-blue">utils</span></a>
+              <a href="/" className="text-black dark:text-white">nocap<span className="text-neo-blue">utils</span></a>
             </h1>
-            <span className="hidden sm:inline-block px-2 py-1 text-xs font-bold border-2 border-black bg-neo-yellow shadow-[2px_2px_0px_#000]">
+            <span className="hidden sm:inline-block px-2 py-1 text-xs font-bold border-2 border-brutal-border bg-neo-yellow text-black shadow-brutal-hover">
               No Cap: 100% Private!
             </span>
           </div>
@@ -39,14 +39,14 @@ export default function RootLayout({
 
         <main>{children}</main>
 
-        <footer className="border-t-[3px] border-black mt-20 p-8 bg-white">
+        <footer className="border-t-[3px] border-brutal-border mt-20 p-8 bg-bg-secondary">
           <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
             <h2 className="text-2xl font-black uppercase mb-4">A project by TripTea</h2>
             <p className="max-w-2xl text-sm font-medium opacity-80 mb-6">
               nocaputils is a suite of utility tools designed to just work. Everything happens locally in your browser.
             </p>
             {/* Horizontal Adsense Placeholder */}
-            <div className="w-full max-w-[728px] h-[90px] border-[3px] border-black bg-gray-100 flex items-center justify-center font-bold text-gray-500 mb-8 shadow-[4px_4px_0px_#000]">
+            <div className="w-full max-w-[728px] h-[90px] border-[3px] border-brutal-border bg-bg-primary flex items-center justify-center font-bold text-gray-500 mb-8 shadow-brutal">
               [AdSense Horizontal Banner 728x90]
             </div>
           </div>

@@ -89,7 +89,7 @@ export default function VideoEditor() {
 
     return (
         <div className="w-full">
-            <div className="brutal-card border-[4px] bg-white w-full min-h-[500px] flex items-center justify-center p-6 relative">
+            <div className="brutal-card w-full min-h-[500px] flex items-center justify-center p-6 relative">
 
                 {!loaded && isLoading && (
                     <div className="text-center">
@@ -127,12 +127,12 @@ export default function VideoEditor() {
 
                 {loaded && videoFile && (
                     <div className="w-full h-full flex flex-col pt-4">
-                        <div className="flex justify-between items-center mb-4 border-b-[3px] border-black pb-4">
+                        <div className="flex justify-between items-center mb-4 border-b-[3px] border-brutal-border pb-4">
                             <h3 className="font-black text-xl uppercase tracking-tighter shrink-0">{videoFile.name}</h3>
                             <div className="flex gap-2 shrink-0">
                                 <button
                                     onClick={clearVideo}
-                                    className="px-4 py-2 bg-gray-200 border-2 border-black font-bold text-sm uppercase shadow-[2px_2px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#000] transition-all"
+                                    className="px-4 py-2 bg-bg-secondary border-2 border-brutal-border font-bold text-sm uppercase shadow-brutal hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-brutal-hover transition-all"
                                 >
                                     Clear
                                 </button>
@@ -150,7 +150,7 @@ export default function VideoEditor() {
                         </div>
 
                         {/* Stub for timeline */}
-                        <div className="mt-8 border-[4px] border-black h-24 bg-gray-100 relative flex items-center justify-center shadow-[4px_4px_0px_#000]">
+                        <div className="mt-8 border-[4px] border-brutal-border h-24 bg-bg-secondary relative flex items-center justify-center shadow-brutal">
                             <p className="font-bold opacity-50 uppercase tracking-widest text-sm">Timeline Under Construction</p>
                         </div>
                         <p ref={messageRef} className="font-mono text-xs mt-4 h-4 overflow-hidden text-gray-500"></p>
