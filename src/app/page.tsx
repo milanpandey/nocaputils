@@ -1,103 +1,229 @@
+import ThemeToggle from "@/components/ThemeToggle";
+
+const tools = [
+  {
+    id: "online-video-editor",
+    name: "Video Editor",
+    description: "Trim, crop, and filter in-browser.",
+    status: "Live",
+    artClass: "tool-art-grid",
+  },
+  {
+    id: "video-frame-extractor",
+    name: "Frame Grab",
+    description: "Extract high-res cinematic stills.",
+    status: "Soon",
+    artClass: "tool-art-frame",
+  },
+  {
+    id: "video-to-mp3",
+    name: "Video to MP3",
+    description: "Fast audio extraction.",
+    status: "Soon",
+    artClass: "tool-art-wave",
+  },
+  {
+    id: "compress-video",
+    name: "Compressor",
+    description: "Shrink files, keep quality.",
+    status: "Soon",
+    artClass: "tool-art-compress",
+  },
+];
+
 export default function Home() {
-  const tools = [
-    {
-      id: "online-video-editor",
-      name: "Online Video Editor",
-      description: "100% private in-browser video editor. Trim, crop, filter, and export without uploading.",
-      color: "bg-neo-yellow",
-      status: "Available"
-    },
-    {
-      id: "video-frame-extractor",
-      name: "Frame Extractor",
-      description: "Extract high-quality still frames from any video instantly.",
-      color: "bg-neo-blue",
-      status: "Coming Soon"
-    },
-    {
-      id: "video-to-mp3",
-      name: "Video to MP3",
-      description: "Strip the visual track and download the audio in seconds.",
-      color: "bg-neo-pink",
-      status: "Coming Soon"
-    },
-    {
-      id: "compress-video",
-      name: "Video Compressor",
-      description: "Reduce video file sizes quickly for Discord or email.",
-      color: "bg-neo-green",
-      status: "Coming Soon"
-    }
-  ];
-
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-
-      {/* Hero Section - App Promotion */}
-      <section className="mb-20">
-        <div className="brutal-card bg-neo-pink text-white p-8 md:p-12 border-[4px]">
-          <div className="max-w-3xl">
-            <h2 className="text-4xl md:text-6xl font-black uppercase leading-tight mb-6" style={{ textShadow: '4px 4px 0px #000' }}>
-              Level up your content creation.
-            </h2>
-            <p className="text-xl md:text-2xl font-bold mb-8">
-              nocaputils is brought to you by the team behind <span className="bg-neo-yellow text-black px-2 py-1 border-2 border-black inline-block transform -rotate-2">TripTea</span>.
-              Download our Android app for the ultimate travel and planning experience.
-            </p>
-            <a
-              href="https://play.google.com/store/apps/details?id=com.triptea.app"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block bg-white text-black text-xl font-black uppercase px-8 py-4 border-4 border-black shadow-[4px_4px_0px_#000] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_#000] transition-all"
-            >
-              Get TripTea on Google Play
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Tools Directory */}
-      <section>
-        <div className="flex items-center justify-between mb-8 pb-4 border-b-[4px] border-black">
-          <h2 className="text-4xl font-black uppercase tracking-tight">Free Utility Tools</h2>
-          <span className="hidden sm:block font-bold bg-neo-green text-black px-4 py-2 border-2 border-black">Browser-based processing</span>
+    <div className="subtle-pattern min-h-screen">
+      <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
+        <div className="mb-12 flex justify-end">
+          <ThemeToggle />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
-          {tools.map((tool) => (
-            <a
-              key={tool.id}
-              href={`/${tool.id}`}
-              className={`block bg-white border-[4px] border-black p-6 shadow-[8px_8px_0px_#000] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-[4px_4px_0px_#000] transition-all relative overflow-hidden group`}
-            >
-              {/* Decorative background shape */}
-              <div className={`absolute -right-16 -top-16 w-40 h-40 ${tool.color} rounded-full border-4 border-black opacity-20 group-hover:scale-150 transition-transform duration-500`}></div>
+        <main className="flex flex-1 flex-col items-center">
+          <section className="mb-20 max-w-4xl text-center">
+            <h1 className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.06em] text-[var(--text-main)] sm:text-7xl lg:text-[6.5rem]">
+              <span className="block">Level Up Your</span>
+              <span className="my-2 inline-block rotate-[-2deg] border-4 border-[var(--border-main)] bg-[var(--accent)] px-4 py-1 text-black shadow-[6px_6px_0_0_var(--border-main)]">
+                Content
+              </span>
+              <span className="block">Creation</span>
+            </h1>
 
-              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-3xl font-black uppercase tracking-tight">{tool.name}</h3>
-                  {tool.status === "Coming Soon" && (
-                    <span className="text-xs font-bold uppercase bg-gray-200 border-2 border-black px-2 py-1">
-                      Soon
-                    </span>
-                  )}
-                  {tool.status === "Available" && (
-                    <span className={`text-xs font-bold uppercase ${tool.color} border-2 border-black px-2 py-1`}>
-                      Live
-                    </span>
-                  )}
+            <div className="mt-10 flex flex-col items-center gap-5">
+              <p className="text-2xl font-extrabold uppercase tracking-[-0.04em] sm:text-3xl">
+                The ultimate{" "}
+                <span className="border-b-[6px] border-[var(--accent)]">nocaputils</span>{" "}
+                suite.
+              </p>
+              <p className="max-w-2xl text-base font-medium leading-7 text-[var(--text-soft)] sm:text-lg">
+                Powered by <span className="font-black text-[var(--text-main)]">TripTea</span>.
+                Get professional-grade assets with{" "}
+                <span className="font-black text-[var(--text-main)]">
+                  100% private in-browser processing
+                </span>
+                . No uploads, zero servers, total control.
+              </p>
+            </div>
+
+            <div className="mt-10 flex flex-wrap justify-center gap-4">
+              {["100% Private", "No Uploads", "Zero Servers"].map((label) => (
+                <div
+                  key={label}
+                  className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-[0.18em]"
+                >
+                  {label}
                 </div>
-                <p className="text-lg font-medium mb-6">{tool.description}</p>
-                <div className="inline-flex items-center font-black uppercase">
-                  Launch Tool
-                  <span className="ml-2 group-hover:translate-x-2 transition-transform">→</span>
+              ))}
+            </div>
+          </section>
+
+          <section className="neo-panel mb-20 grid w-full max-w-6xl grid-cols-1 gap-10 bg-[var(--bg-panel)] p-8 lg:grid-cols-[1.1fr_0.9fr] lg:p-12">
+            <div className="flex flex-col justify-center">
+              <h2 className="mb-6 text-4xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-6xl">
+                Meet{" "}
+                <span className="inline-block border-4 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-black not-italic">
+                  TripTea
+                </span>
+              </h2>
+              <p className="mb-6 max-w-xl text-2xl font-extrabold uppercase leading-[1.25] tracking-[-0.04em]">
+                Simply describe your dream vacation in plain language, and our AI
+                creates a complete, day-by-day itinerary tailored to your preferences.
+              </p>
+              <p className="mb-10 max-w-xl text-lg leading-8 text-[var(--text-soft)]">
+                Whether it&apos;s a romantic getaway to Paris, an adventure trek in the
+                Himalayas, or a family beach vacation, TripTea handles it all.
+              </p>
+              <div>
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.triptea.app"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="neo-button inline-flex bg-[#161c2b] px-8 py-4 text-lg font-black uppercase tracking-[0.2em] !text-white"
+                  style={{ color: "#ffffff" }}
+                >
+                  Download on Google Play
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <div className="relative w-full max-w-[20rem] rotate-[4deg] border-4 border-[var(--border-main)] bg-[var(--accent)] p-4 shadow-[8px_8px_0_0_var(--border-main)]">
+                <div className="absolute -left-2 -top-2 border-2 border-[var(--border-main)] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-black">
+                  New App
+                </div>
+                <div className="phone-screen overflow-hidden rounded-[1.25rem] border-4 border-[var(--border-main)] p-3">
+                  <div className="overflow-hidden rounded-[1rem] border-2 border-[var(--border-main)] bg-white">
+                    <img
+                      src="/media/app_screen.jpg"
+                      alt="TripTea app screen"
+                      className="aspect-[9/16] h-full w-full object-cover object-top"
+                    />
+                  </div>
                 </div>
               </div>
-            </a>
-          ))}
-        </div>
-      </section>
+            </div>
+          </section>
 
+          <section className="mb-20 w-full max-w-6xl">
+            <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-[-0.06em] sm:text-6xl">
+                Free Utility
+                <br />
+                Tools
+              </h2>
+              <p className="max-w-sm text-sm font-bold uppercase leading-7 tracking-[0.18em] text-[var(--text-soft)] md:text-right">
+                Industry standard tools running entirely in your browser.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+              {tools.map((tool) => {
+                const statusClass =
+                  tool.status === "Live"
+                    ? "bg-[var(--success)] text-black"
+                    : "bg-[var(--accent)] text-black";
+
+                return (
+                  <a
+                    key={tool.id}
+                    href={`/${tool.id}`}
+                    className="neo-button block bg-[var(--bg-panel-muted)] p-3"
+                  >
+                    <div className="mb-4 border-4 border-[var(--border-main)] bg-[#111827] p-3">
+                      <div
+                        className={`relative aspect-square border-2 border-[var(--border-main)] ${tool.artClass}`}
+                      >
+                        <div
+                          className={`absolute right-2 top-2 border-2 border-[var(--border-main)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${statusClass}`}
+                        >
+                          {tool.status}
+                        </div>
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-black uppercase italic tracking-[-0.05em]">
+                      {tool.name}
+                    </h3>
+                    <p className="mt-2 text-xs font-bold uppercase leading-6 tracking-[0.14em] text-[var(--text-soft)]">
+                      {tool.description}
+                    </p>
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="neo-panel mb-24 w-full max-w-6xl bg-[var(--accent)] px-6 py-16 text-center text-black sm:px-10 sm:py-20">
+            <h2 className="text-5xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-7xl">
+              Ready to Create?
+            </h2>
+            <p className="mx-auto mt-8 max-w-2xl text-lg font-extrabold uppercase leading-8 tracking-[0.12em]">
+              Join 50,000+ creators using{" "}
+              <span className="border-2 border-[var(--border-main)] bg-white px-2 py-1">
+                nocaputils
+              </span>{" "}
+              to skip the wait times and keep their data safe.
+            </p>
+            <div className="mt-12">
+              <a
+                href="#"
+                className="neo-button inline-flex bg-[#161c2b] px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] !text-white"
+                style={{ color: "#ffffff" }}
+              >
+                Explore All Tools
+              </a>
+            </div>
+          </section>
+        </main>
+
+        <footer className="border-t-4 border-[var(--border-main)] py-8">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
+            <div className="flex items-center gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.24em]">
+                A Project By
+              </p>
+              <span className="border-2 border-[var(--border-main)] bg-[var(--bg-dark)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-white">
+                TripTea
+              </span>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-6 text-[11px] font-black uppercase tracking-[0.22em]">
+              <a href="#">Privacy</a>
+              <a href="#">Terms</a>
+              <a href="#">Support</a>
+              <a href="#">Twitter</a>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="neo-button flex h-10 w-10 items-center justify-center bg-[var(--bg-panel)] text-lg">
+                {"\u2197"}
+              </div>
+              <div className="neo-button flex h-10 w-10 items-center justify-center bg-[var(--bg-panel)] text-lg">
+                {"\u25CE"}
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
