@@ -28,6 +28,9 @@ Cloudflare will ask how to build the site. Use these exact settings:
 - **Build Command**: `npm run build`
 - **Build Output Directory**: `out`
 
+> [!WARNING]
+> Selecting the standard **"Next.js"** preset instead of **"Next.js (Static HTML Export)"** will cause the build to fail with a `standalone` directory error. This is because the standard preset expects a server-side build, while this project is strictly static.
+
 > **Note on Headers**: We have included a `public/_headers` file. During the build, Next.js copies this to the `out` folder. Cloudflare automatically reads this to apply `Cross-Origin-Embedder-Policy` and `Cross-Origin-Opener-Policy`. This is **critical** for FFmpeg.wasm to work securely in the browser.
 
 ## Step 4: Deploy and Link Domain
