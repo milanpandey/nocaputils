@@ -3,17 +3,34 @@
 import { useEffect, useState } from "react";
 
 export default function ThemeToggle() {
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window === "undefined") return false;
+  const [darkMode, setDarkMode] = useState<boolean | null>(null);
+
+  // Read theme only on client after mount — avoids SSR hydration mismatch
+  useEffect(() => {
     const savedTheme = window.localStorage.getItem("theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return savedTheme ? savedTheme === "dark" : prefersDark;
-  });
+    setDarkMode(savedTheme ? savedTheme === "dark" : prefersDark);
+  }, []);
 
   useEffect(() => {
+    if (darkMode === null) return;
     document.documentElement.classList.toggle("dark", darkMode);
     window.localStorage.setItem("theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+
+  // Render nothing until we know the theme (prevents flash + hydration mismatch)
+  if (darkMode === null) {
+    return (
+      <button
+        type="button"
+        className="neo-button flex h-12 w-12 items-center justify-center bg-[var(--bg-panel)] text-2xl leading-none text-[var(--text-main)]"
+        aria-label="Toggle theme"
+        title="Toggle theme"
+      >
+        <span aria-hidden="true">&nbsp;</span>
+      </button>
+    );
+  }
 
   return (
     <button

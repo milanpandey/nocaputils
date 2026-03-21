@@ -28,6 +28,9 @@ Cloudflare will ask how to build the site. Use these exact settings:
 - **Build Command**: `npm run build`
 - **Build Output Directory**: `out`
 
+> [!NOTE]
+> We have added a **`wrangler.jsonc`** file to the project. This ensures Cloudflare's deployment step knows exactly where your static assets are (`./out`).
+
 > [!WARNING]
 > Selecting the standard **"Next.js"** preset instead of **"Next.js (Static HTML Export)"** will cause the build to fail with a `standalone` directory error. This is because the standard preset expects a server-side build, while this project is strictly static.
 

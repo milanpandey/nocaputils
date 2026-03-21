@@ -71,19 +71,8 @@ export default function OnlineVideoEditor() {
             </p>
           </section>
 
-          <section className="grid w-full max-w-7xl grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_220px]">
+          <section className="w-full max-w-7xl">
             <VideoEditor />
-
-            <aside className="hidden xl:block">
-              <div className="mb-4 text-xs font-black uppercase tracking-[0.24em] text-[var(--text-soft)]">
-                Sponsored
-              </div>
-              <div className="neo-panel flex min-h-[620px] items-center justify-center border-dashed bg-[var(--bg-panel)]/70 px-6 text-center text-sm font-black uppercase tracking-[0.18em] text-[var(--text-soft)]/60">
-                Skyscraper Ad
-                <br />
-                160 x 600
-              </div>
-            </aside>
           </section>
 
           <section className="mt-16 w-full max-w-6xl">
@@ -110,6 +99,17 @@ export default function OnlineVideoEditor() {
                     the workspace as a lightweight browser-based video editor before
                     moving on to deeper transformations.
                   </p>
+                  <div className="mt-4">
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Keyboard Shortcuts
+                    </p>
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
+                      <li><strong>Space</strong> — Play / Pause</li>
+                      <li><strong>← →</strong> — Seek ±1 second</li>
+                      <li><strong>Shift + ← →</strong> — Seek ±1 frame (1/30s)</li>
+                      <li><strong>Delete / Backspace</strong> — Delete selected clip</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
 

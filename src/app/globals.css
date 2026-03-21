@@ -87,6 +87,11 @@ button {
   box-shadow: 0 0 0 0 var(--border-main);
 }
 
+/* Ensure text on accent-colored elements is always black (visible on yellow) */
+.neo-button[class*="bg-[var(--accent)"] {
+  color: #000;
+}
+
 .tool-art-grid {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
