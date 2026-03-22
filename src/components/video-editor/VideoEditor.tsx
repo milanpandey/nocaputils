@@ -459,6 +459,9 @@ export default function VideoEditor() {
             filterPreset={filterPreset}
             cropPreset={cropPreset}
             cropMode={cropMode}
+            rotation={rotation}
+            flipH={flipH}
+            flipV={flipV}
           />
         </div>
       </div>
@@ -578,7 +581,7 @@ export default function VideoEditor() {
 
       {/* Mobile tab bar (visible on small screens) */}
       <div className="flex gap-2 overflow-x-auto sm:hidden">
-        {(["Trim", "Crop", "Audio", "Filters", "Text"] as ToolId[]).map((t) => (
+        {(["Trim", "Tools", "Audio", "Filters", "Text"] as ToolId[]).map((t) => (
           <button
             key={t}
             type="button"

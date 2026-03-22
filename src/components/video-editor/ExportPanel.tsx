@@ -16,6 +16,9 @@ type ExportPanelProps = {
   filterPreset: string;
   cropPreset: string;
   cropMode: string;
+  rotation: number;
+  flipH: boolean;
+  flipV: boolean;
 };
 
 export default function ExportPanel({
@@ -29,6 +32,9 @@ export default function ExportPanel({
   filterPreset,
   cropPreset,
   cropMode,
+  rotation,
+  flipH,
+  flipV,
 }: ExportPanelProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ExportState>("idle");
@@ -112,6 +118,14 @@ export default function ExportPanel({
           }
         }
       }
+
+      if (flipH) filters.push("hflip");
+      if (flipV) filters.push("vflip");
+
+      const r = ((rotation % 360) + 360) % 360;
+      if (r === 90) filters.push("transpose=1");
+      else if (r === 180) { filters.push("hflip", "vflip"); }
+      else if (r === 270) filters.push("transpose=2");
 
       const hasCustomAudio = Boolean(audioSrc && audioSegments.length > 0);
 
@@ -205,7 +219,7 @@ export default function ExportPanel({
       setErrorMsg(err instanceof Error ? err.message : "Export failed");
       setState("error");
     }
-  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, cleanup]);
+  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, rotation, flipH, flipV, cleanup]);
 
   if (!open) {
     return (
