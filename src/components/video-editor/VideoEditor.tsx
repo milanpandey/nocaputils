@@ -125,13 +125,9 @@ export default function VideoEditor() {
     const p = [`brightness(${brightness}%)`, `contrast(${contrast}%)`, `saturate(${saturation}%)`];
     if (filterPreset === "grayscale") p.push("grayscale(100%)");
     if (filterPreset === "sepia") p.push("sepia(100%)");
-    if (filterPreset === "vintage") p.push("sepia(35%)", "contrast(110%)", "saturate(85%)", "hue-rotate(-8deg)");
+    if (filterPreset === "vintage") p.push("sepia(35%)", `contrast(110%)`, `saturate(85%)`, `hue-rotate(-8deg)`);
     return p.join(" ");
   }, [brightness, contrast, saturation, filterPreset]);
-
-  const previewTransform = useMemo(() => {
-    return `rotate(${rotation}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`;
-  }, [flipH, flipV, rotation]);
 
   /* ---- media sync ---- */
   const syncMedia = useCallback(
@@ -479,7 +475,9 @@ export default function VideoEditor() {
             ref={previewRef}
             src={videoSrc}
             filter={previewFilter}
-            transform={previewTransform}
+            rotation={rotation}
+            flipH={flipH}
+            flipV={flipV}
             cropPreset={cropPreset}
             textOverlay={textOverlay}
             textSize={textSize}

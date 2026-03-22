@@ -1,13 +1,15 @@
 "use client";
 
-import { useRef, forwardRef, useImperativeHandle } from "react";
+import { useRef, forwardRef, useImperativeHandle, useState, useEffect } from "react";
 
 type CropPreset = "free" | "16:9" | "1:1" | "9:16";
 
 type VideoPreviewProps = {
   src: string;
   filter: string;
-  transform: string;
+  rotation: number;
+  flipH: boolean;
+  flipV: boolean;
   cropPreset: CropPreset;
   textOverlay: string;
   textSize: number;
@@ -21,14 +23,31 @@ export type VideoPreviewHandle = {
 
 const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
   function VideoPreview(
-    { src, filter, transform, cropPreset, textOverlay, textSize, textY, onLoadedMetadata },
+    { src, filter, rotation, flipH, flipV, cropPreset, textOverlay, textSize, textY, onLoadedMetadata },
     ref,
   ) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
     useImperativeHandle(ref, () => ({
       getElement: () => videoRef.current,
     }));
+
+    useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerSize({
+            w: entry.contentRect.width,
+            h: entry.contentRect.height,
+          });
+        }
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    }, []);
 
     const aspectClass =
       cropPreset === "16:9"
@@ -39,16 +58,27 @@ const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
             ? "aspect-[9/16] max-h-[520px]"
             : "";
 
+    const r = ((rotation % 360) + 360) % 360;
+    const isRotated90 = r === 90 || r === 270;
+    const transformStr = `translate(-50%, -50%) rotate(${rotation}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`;
+
     return (
       <div className="neo-panel overflow-hidden bg-black p-0">
-        <div className={`relative flex items-center justify-center bg-black ${aspectClass}`}
+        <div 
+          ref={containerRef}
+          className={`relative flex items-center justify-center bg-black ${aspectClass}`}
           style={!aspectClass ? { aspectRatio: "16/9" } : undefined}
         >
           <video
             ref={videoRef}
             src={src}
-            className="h-full w-full object-contain"
-            style={{ filter, transform }}
+            className="absolute left-1/2 top-1/2 object-contain"
+            style={{ 
+              filter, 
+              transform: transformStr,
+              width: isRotated90 && containerSize.h ? `${containerSize.h}px` : "100%",
+              height: isRotated90 && containerSize.w ? `${containerSize.w}px` : "100%",
+            }}
             controls={false}
             playsInline
             onLoadedMetadata={(e) => {
