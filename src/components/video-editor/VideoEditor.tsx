@@ -17,6 +17,7 @@ import ExportPanel from "./ExportPanel";
 
 type FilterPreset = "none" | "grayscale" | "sepia" | "vintage";
 type CropPreset = "free" | "16:9" | "1:1" | "9:16";
+type CropMode = "letterbox" | "crop";
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(Math.max(v, min), max);
@@ -75,6 +76,7 @@ export default function VideoEditor() {
   /* ---- tool state ---- */
   const [activeTab, setActiveTab] = useState<ToolId>("Trim");
   const [cropPreset, setCropPreset] = useState<CropPreset>("free");
+  const [cropMode, setCropMode] = useState<CropMode>("letterbox");
   const [rotation, setRotation] = useState(0);
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
@@ -432,17 +434,19 @@ export default function VideoEditor() {
 
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--text-soft)]">
-            Zoom
+            Timeline Zoom
+            <button type="button" onClick={() => setZoom((z) => Math.max(z - 0.25, 0.25))} className="border-2 border-[var(--border-main)] bg-[var(--bg-panel)] px-1.5 py-0.5 text-xs font-black leading-none">−</button>
             <input
               type="range"
-              min="1"
+              min="0.25"
               max="4"
               step="0.25"
               value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))}
               className="w-20 accent-[var(--accent)]"
             />
-            <span className="w-10 text-right">{zoom.toFixed(1)}x</span>
+            <button type="button" onClick={() => setZoom((z) => Math.min(z + 0.25, 4))} className="border-2 border-[var(--border-main)] bg-[var(--bg-panel)] px-1.5 py-0.5 text-xs font-black leading-none">+</button>
+            <span className="w-10 text-right">{zoom.toFixed(2)}x</span>
           </label>
           <ExportPanel
             videoSrc={videoSrc}
@@ -453,6 +457,8 @@ export default function VideoEditor() {
             contrast={contrast}
             saturation={saturation}
             filterPreset={filterPreset}
+            cropPreset={cropPreset}
+            cropMode={cropMode}
           />
         </div>
       </div>
@@ -530,12 +536,14 @@ export default function VideoEditor() {
         </div>
 
         {/* Right: tool panel */}
-        <div className="hidden w-52 shrink-0 lg:block">
+        <div className="hidden w-60 shrink-0 lg:block">
           <div className="neo-panel h-full bg-[var(--bg-panel)] p-4">
             <ToolPanel
               activeTab={activeTab}
               cropPreset={cropPreset}
               onCropPreset={setCropPreset}
+              cropMode={cropMode}
+              onCropMode={setCropMode}
               onRotate={(d) => setRotation((v) => v + d)}
               onFlipH={() => setFlipH((v) => !v)}
               onFlipV={() => setFlipV((v) => !v)}
@@ -576,7 +584,7 @@ export default function VideoEditor() {
             type="button"
             onClick={() => setActiveTab(t)}
             className={`shrink-0 border-3 border-[var(--border-main)] px-3 py-2 text-xs font-black uppercase tracking-wider shadow-[2px_2px_0_0_var(--border-main)] ${
-              activeTab === t ? "bg-[var(--accent)]" : "bg-[var(--bg-panel)]"
+              activeTab === t ? "bg-[var(--accent)] text-black" : "bg-[var(--bg-panel)]"
             }`}
           >
             {t}
@@ -591,6 +599,8 @@ export default function VideoEditor() {
             activeTab={activeTab}
             cropPreset={cropPreset}
             onCropPreset={setCropPreset}
+            cropMode={cropMode}
+            onCropMode={setCropMode}
             onRotate={(d) => setRotation((v) => v + d)}
             onFlipH={() => setFlipH((v) => !v)}
             onFlipV={() => setFlipV((v) => !v)}
