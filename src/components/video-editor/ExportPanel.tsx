@@ -113,27 +113,44 @@ export default function ExportPanel({
         }
       }
 
+      const hasCustomAudio = Boolean(audioSrc && audioSegments.length > 0);
+
       // Step 1: Process video (trim/concat)
       if (videoSegments.length === 1) {
         const seg = videoSegments[0];
-        const args = ["-i", "input.mp4"];
-        args.push("-ss", seg.sourceStart.toFixed(3));
-        args.push("-to", seg.sourceEnd.toFixed(3));
-        if (filters.length) args.push("-vf", filters.join(","));
-        args.push("-c:v", "libx264", "-preset", "fast");
-        args.push("-an", "-y", "video_only.mp4");
+        const duration = seg.sourceEnd - seg.sourceStart;
+        const args = [
+          "-ss", seg.sourceStart.toFixed(3),
+          "-t", duration.toFixed(3),
+          "-i", "input.mp4"
+        ];
+        if (filters.length > 0) {
+          args.push("-vf", filters.join(","));
+          args.push("-c:v", "libx264", "-preset", "ultrafast");
+        } else {
+          args.push("-c:v", "copy");
+        }
+        if (hasCustomAudio) args.push("-an");
+        args.push("-y", "video_only.mp4");
         await ffmpeg.exec(args);
       } else {
         const concatList: string[] = [];
         for (let i = 0; i < videoSegments.length; i++) {
           const seg = videoSegments[i];
+          const duration = seg.sourceEnd - seg.sourceStart;
           const segArgs = [
-            "-i", "input.mp4",
             "-ss", seg.sourceStart.toFixed(3),
-            "-to", seg.sourceEnd.toFixed(3),
+            "-t", duration.toFixed(3),
+            "-i", "input.mp4",
           ];
-          if (filters.length) segArgs.push("-vf", filters.join(","));
-          segArgs.push("-c:v", "libx264", "-preset", "fast", "-an", "-y", `seg${i}.mp4`);
+          if (filters.length > 0) {
+            segArgs.push("-vf", filters.join(","));
+            segArgs.push("-c:v", "libx264", "-preset", "ultrafast");
+          } else {
+            segArgs.push("-c:v", "copy");
+          }
+          if (hasCustomAudio) segArgs.push("-an");
+          segArgs.push("-y", `seg${i}.mp4`);
           await ffmpeg.exec(segArgs);
           concatList.push(`file 'seg${i}.mp4'`);
         }
@@ -145,19 +162,18 @@ export default function ExportPanel({
       }
 
       // Step 2: If audio exists, fetch and trim it, then mux with video
-      const hasAudio = audioSrc && audioSegments.length > 0;
-
-      if (hasAudio) {
+      if (hasCustomAudio) {
         const audioResponse = await fetch(audioSrc);
         const audioBuffer = await audioResponse.arrayBuffer();
         await ffmpeg.writeFile("input_audio.mp3", new Uint8Array(audioBuffer));
 
         // Trim audio to first segment bounds
         const aSeg = audioSegments[0];
+        const aDuration = aSeg.sourceEnd - aSeg.sourceStart;
         await ffmpeg.exec([
-          "-i", "input_audio.mp3",
           "-ss", aSeg.sourceStart.toFixed(3),
-          "-to", aSeg.sourceEnd.toFixed(3),
+          "-t", aDuration.toFixed(3),
+          "-i", "input_audio.mp3",
           "-y", "audio_trimmed.mp3",
         ]);
 
