@@ -536,7 +536,7 @@ export default function VideoEditor() {
         </div>
 
         {/* Right: tool panel */}
-        <div className="hidden w-52 shrink-0 lg:block">
+        <div className="hidden w-60 shrink-0 lg:block">
           <div className="neo-panel h-full bg-[var(--bg-panel)] p-4">
             <ToolPanel
               activeTab={activeTab}
