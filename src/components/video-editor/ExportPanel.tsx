@@ -14,6 +14,8 @@ type ExportPanelProps = {
   contrast: number;
   saturation: number;
   filterPreset: string;
+  cropPreset: string;
+  cropMode: string;
 };
 
 export default function ExportPanel({
@@ -25,6 +27,8 @@ export default function ExportPanel({
   contrast,
   saturation,
   filterPreset,
+  cropPreset,
+  cropMode,
 }: ExportPanelProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ExportState>("idle");
@@ -87,6 +91,27 @@ export default function ExportPanel({
       if (filterPreset === "grayscale") filters.push("hue=s=0");
       if (filterPreset === "sepia") filters.push("colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131");
       if (filterPreset === "vintage") filters.push("curves=vintage");
+
+      // Crop/Letterbox filter
+      if (cropPreset !== "free") {
+        const ratioMap: Record<string, [number, number]> = {
+          "16:9": [16, 9],
+          "1:1": [1, 1],
+          "9:16": [9, 16],
+        };
+        const ratio = ratioMap[cropPreset];
+        if (ratio) {
+          const [rw, rh] = ratio;
+          if (cropMode === "crop") {
+            // Crop: cut video to target aspect ratio (center crop)
+            filters.push(`crop='if(gt(iw/ih,${rw}/${rh}),ih*${rw}/${rh},iw)':'if(gt(iw/ih,${rw}/${rh}),ih,iw*${rh}/${rw})'`);
+          } else {
+            // Letterbox: add black bars to fit target aspect ratio
+            filters.push(`scale=iw:ih,setsar=1`);
+            filters.push(`pad='if(gt(iw/ih,${rw}/${rh}),iw,ih*${rw}/${rh})':'if(gt(iw/ih,${rw}/${rh}),iw*${rh}/${rw},ih)':(ow-iw)/2:(oh-ih)/2:black`);
+          }
+        }
+      }
 
       // Step 1: Process video (trim/concat)
       if (videoSegments.length === 1) {
@@ -164,7 +189,7 @@ export default function ExportPanel({
       setErrorMsg(err instanceof Error ? err.message : "Export failed");
       setState("error");
     }
-  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cleanup]);
+  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, cleanup]);
 
   if (!open) {
     return (
@@ -172,7 +197,7 @@ export default function ExportPanel({
         type="button"
         onClick={() => setOpen(true)}
         disabled={!videoSrc}
-        className="neo-button bg-[var(--accent)] px-5 py-2.5 text-xs font-black uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
+        className="neo-button bg-[var(--accent)] px-5 py-2.5 text-xs font-black uppercase tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-40"
       >
         Export
       </button>
@@ -210,7 +235,7 @@ export default function ExportPanel({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="border-3 border-[var(--border-main)] bg-[var(--accent)] px-4 py-2 text-xs font-black uppercase tracking-wider shadow-[2px_2px_0_0_var(--border-main)]"
+                    className="border-3 border-[var(--border-main)] bg-[var(--accent)] px-4 py-2 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_0_var(--border-main)]"
                   >
                     MP4
                   </button>

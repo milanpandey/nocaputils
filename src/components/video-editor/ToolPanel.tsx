@@ -3,6 +3,7 @@
 import type { ToolId } from "./EditorToolbar";
 
 type CropPreset = "free" | "16:9" | "1:1" | "9:16";
+type CropMode = "letterbox" | "crop";
 type FilterPreset = "none" | "grayscale" | "sepia" | "vintage";
 
 type ToolPanelProps = {
@@ -10,6 +11,8 @@ type ToolPanelProps = {
   // Crop
   cropPreset: CropPreset;
   onCropPreset: (p: CropPreset) => void;
+  cropMode: CropMode;
+  onCropMode: (m: CropMode) => void;
   onRotate: (deg: number) => void;
   onFlipH: () => void;
   onFlipV: () => void;
@@ -93,8 +96,8 @@ function SmallButton({ active, onClick, children }: {
     <button
       type="button"
       onClick={onClick}
-      className={`border-3 border-[var(--border-main)] px-3 py-2 text-xs font-black uppercase tracking-wider shadow-[2px_2px_0_0_var(--border-main)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_var(--border-main)] ${
-        active ? "bg-[var(--accent)]" : "bg-[var(--bg-panel)]"
+      className={`border-3 border-[var(--border-main)] px-3 py-2 text-xs font-black uppercase tracking-wider shadow-[2px_2px_0_0_var(--border-main)] transition-all truncate hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_var(--border-main)] ${
+        active ? "bg-[var(--accent)] text-black" : "bg-[var(--bg-panel)]"
       }`}
     >
       {children}
@@ -105,7 +108,7 @@ function SmallButton({ active, onClick, children }: {
 export default function ToolPanel(props: ToolPanelProps) {
   const {
     activeTab,
-    cropPreset, onCropPreset, onRotate, onFlipH, onFlipV,
+    cropPreset, onCropPreset, cropMode, onCropMode, onRotate, onFlipH, onFlipV,
     audioSrc, onUploadAudio, onClearAudio,
     playbackRate, onPlaybackRate,
     volume, onVolume,
@@ -149,6 +152,20 @@ export default function ToolPanel(props: ToolPanelProps) {
 
       {activeTab === "Crop" && (
         <>
+          <SectionTitle>Mode</SectionTitle>
+          <div className="grid grid-cols-2 gap-2">
+            <SmallButton active={cropMode === "letterbox"} onClick={() => onCropMode("letterbox")}>
+              Letterbox
+            </SmallButton>
+            <SmallButton active={cropMode === "crop"} onClick={() => onCropMode("crop")}>
+              Crop
+            </SmallButton>
+          </div>
+          <p className="text-[10px] leading-4 text-[var(--text-soft)]">
+            {cropMode === "letterbox"
+              ? "Adds black bars to fit the aspect ratio. No content is cut."
+              : "Cuts the video to fill the aspect ratio. Some content may be lost."}
+          </p>
           <SectionTitle>Aspect Ratio</SectionTitle>
           <div className="grid grid-cols-2 gap-2">
             {(["free", "16:9", "1:1", "9:16"] as CropPreset[]).map((p) => (
@@ -173,7 +190,7 @@ export default function ToolPanel(props: ToolPanelProps) {
           <button
             type="button"
             onClick={onUploadAudio}
-            className="neo-button w-full bg-[var(--accent)] px-3 py-2.5 text-xs font-black uppercase tracking-wider"
+            className="neo-button w-full bg-[var(--accent)] px-3 py-2.5 text-xs font-black uppercase tracking-wider text-black"
           >
             {audioSrc ? "Replace Audio" : "Upload Audio"}
           </button>
