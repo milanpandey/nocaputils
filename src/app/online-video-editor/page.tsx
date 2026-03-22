@@ -39,6 +39,14 @@ export default function OnlineVideoEditor() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
       <div className="relative mx-auto flex w-full max-w-7xl flex-col px-6 pb-8 pt-10 md:px-10 md:pt-12">
+        <div className="absolute left-6 top-8 md:left-10 md:top-10">
+          <a
+            href="/"
+            className="neo-button flex items-center gap-2 bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-wider"
+          >
+            ← Home
+          </a>
+        </div>
         <div className="absolute right-6 top-8 md:right-10 md:top-10">
           <ThemeToggle />
         </div>
@@ -53,7 +61,7 @@ export default function OnlineVideoEditor() {
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Free", "No Sign-In Required", "Privacy First: In-Browser"].map(
+              {["100% Free", "No Sign-In Required", "Privacy First: In-Browser", "No Watermark"].map(
                 (label) => (
                   <div
                     key={label}
@@ -165,9 +173,14 @@ export default function OnlineVideoEditor() {
               <p className="text-[11px] font-black uppercase tracking-[0.24em]">
                 A Project By
               </p>
-              <span className="border-2 border-[var(--border-main)] bg-[var(--bg-dark)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-white">
+              <a
+                href="https://play.google.com/store/apps/details?id=com.triptea.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-2 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] !text-black shadow-[3px_3px_0_0_var(--border-main)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)]"
+              >
                 TripTea
-              </span>
+              </a>
             </div>
 
             <div className="flex flex-wrap justify-center gap-6 text-[11px] font-black uppercase tracking-[0.22em]">

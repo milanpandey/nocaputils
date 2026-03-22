@@ -250,7 +250,7 @@ export default function ExportPanel({
               <button
                 type="button"
                 onClick={handleExport}
-                className="neo-button w-full bg-[var(--accent)] px-4 py-3 text-sm font-black uppercase tracking-wider"
+                className="neo-button w-full bg-[var(--accent)] px-4 py-3 text-sm font-black uppercase tracking-wider text-black"
               >
                 Start Export
               </button>
@@ -277,7 +277,7 @@ export default function ExportPanel({
               <a
                 href={downloadUrl}
                 download="edited-video.mp4"
-                className="neo-button inline-block bg-[var(--accent)] px-6 py-3 text-sm font-black uppercase tracking-wider"
+                className="neo-button inline-block bg-[var(--accent)] px-6 py-3 text-sm font-black uppercase tracking-wider text-black"
               >
                 Download .mp4
               </a>

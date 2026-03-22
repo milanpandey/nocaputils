@@ -107,7 +107,7 @@ export default function Home() {
             </div>
 
             <div className="flex items-center justify-center">
-              <div className="relative w-full max-w-[20rem] rotate-[4deg] border-4 border-[var(--border-main)] bg-[var(--accent)] p-4 shadow-[8px_8px_0_0_var(--border-main)]">
+              <div className="relative w-full max-w-[20rem] rotate-[4deg] border-4 border-[var(--border-main)] bg-[var(--accent)] p-4 text-black shadow-[8px_8px_0_0_var(--border-main)]">
                 <div className="absolute -left-2 -top-2 border-2 border-[var(--border-main)] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-black">
                   New App
                 </div>
