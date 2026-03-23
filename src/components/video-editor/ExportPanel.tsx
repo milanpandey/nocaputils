@@ -19,6 +19,9 @@ type ExportPanelProps = {
   rotation: number;
   flipH: boolean;
   flipV: boolean;
+  textOverlay: string;
+  textSize: number;
+  textY: number;
 };
 
 export default function ExportPanel({
@@ -35,6 +38,9 @@ export default function ExportPanel({
   rotation,
   flipH,
   flipV,
+  textOverlay,
+  textSize,
+  textY,
 }: ExportPanelProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ExportState>("idle");
@@ -126,6 +132,31 @@ export default function ExportPanel({
       if (r === 90) filters.push("transpose=1");
       else if (r === 180) { filters.push("hflip", "vflip"); }
       else if (r === 270) filters.push("transpose=2");
+
+      if (textOverlay) {
+        try {
+          // Download font for FFmpeg to use
+          const fontRes = await fetch("https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf");
+          if (!fontRes.ok) throw new Error("Failed to fetch font for text overlay");
+          const fontBuf = await fontRes.arrayBuffer();
+          await ffmpeg.writeFile("font.ttf", new Uint8Array(fontBuf));
+
+          // Compute realistic font size based on original exported resolution
+          let videoHeight = 720;
+          try {
+            const v = document.createElement("video");
+            v.src = videoSrc;
+            await new Promise((resolve) => { v.onloadedmetadata = resolve; v.onerror = resolve; });
+            if (v.videoHeight) videoHeight = (r === 90 || r === 270) ? v.videoWidth : v.videoHeight;
+          } catch (e) {}
+
+          const finalFontSize = Math.max(10, Math.round(videoHeight * (textSize / 500)));
+          const escapedText = textOverlay.replace(/'/g, "'\\''").replace(/:/g, "\\:");
+          filters.push(`drawtext=fontfile=font.ttf:text='${escapedText}':fontcolor=white:fontsize=${finalFontSize}:x=(w-text_w)/2:y=(h-text_h)*${textY}/100:shadowcolor=black@0.7:shadowx=2:shadowy=2`);
+        } catch (e) {
+          console.error("Text overlay failed", e);
+        }
+      }
 
       const hasCustomAudio = Boolean(audioSrc && audioSegments.length > 0);
 
@@ -219,7 +250,7 @@ export default function ExportPanel({
       setErrorMsg(err instanceof Error ? err.message : "Export failed");
       setState("error");
     }
-  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, rotation, flipH, flipV, cleanup]);
+  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, rotation, flipH, flipV, textOverlay, textSize, textY, cleanup]);
 
   if (!open) {
     return (
