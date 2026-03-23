@@ -12,7 +12,7 @@ const tools = [
     id: "video-frame-extractor",
     name: "Frame Grab",
     description: "Extract high-res cinematic stills.",
-    status: "Soon",
+    status: "Live",
     artClass: "tool-art-frame",
   },
   {
