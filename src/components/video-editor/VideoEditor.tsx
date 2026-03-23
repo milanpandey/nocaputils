@@ -458,8 +458,6 @@ export default function VideoEditor() {
             rotation={rotation}
             flipH={flipH}
             flipV={flipV}
-            cropPreset={cropPreset}
-            cropMode={cropMode}
             textOverlay={textOverlay}
             textSize={textSize}
             textY={textY}
