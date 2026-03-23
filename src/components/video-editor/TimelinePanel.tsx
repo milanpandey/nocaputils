@@ -277,10 +277,24 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
     ctx.moveTo(px, 14);
     ctx.lineTo(px, h - 6);
     ctx.stroke();
+
     ctx.fillStyle = "#000";
     ctx.beginPath();
     ctx.arc(px, 14, 4, 0, Math.PI * 2);
     ctx.fill();
+
+    // playhead time label
+    const timeText = currentTime.toFixed(2) + "s";
+    ctx.font = "800 10px sans-serif";
+    const tw = ctx.measureText(timeText).width;
+    const labelX = Math.max(0, Math.min(px - tw / 2, w - tw - 8));
+    
+    ctx.fillStyle = "#000";
+    // Draw rounding rect for a nicer look if possible, but fillRect is fine
+    ctx.fillRect(labelX - 4, 0, tw + 8, 14);
+    
+    ctx.fillStyle = "#fff";
+    ctx.fillText(timeText, labelX, 10);
   }, [audioPeaks, audioSegments, currentTime, selection, timelineWidth, totalDuration, videoSegments, videoTrackEnd]);
 
   useEffect(() => { draw(); }, [draw]);

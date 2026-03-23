@@ -150,7 +150,7 @@ export default function ToolPanel(props: ToolPanelProps) {
         </>
       )}
 
-      {activeTab === "Crop" && (
+      {activeTab === "Tools" && (
         <>
           <SectionTitle>Mode</SectionTitle>
           <div className="grid grid-cols-2 gap-2">

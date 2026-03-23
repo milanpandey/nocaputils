@@ -2,7 +2,7 @@
 
 const tools = [
   { id: "Trim", icon: "✂", label: "Trim" },
-  { id: "Crop", icon: "⬒", label: "Crop" },
+  { id: "Tools", icon: "⬒", label: "Tools" },
   { id: "Audio", icon: "♪", label: "Audio" },
   { id: "Filters", icon: "◑", label: "Filters" },
   { id: "Text", icon: "A", label: "Text" },
