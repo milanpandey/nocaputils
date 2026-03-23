@@ -104,7 +104,15 @@ export default function ExportPanel({
       if (filterPreset === "sepia") filters.push("colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131");
       if (filterPreset === "vintage") filters.push("curves=vintage");
 
-      // Crop/Letterbox filter
+      if (flipH) filters.push("hflip");
+      if (flipV) filters.push("vflip");
+
+      const r = ((rotation % 360) + 360) % 360;
+      if (r === 90) filters.push("transpose=1");
+      else if (r === 180) { filters.push("hflip", "vflip"); }
+      else if (r === 270) filters.push("transpose=2");
+
+      // Crop/Letterbox filter (must be applied AFTER rotation/flips)
       if (cropPreset !== "free") {
         const ratioMap: Record<string, [number, number]> = {
           "16:9": [16, 9],
@@ -124,14 +132,6 @@ export default function ExportPanel({
           }
         }
       }
-
-      if (flipH) filters.push("hflip");
-      if (flipV) filters.push("vflip");
-
-      const r = ((rotation % 360) + 360) % 360;
-      if (r === 90) filters.push("transpose=1");
-      else if (r === 180) { filters.push("hflip", "vflip"); }
-      else if (r === 270) filters.push("transpose=2");
 
       if (textOverlay) {
         try {
