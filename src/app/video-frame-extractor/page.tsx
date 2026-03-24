@@ -9,8 +9,8 @@ export const metadata = {
 export default function VideoFrameExtractorPage() {
   return (
     <div className="subtle-pattern min-h-screen">
-      <div className="relative mx-auto flex w-full max-w-7xl flex-col px-6 pb-8 pt-10 md:px-10 md:pt-12">
-        <div className="absolute left-6 top-8 md:left-10 md:top-10">
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col px-6 pb-8 pt-20 md:px-10 md:pt-12">
+        <div className="absolute left-6 top-6 z-10 md:left-10 md:top-10">
           <a
             href="/"
             className="neo-button flex items-center gap-2 bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-wider"
@@ -18,7 +18,7 @@ export default function VideoFrameExtractorPage() {
             ← Home
           </a>
         </div>
-        <div className="absolute right-6 top-8 md:right-10 md:top-10">
+        <div className="absolute right-6 top-6 z-10 md:right-10 md:top-10">
           <ThemeToggle />
         </div>
 
