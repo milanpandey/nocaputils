@@ -26,7 +26,7 @@ const tools = [
     id: "compress-video",
     name: "Compressor",
     description: "Shrink files, keep quality.",
-    status: "Soon",
+    status: "Live",
     artClass: "tool-art-compress",
   },
 ];
