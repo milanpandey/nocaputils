@@ -115,7 +115,7 @@ export default function GifConverterPanel() {
       ]);
 
       const data = await ffmpeg.readFile("output.gif");
-      const gifBlob = new Blob([data], { type: "image/gif" });
+      const gifBlob = new Blob([data as any], { type: "image/gif" });
       const newGifUrl = URL.createObjectURL(gifBlob);
       setGifUrl(newGifUrl);
 
