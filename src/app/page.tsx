@@ -16,11 +16,11 @@ const tools = [
     artClass: "tool-art-frame",
   },
   {
-    id: "video-to-mp3",
-    name: "Video to MP3",
-    description: "Fast audio extraction.",
-    status: "Soon",
-    artClass: "tool-art-wave",
+    id: "video-to-gif",
+    name: "Video to GIF",
+    description: "Convert clips to looping GIFs.",
+    status: "Live",
+    artClass: "tool-art-wave", // Re-using tool-art-wave for now unless a specific one is made
   },
   {
     id: "compress-video",
