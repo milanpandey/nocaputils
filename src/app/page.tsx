@@ -1,4 +1,5 @@
 import ThemeToggle from "@/components/ThemeToggle";
+import { getTripTeaLink } from "@/lib/constants";
 
 const tools = [
   {
@@ -93,9 +94,8 @@ export default function Home() {
                 Whether it&apos;s a romantic getaway to Paris, an adventure trek in the
                 Himalayas, or a family beach vacation, TripTea handles it all.
               </p>
-              <div>
                 <a
-                  href="https://play.google.com/store/apps/details?id=com.triptea.app"
+                  href={getTripTeaLink("homepage")}
                   target="_blank"
                   rel="noreferrer"
                   className="neo-button inline-flex bg-[#161c2b] px-8 py-4 text-lg font-black uppercase tracking-[0.2em] !text-white"
@@ -103,7 +103,6 @@ export default function Home() {
                 >
                   Download on Google Play
                 </a>
-              </div>
             </div>
 
             <div className="flex items-center justify-center">

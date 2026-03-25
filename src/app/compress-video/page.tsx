@@ -1,5 +1,6 @@
 import CompressorPanel from "@/components/video-compressor/CompressorPanel";
 import ThemeToggle from "@/components/ThemeToggle";
+import { getTripTeaLink } from "@/lib/constants";
 
 export const metadata = {
   title: "Video Compressor | nocaputils",
@@ -73,7 +74,7 @@ export default function CompressVideoPage() {
                 A Project By
               </p>
               <a
-                href="https://play.google.com/store/apps/details?id=com.triptea.app"
+                href={getTripTeaLink("video_compressor")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="border-2 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] !text-black shadow-[3px_3px_0_0_var(--border-main)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)]"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { getTripTeaLink } from "@/lib/constants";
 
 export default function GifConverterPanel() {
   const [videoSrc, setVideoSrc] = useState<string>("");
@@ -222,7 +223,7 @@ export default function GifConverterPanel() {
                   Simply describe your dream vacation in plain language, and our AI creates a complete, day-by-day itinerary tailored to your preferences.
                 </p>
                 <a
-                  href="https://play.google.com/store/apps/details?id=com.triptea.app"
+                  href={getTripTeaLink("video_to_gif")}
                   target="_blank"
                   rel="noreferrer"
                   className="bg-[#ff33ff] text-black border-2 border-black px-4 py-2 text-xs font-black uppercase inline-block hover:bg-[#ff66ff] transition-colors shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000]"
