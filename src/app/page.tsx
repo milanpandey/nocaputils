@@ -199,7 +199,7 @@ export default function Home() {
             <div className="mt-12">
               <a
                 href="#tools"
-                className="neo-button inline-flex bg-black px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] text-white hover:bg-white !hover:text-[#000000] !hover:opacity-100 transition-colors"
+                className="neo-button inline-flex bg-black px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] text-white hover:bg-white hover:!text-black"
               >
                 Explore All Tools
               </a>
