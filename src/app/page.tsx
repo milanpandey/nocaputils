@@ -1,5 +1,6 @@
 import ThemeToggle from "@/components/ThemeToggle";
 import { getTripTeaLink } from "@/lib/constants";
+import Footer from "@/components/Footer";
 
 const tools = [
   {
@@ -21,7 +22,7 @@ const tools = [
     name: "Video to GIF",
     description: "Convert clips to looping GIFs.",
     status: "Live",
-    artClass: "tool-art-wave", // Re-using tool-art-wave for now unless a specific one is made
+    artClass: "tool-art-wave",
   },
   {
     id: "compress-video",
@@ -29,6 +30,20 @@ const tools = [
     description: "Shrink files, keep quality.",
     status: "Live",
     artClass: "tool-art-compress",
+  },
+  {
+    id: "video-to-mp3",
+    name: "Video to MP3",
+    description: "Extract pure audio from any video.",
+    status: "Live",
+    artClass: "tool-art-mp3",
+  },
+  {
+    id: "blog",
+    name: "The Blog",
+    description: "Creator tips & tool updates.",
+    status: "New",
+    artClass: "tool-art-blog",
   },
 ];
 
@@ -98,8 +113,7 @@ export default function Home() {
                   href={getTripTeaLink("homepage")}
                   target="_blank"
                   rel="noreferrer"
-                  className="neo-button inline-flex bg-[#161c2b] px-8 py-4 text-lg font-black uppercase tracking-[0.2em] !text-white"
-                  style={{ color: "#ffffff" }}
+                  className="neo-button inline-flex bg-black px-8 py-4 text-lg font-black uppercase tracking-[0.2em] text-white hover:bg-accent hover:text-black transition-colors"
                 >
                   Download on Google Play
                 </a>
@@ -123,7 +137,7 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="mb-20 w-full max-w-6xl">
+          <section id="tools" className="mb-20 w-full max-w-6xl">
             <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
               <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-[-0.06em] sm:text-6xl">
                 Free Utility
@@ -171,57 +185,30 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="neo-panel mb-24 w-full max-w-6xl bg-[var(--accent)] px-6 py-16 text-center text-black sm:px-10 sm:py-20">
+          <section className="neo-panel mb-24 w-full max-w-6xl !bg-[var(--bg-panel)] px-6 py-16 text-center text-[var(--text-main)] sm:px-10 sm:py-20">
             <h2 className="text-5xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-7xl">
               Ready to Create?
             </h2>
             <p className="mx-auto mt-8 max-w-2xl text-lg font-extrabold uppercase leading-8 tracking-[0.12em]">
               Join 50,000+ creators using{" "}
-              <span className="border-2 border-[var(--border-main)] bg-white px-2 py-1">
+              <span className="border-2 border-[var(--border-main)] bg-[#FF00FF] px-2 py-1 text-white">
                 nocaputils
               </span>{" "}
               to skip the wait times and keep their data safe.
             </p>
             <div className="mt-12">
               <a
-                href="#"
-                className="neo-button inline-flex bg-[#161c2b] px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] !text-white"
-                style={{ color: "#ffffff" }}
+                href="#tools"
+                className="neo-button inline-flex bg-black px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] text-white hover:bg-white !hover:text-[#000000] !hover:opacity-100 transition-colors"
               >
                 Explore All Tools
               </a>
             </div>
           </section>
+
         </main>
 
-        <footer className="border-t-4 border-[var(--border-main)] py-8">
-          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
-            <div className="flex items-center gap-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.24em]">
-                A Project By
-              </p>
-              <span className="border-2 border-[var(--border-main)] bg-[var(--bg-dark)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-white">
-                TripTea
-              </span>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-6 text-[11px] font-black uppercase tracking-[0.22em]">
-              <a href="#">Privacy</a>
-              <a href="#">Terms</a>
-              <a href="#">Support</a>
-              <a href="#">Twitter</a>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="neo-button flex h-10 w-10 items-center justify-center bg-[var(--bg-panel)] text-lg">
-                {"\u2197"}
-              </div>
-              <div className="neo-button flex h-10 w-10 items-center justify-center bg-[var(--bg-panel)] text-lg">
-                {"\u25CE"}
-              </div>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   );
