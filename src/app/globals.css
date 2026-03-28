@@ -139,6 +139,25 @@ button {
     linear-gradient(180deg, #4b5563 0%, #111827 100%);
 }
 
+.tool-art-mp3 {
+  background: 
+    repeating-linear-gradient(90deg, rgba(153, 255, 153, 0.1) 0px, rgba(153, 255, 153, 0.1) 1px, transparent 1px, transparent 10px),
+    linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  position: relative;
+}
+
+.tool-art-mp3::before {
+  content: "♫";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  color: #99ff99;
+  text-shadow: 4px 4px 0px #000;
+  opacity: 0.6;
+}
+
 .phone-screen {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
