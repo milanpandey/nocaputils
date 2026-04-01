@@ -39,6 +39,13 @@ const tools = [
     artClass: "tool-art-mp3",
   },
   {
+    id: "change-video-speed",
+    name: "Speed Control",
+    description: "Speed up or slow down videos.",
+    status: "New",
+    artClass: "tool-art-speed",
+  },
+  {
     id: "blog",
     name: "The Blog",
     description: "Creator tips & tool updates.",

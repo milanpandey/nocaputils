@@ -158,6 +158,26 @@ button {
   opacity: 0.6;
 }
 
+.tool-art-speed {
+  background: 
+    linear-gradient(135deg, rgba(255, 51, 255, 0.1) 0%, transparent 40%),
+    repeating-linear-gradient(45deg, rgba(215, 252, 112, 0.05) 0px, rgba(215, 252, 112, 0.05) 2px, transparent 2px, transparent 12px),
+    linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  position: relative;
+}
+
+.tool-art-speed::before {
+  content: "⟲ ⟳";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  color: #ff33ff;
+  text-shadow: 4px 4px 0px #000;
+  opacity: 0.7;
+}
+
 .phone-screen {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
