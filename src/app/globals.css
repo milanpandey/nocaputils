@@ -87,6 +87,16 @@ button {
   box-shadow: 0 0 0 0 var(--border-main);
 }
 
+.neo-button-theme {
+  background-color: var(--bg-panel) !important;
+  color: var(--text-main) !important;
+}
+
+.neo-button-theme:hover {
+  background-color: var(--accent) !important;
+  color: #000000 !important;
+}
+
 /* Ensure text on accent-colored elements is always black (visible on yellow) */
 .neo-button[class*="bg-[var(--accent)"] {
   color: #000;

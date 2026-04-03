@@ -120,7 +120,7 @@ export default function Home() {
                   href={getTripTeaLink("homepage")}
                   target="_blank"
                   rel="noreferrer"
-                  className="neo-button inline-flex bg-black px-8 py-4 text-lg font-black uppercase tracking-[0.2em] text-white hover:bg-accent hover:text-black transition-colors"
+                  className="neo-button neo-button-theme inline-flex px-8 py-4 text-lg font-black uppercase tracking-[0.2em] transition-colors"
                 >
                   Download on Google Play
                 </a>
@@ -206,7 +206,7 @@ export default function Home() {
             <div className="mt-12">
               <a
                 href="#tools"
-                className="neo-button inline-flex bg-black px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] text-white hover:bg-white hover:!text-black"
+                className="neo-button neo-button-theme inline-flex px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] transition-all"
               >
                 Explore All Tools
               </a>

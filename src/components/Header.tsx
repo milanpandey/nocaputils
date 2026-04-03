@@ -17,7 +17,7 @@ export default function Header({ backLink }: HeaderProps) {
         <div className="pointer-events-auto">
           <Link
             href={backLink?.href || "/"}
-            className="neo-button flex items-center gap-2 bg-[#161c2b] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-black transition-colors"
+            className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all"
           >
             {backLink?.label || "← Home"}
           </Link>
