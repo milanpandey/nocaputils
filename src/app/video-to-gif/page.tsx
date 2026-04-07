@@ -1,5 +1,6 @@
 import GifConverterPanel from "@/components/video-to-gif/GifConverterPanel";
 import Header from "@/components/Header";
+import TripTeaBanner from "@/components/TripTeaBanner";
 import Footer from "@/components/Footer";
 
 export const metadata = {
