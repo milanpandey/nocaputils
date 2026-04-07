@@ -44,16 +44,73 @@ export default function VideoToGifPage() {
             <GifConverterPanel />
           </section>
 
+          <section className="mt-16 w-full max-w-6xl">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="neo-panel bg-[var(--bg-panel)] p-8">
+                <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
+                  How to Create High-Quality Looping GIFs
+                </h2>
+                <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
+                  <p>
+                    GIFs are the lifeblood of the modern web, from social media to technical tutorials.
+                    However, many online converters are slow, add intrusive watermarks, or compress
+                    your content into a pixelated mess. **nocaputils** changes this by giving you
+                    professional-grade conversion tools directly in your browser.
+                  </p>
+                  <p>
+                    Our converter puts you in full control of the output parameters. You can choose
+                    the frames per second (FPS), output dimensions, and optimization levels for your
+                    GIF. This makes it easy to balance file size with visual clarity, ensuring your
+                    animations look great everywhere.
+                  </p>
+                  <p>
+                    Because we use client-side processing, you can convert clips from personal videos
+                    or sensitive demos without ever worrying about where that data is stored. Just
+                    select your video, trim the segment you want to loops, and export your GIF in
+                    seconds.
+                  </p>
+                </div>
+              </div>
+
+              <div className="neo-panel bg-[var(--bg-panel)] p-8">
+                <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
+                  FAQ
+                </h2>
+                <div className="mt-6 space-y-5 text-sm leading-7 text-[var(--text-soft)]">
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Is there a file size limit?
+                    </p>
+                    <p className="mt-2">
+                       We don't impose artificial limits on file size. Your only limitation is your
+                       device's memory and performance, as everything happens in your browser.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Can I optimize for Discord?
+                    </p>
+                    <p className="mt-2">
+                      Yes. By adjusting the FPS and resolution in our settings, you can easily create
+                      optimized GIFs that fit within Discord's upload limits for free users.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Will there be watermarks?
+                    </p>
+                    <p className="mt-2">
+                      Never. All tools on **nocaputils** produce clean, high-quality output with zero
+                      branding or watermarks.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section className="mt-12 mb-8 w-full max-w-7xl">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="text-xs font-black uppercase tracking-[0.24em] text-[var(--text-soft)]">
-                Advertisement
-              </span>
-              <div className="h-px flex-1 bg-[var(--text-soft)]/20" />
-            </div>
-            <div className="neo-panel flex h-40 items-center justify-center bg-[var(--bg-panel)]/50 text-lg font-black italic text-[var(--text-soft)]/50 md:h-56">
-              AdSense Banner Placeholder
-            </div>
+            <TripTeaBanner source="video_to_gif" />
           </section>
         </main>
 
