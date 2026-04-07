@@ -57,7 +57,7 @@ export default function BlogIndex() {
                             </h2>
                             <p className="text-lg font-bold mb-8 text-[var(--text-soft)] leading-snug">{post.excerpt}</p>
                             
-                            <Link href={`/blog/${post.slug}`} className="font-black uppercase inline-flex items-center group bg-black text-white px-6 py-3 border-2 border-black hover:bg-accent hover:text-black transition-colors self-start">
+                            <Link href={`/blog/${post.slug}`} className="neo-button neo-button-theme font-black uppercase inline-flex items-center group px-6 py-3 self-start transition-all">
                                 Read Article
                                 <span className="ml-2 group-hover:translate-x-2 transition-transform">→</span>
                             </Link>

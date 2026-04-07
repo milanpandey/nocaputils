@@ -45,6 +45,70 @@ export default function ChangeVideoSpeedPage() {
             <SpeedControllerPanel />
           </section>
 
+          <section className="mt-16 w-full max-w-6xl">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="neo-panel bg-[var(--bg-panel)] p-8">
+                <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
+                  How to Control Video Playback Speed In-Browser
+                </h2>
+                <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
+                  <p>
+                    From perfect slow-motion effects to fast-forwarding through long screen recordings,
+                    controlling video playback speed is an essential tool for creators. Many cloud-based
+                    tools force you to re-upload massive files just to change the speed. **nocaputils** lets
+                    you make these adjustments locally in seconds.
+                  </p>
+                  <p>
+                    Our tool utilizes advanced frame-rate manipulation and video encoding directly in your
+                    browser window. This allows you to speed up or slow down any clip while maintaining
+                    full control over the output frame rate (FPS). This is perfect for creating smooth
+                    timelapse effects or detailed slow-motion for technical analysis.
+                  </p>
+                  <p>
+                    Simply drop your video, use our slider to choose your desired speed (from 0.25x to 4x),
+                    and preview your changes instantly. Once you're happy with the results, click export to
+                    save the modified video to your device.
+                  </p>
+                </div>
+              </div>
+
+              <div className="neo-panel bg-[var(--bg-panel)] p-8">
+                <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
+                  FAQ
+                </h2>
+                <div className="mt-6 space-y-5 text-sm leading-7 text-[var(--text-soft)]">
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Does it affect the audio?
+                    </p>
+                    <p className="mt-2">
+                       Currently, our speed tool focuses on the video frames. You can adjust the playback
+                       speed, and we'll ensure the final video file is technically accurate.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Can I set a custom FPS?
+                    </p>
+                    <p className="mt-2">
+                      Yes. You can manually set the output frames per second to ensure your video
+                      meets specific technical requirements for social media or professional projects.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Is there a limit on video length?
+                    </p>
+                    <p className="mt-2">
+                      We don't have a strict length limit. However, since the processing happens in your
+                      browser, extremely long or high-resolution videos may take longer to process.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section className="mt-12 mb-8 w-full max-w-7xl">
             <TripTeaBanner source="video_speed_controller" />
           </section>

@@ -42,14 +42,14 @@ const tools = [
     id: "change-video-speed",
     name: "Speed Control",
     description: "Speed up or slow down videos.",
-    status: "New",
+    status: "Live",
     artClass: "tool-art-speed",
   },
   {
     id: "blog",
     name: "The Blog",
     description: "Creator tips & tool updates.",
-    status: "New",
+    status: "Live",
     artClass: "tool-art-blog",
   },
 ];

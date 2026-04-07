@@ -24,7 +24,7 @@ export default function CompressVideoPage() {
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Free", "Privacy First", "Discord Ready", "No Upoads"].map(
+              {["100% Free", "Privacy First", "Discord Ready", "No Uploads"].map(
                 (label) => (
                   <div
                     key={label}
@@ -43,6 +43,71 @@ export default function CompressVideoPage() {
 
           <section className="w-full max-w-7xl">
             <CompressorPanel />
+          </section>
+
+          <section className="mt-16 w-full max-w-6xl">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="neo-panel bg-[var(--bg-panel)] p-8">
+                <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
+                  How to Compress Videos Locally
+                </h2>
+                <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
+                  <p>
+                    Large video files are a major headache for online sharing. Discord has strict limits,
+                    emails often bounce if attachments are over 25MB, and social media platforms can
+                    mangle your content during upload. **nocaputils** solves this by providing a
+                    powerful bitrate calculator and compression engine that runs entirely in your browser.
+                  </p>
+                  <p>
+                    Our compressor allows you to set a target file size (e.g., 8MB or 25MB) and
+                    automatically calculates the required bitrate for you. Using FFmpeg and WebAssembly,
+                    we shrink your files without ever sending them to an external server. This keeps
+                    your private videos private while making them easy to share.
+                  </p>
+                  <p>
+                    Simply drop your video, select your target size, and let our browser-based engine
+                    do the heavy lifting. You'll get a preview of the estimated quality and file size
+                    before you even start the compression process.
+                  </p>
+                </div>
+              </div>
+
+              <div className="neo-panel bg-[var(--bg-panel)] p-8">
+                <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
+                  FAQ
+                </h2>
+                <div className="mt-6 space-y-5 text-sm leading-7 text-[var(--text-soft)]">
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Will it ruin the video quality?
+                    </p>
+                    <p className="mt-2">
+                      We use high-efficiency H.264 encoding. While all compression involves some
+                      trade-off, our bitrate calculator ensures the best possible quality for your
+                      chosen file size limit.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                      Is it faster than other compressors?
+                    </p>
+                    <p className="mt-2">
+                       Since there is NO upload or download time, **nocaputils** is often significantly
+                       faster than traditional cloud converters, especially for large source files.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
+                       What is the limit for Discord?
+                    </p>
+                    <p className="mt-2">
+                      Discord's file limit for free users is currently 25MB. Simply select the 25MB
+                      preset in our tool to ensure your video will upload successfully every time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="mt-12 mb-8 w-full max-w-7xl">
