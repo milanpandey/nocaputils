@@ -90,6 +90,10 @@ export default function MusicVisualizerPanel() {
   // ── Layout & overlays ──
   const [aspect, setAspect] = useState("16:9");
   const [showSeekBar, setShowSeekBar] = useState(true);
+  const [showParticles, setShowParticles] = useState(false);
+  const [particleDensity, setParticleDensity] = useState(60);
+  const [particleSpeed, setParticleSpeed] = useState(1.0);
+  const [particleSize, setParticleSize] = useState(1.0);
   const [reactivity, setReactivity] = useState(1.0);
   const [glowLevel, setGlowLevel] = useState(1);
   const [rotating, setRotating] = useState(false);
@@ -396,6 +400,10 @@ export default function MusicVisualizerPanel() {
               title={title}
               artist={artist}
               showSeekBar={showSeekBar}
+              showParticles={showParticles}
+              particleDensity={particleDensity}
+              particleSpeed={particleSpeed}
+              particleSize={particleSize}
               reactivity={reactivity}
               glowLevel={glowLevel}
               rotating={rotating}
@@ -577,6 +585,72 @@ export default function MusicVisualizerPanel() {
                 <label htmlFor="seekbar-toggle" className="font-black uppercase tracking-widest cursor-pointer text-[var(--text-main)]">
                   Show Seek Bar Overlay
                 </label>
+              </div>
+
+              {/* Particles Overlay */}
+              <div className="space-y-4 p-4 border-4 border-black bg-[var(--bg-panel-muted)]">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="particles-toggle"
+                    className="w-5 h-5 accent-[var(--accent)] border-2 border-black"
+                    checked={showParticles}
+                    onChange={(e) => setShowParticles(e.target.checked)}
+                  />
+                  <label htmlFor="particles-toggle" className="font-black uppercase tracking-widest cursor-pointer text-[var(--text-main)]">
+                    Floating Particles
+                  </label>
+                </div>
+
+                {showParticles && (
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <div className="flex justify-between text-xs font-black uppercase tracking-widest mb-1 text-[var(--text-soft)]">
+                        <span>Density</span>
+                        <span className="text-[var(--text-main)]">{particleDensity}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="20"
+                        max="200"
+                        step="10"
+                        value={particleDensity}
+                        onChange={(e) => setParticleDensity(Number(e.target.value))}
+                        className="w-full vis-range"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-black uppercase tracking-widest mb-1 text-[var(--text-soft)]">
+                        <span>Speed</span>
+                        <span className="text-[var(--text-main)]">{particleSpeed.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        value={particleSpeed}
+                        onChange={(e) => setParticleSpeed(Number(e.target.value))}
+                        className="w-full vis-range"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-black uppercase tracking-widest mb-1 text-[var(--text-soft)]">
+                        <span>Size</span>
+                        <span className="text-[var(--text-main)]">{particleSize.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="4.0"
+                        step="0.1"
+                        value={particleSize}
+                        onChange={(e) => setParticleSize(Number(e.target.value))}
+                        className="w-full vis-range"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Aspect Ratio */}
