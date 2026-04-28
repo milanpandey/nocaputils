@@ -33,6 +33,7 @@ export interface OfflineAudioEffects {
   bassGain: number;       // dB (lowshelf at 110Hz), 0 = no change
   reverbMix: number;      // 0-1, 0 = dry, 1 = full wet
   preservePitch: boolean; // whether to attempt pitch preservation
+  gain: number;           // dB, master output gain (0 = unity)
 }
 
 /**
@@ -74,13 +75,18 @@ export async function renderAudioOffline(
   const wet = offline.createGain();
   wet.gain.value = fx.reverbMix;
 
+  // Master gain (dB → linear)
+  const masterGain = offline.createGain();
+  masterGain.gain.value = Math.pow(10, (fx.gain || 0) / 20);
+
   // Wire graph
   src.connect(bass);
   bass.connect(dry);
   bass.connect(convolver);
   convolver.connect(wet);
-  dry.connect(offline.destination);
-  wet.connect(offline.destination);
+  dry.connect(masterGain);
+  wet.connect(masterGain);
+  masterGain.connect(offline.destination);
 
   src.start(0);
 
@@ -461,6 +467,10 @@ export function useAudioEngine() {
     if (wetRef.current) wetRef.current.gain.value = m;
   }, []);
 
+  const setMasterGain = useCallback((dB: number) => {
+    if (masterRef.current) masterRef.current.gain.value = Math.pow(10, dB / 20);
+  }, []);
+
   const setMuted = useCallback((v: boolean) => {
     if (outputRef.current) outputRef.current.gain.value = v ? 0 : 1;
   }, []);
@@ -501,6 +511,7 @@ export function useAudioEngine() {
     setPreservePitch,
     setBassGain,
     setReverbMix,
+    setMasterGain,
     setMuted,
     getFrequencyData,
     getTimeDomainData,

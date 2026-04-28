@@ -102,6 +102,8 @@ export default function MusicVisualizerPanel() {
   const [customSpeed, setCustomSpeed] = useState(1.0);
   const [customBassGain, setCustomBassGain] = useState(0);
   const [customReverbMix, setCustomReverbMix] = useState(0);
+  const [customPitchSemitones, setCustomPitchSemitones] = useState(0);
+  const [customGain, setCustomGain] = useState(0); // dB
 
   // ── Export ──
   const [isExporting, setIsExporting] = useState(false);
@@ -194,15 +196,20 @@ export default function MusicVisualizerPanel() {
         engine.setReverbMix(0);
         engine.setPreservePitch(preservePitch);
         break;
-      case "custom":
-        engine.setSpeed(customSpeed);
+      case "custom": {
+        // Pitch shift is achieved by adjusting playbackRate
+        const pitchFactor = Math.pow(2, customPitchSemitones / 12);
+        engine.setSpeed(customSpeed * pitchFactor);
         engine.setBassGain(customBassGain);
         engine.setReverbMix(customReverbMix);
-        engine.setPreservePitch(preservePitch);
+        // When pitch is shifted, we must disable preservePitch so the shift is audible
+        engine.setPreservePitch(customPitchSemitones === 0 ? preservePitch : false);
+        engine.setMasterGain(customGain);
         break;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioEffect, preservePitch, customSpeed, customBassGain, customReverbMix, engine.isReady]);
+  }, [audioEffect, preservePitch, customSpeed, customBassGain, customReverbMix, customPitchSemitones, customGain, engine.isReady]);
 
   /* ────────────────────────────────────────────────────────────────────
      Mute control
@@ -270,7 +277,7 @@ export default function MusicVisualizerPanel() {
       audioCtx.close();
 
       // 2. Resolve the current audio effect settings
-      let fxSpeed = 1, fxBass = 0, fxReverb = 0, fxPitch = true;
+      let fxSpeed = 1, fxBass = 0, fxReverb = 0, fxPitch = true, fxGain = 0;
       switch (audioEffect) {
         case "bass_boost":
           fxBass = 14;
@@ -281,10 +288,15 @@ export default function MusicVisualizerPanel() {
         case "nightcore":
           fxSpeed = 1.25; fxPitch = preservePitch;
           break;
-        case "custom":
-          fxSpeed = customSpeed; fxBass = customBassGain;
-          fxReverb = customReverbMix; fxPitch = preservePitch;
+        case "custom": {
+          const pitchFactor = Math.pow(2, customPitchSemitones / 12);
+          fxSpeed = customSpeed * pitchFactor;
+          fxBass = customBassGain;
+          fxReverb = customReverbMix;
+          fxPitch = customPitchSemitones === 0 ? preservePitch : false;
+          fxGain = customGain;
           break;
+        }
         // "none" — all defaults
       }
 
@@ -293,6 +305,7 @@ export default function MusicVisualizerPanel() {
         bassGain: fxBass,
         reverbMix: fxReverb,
         preservePitch: fxPitch,
+        gain: fxGain,
       };
 
       // 3. Render audio through the effect chain offline
@@ -360,14 +373,15 @@ export default function MusicVisualizerPanel() {
       const audioFSName = "processed_audio.wav";
       await ffmpeg.writeFile(audioFSName, wavBytes);
 
-      // 6. Frame-by-frame render loop
-      const BATCH = 30; // yield every 30 frames for UI responsiveness
+      // 8. Frame-by-frame render loop
+      // Encode blob concurrently with next frame render, but serialise FS writes.
+      const YIELD_INTERVAL = 90;
+      let pendingBlob: { blob: Promise<Blob>; name: string } | null = null;
 
       for (let f = 0; f < totalFrames; f++) {
         if (cancelledRef.current) break;
 
         const timeSec = startSec + f / EXPORT_FPS;
-        // FFT runs against the processed buffer (effects already baked in)
         const freqData = getFrequencyDataAtTime(processedBuffer, timeSec, 2048);
 
         renderVisualizerFrame(offCtx, {
@@ -391,21 +405,33 @@ export default function MusicVisualizerPanel() {
           thumbImg,
         }, renderState);
 
-        // Capture as JPEG and write to FFmpeg FS
-        const blob = await new Promise<Blob>((res) =>
-          offCanvas.toBlob((b) => res(b!), "image/jpeg", 0.92)
-        );
-        const frameBuf = new Uint8Array(await blob.arrayBuffer());
+        // Kick off JPEG encoding (browser snapshots bitmap synchronously)
         const frameName = `frame_${String(f).padStart(6, "0")}.jpg`;
-        await ffmpeg.writeFile(frameName, frameBuf);
+        const blobPromise = new Promise<Blob>((res) =>
+          offCanvas.toBlob((b) => res(b!), "image/jpeg", 0.82)
+        );
+
+        // While this frame encodes, flush the PREVIOUS frame to FFmpeg FS
+        if (pendingBlob) {
+          const prev = await pendingBlob.blob;
+          const buf = new Uint8Array(await prev.arrayBuffer());
+          await ffmpeg.writeFile(pendingBlob.name, buf);
+        }
+        pendingBlob = { blob: blobPromise, name: frameName };
 
         // Update progress
-        setExportProgress(Math.round(((f + 1) / totalFrames) * 90)); // 0-90% for frames
+        setExportProgress(Math.round(((f + 1) / totalFrames) * 90));
 
-        // Yield to event loop periodically
-        if ((f + 1) % BATCH === 0) {
+        // Yield to event loop periodically for UI responsiveness
+        if ((f + 1) % YIELD_INTERVAL === 0) {
           await new Promise((r) => setTimeout(r, 0));
         }
+      }
+      // Flush last frame
+      if (pendingBlob) {
+        const last = await pendingBlob.blob;
+        const buf = new Uint8Array(await last.arrayBuffer());
+        await ffmpeg.writeFile(pendingBlob.name, buf);
       }
 
       if (cancelledRef.current) {
@@ -479,6 +505,7 @@ export default function MusicVisualizerPanel() {
     particleSpeed, reactivity, glowLevel, rotating,
     title, artist,
     audioEffect, preservePitch, customSpeed, customBassGain, customReverbMix,
+    customPitchSemitones, customGain,
   ]);
 
   const handleExport = useCallback(() => offlineRender("full"), [offlineRender]);
@@ -507,9 +534,14 @@ export default function MusicVisualizerPanel() {
       : audioEffect === "custom" || audioEffect === "nightcore" ? preservePitch
         : true;
 
-  const semitoneShift = effectivePreservePitch
-    ? 0
-    : +(12 * Math.log2(effectiveSpeed)).toFixed(1);
+  // For custom mode, combine speed-derived pitch and explicit pitch slider
+  const semitoneShift = audioEffect === "custom"
+    ? (customPitchSemitones !== 0
+      ? customPitchSemitones + (preservePitch ? 0 : +(12 * Math.log2(customSpeed)).toFixed(1))
+      : (preservePitch ? 0 : +(12 * Math.log2(customSpeed)).toFixed(1)))
+    : effectivePreservePitch
+      ? 0
+      : +(12 * Math.log2(effectiveSpeed)).toFixed(1);
 
   const downloadExt = "mp4";
 
@@ -1057,6 +1089,50 @@ export default function MusicVisualizerPanel() {
                       step="0.05"
                       value={customReverbMix}
                       onChange={(e) => setCustomReverbMix(Number(e.target.value))}
+                      className="w-full vis-range"
+                    />
+                  </div>
+
+                  {/* Pitch Shift */}
+                  <div>
+                    <div className="flex justify-between text-xs font-black uppercase tracking-widest mb-1 text-[var(--text-soft)]">
+                      <span>Pitch Shift</span>
+                      <span className="text-[var(--text-main)]">{customPitchSemitones > 0 ? "+" : ""}{customPitchSemitones} st</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-12"
+                      max="12"
+                      step="0.5"
+                      value={customPitchSemitones}
+                      onChange={(e) => setCustomPitchSemitones(Number(e.target.value))}
+                      className="w-full vis-range"
+                    />
+                    <div className="flex justify-between text-[10px] text-[var(--text-soft)] mt-1">
+                      <span>-1 Oct</span>
+                      <span>0</span>
+                      <span>+1 Oct</span>
+                    </div>
+                    {customPitchSemitones !== 0 && (
+                      <p className="text-[10px] text-[var(--text-soft)] mt-1 italic normal-case">
+                        Pitch shift adjusts playback speed. Effective speed: {(customSpeed * Math.pow(2, customPitchSemitones / 12)).toFixed(2)}x
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Volume / Gain */}
+                  <div>
+                    <div className="flex justify-between text-xs font-black uppercase tracking-widest mb-1 text-[var(--text-soft)]">
+                      <span>Volume</span>
+                      <span className="text-[var(--text-main)]">{customGain > 0 ? "+" : ""}{customGain} dB</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-12"
+                      max="12"
+                      step="1"
+                      value={customGain}
+                      onChange={(e) => setCustomGain(Number(e.target.value))}
                       className="w-full vis-range"
                     />
                   </div>
