@@ -367,111 +367,212 @@ export default function MusicVisualizerPanel() {
         },
       };
 
-      // 7. Load FFmpeg & write the processed audio as WAV
+      // 7. Prepare audio for FFmpeg
       const ffmpeg = await ensureFFmpeg();
       const wavBytes = audioBufferToWav(processedBuffer);
       const audioFSName = "processed_audio.wav";
       await ffmpeg.writeFile(audioFSName, wavBytes);
 
-      // 8. Frame-by-frame render loop
-      // Encode blob concurrently with next frame render, but serialise FS writes.
-      const YIELD_INTERVAL = 90;
-      let pendingBlob: { blob: Promise<Blob>; name: string } | null = null;
+      // 8. Render frames — try hardware-accelerated WebCodecs first, fallback to JPEG
+      const useWebCodecs = typeof VideoEncoder !== "undefined";
+      let h264Chunks: Uint8Array[] | null = null;
 
-      for (let f = 0; f < totalFrames; f++) {
-        if (cancelledRef.current) break;
+      if (useWebCodecs) {
+        /* ─── FAST PATH: WebCodecs H.264 encoder ─── */
+        h264Chunks = [];
+        const chunks = h264Chunks; // closure ref
 
-        const timeSec = startSec + f / EXPORT_FPS;
-        const freqData = getFrequencyDataAtTime(processedBuffer, timeSec, 2048);
+        const encoder = new VideoEncoder({
+          output: (chunk) => {
+            const buf = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(buf);
+            chunks.push(buf);
+          },
+          error: (e) => console.error("VideoEncoder error:", e),
+        });
 
-        renderVisualizerFrame(offCtx, {
-          width: W,
-          height: H,
-          freqData,
-          visStyle,
-          visColor,
-          isPlaying: true,
-          currentTime: timeSec,
-          duration: processedDuration,
-          showSeekBar,
-          showParticles,
-          particleSpeed,
-          reactivity,
-          glowLevel,
-          rotating,
-          title,
-          artist,
-          bgImg,
-          thumbImg,
-        }, renderState);
-
-        // Kick off JPEG encoding (browser snapshots bitmap synchronously)
-        const frameName = `frame_${String(f).padStart(6, "0")}.jpg`;
-        const blobPromise = new Promise<Blob>((res) =>
-          offCanvas.toBlob((b) => res(b!), "image/jpeg", 0.82)
-        );
-
-        // While this frame encodes, flush the PREVIOUS frame to FFmpeg FS
-        if (pendingBlob) {
-          const prev = await pendingBlob.blob;
-          const buf = new Uint8Array(await prev.arrayBuffer());
-          await ffmpeg.writeFile(pendingBlob.name, buf);
+        // Try High profile first, fall back to Baseline
+        const codecCandidates = [
+          "avc1.640028", // High L4.0
+          "avc1.4d0028", // Main L4.0
+          "avc1.42001E", // Baseline L3.0
+        ];
+        let configured = false;
+        for (const codec of codecCandidates) {
+          try {
+            const support = await VideoEncoder.isConfigSupported({
+              codec,
+              width: W,
+              height: H,
+              bitrate: 5_000_000,
+              framerate: EXPORT_FPS,
+            });
+            if (support.supported) {
+              encoder.configure({
+                codec,
+                width: W,
+                height: H,
+                bitrate: 5_000_000,
+                framerate: EXPORT_FPS,
+                avc: { format: "annexb" },
+              });
+              configured = true;
+              break;
+            }
+          } catch { /* try next */ }
         }
-        pendingBlob = { blob: blobPromise, name: frameName };
 
-        // Update progress
-        setExportProgress(Math.round(((f + 1) / totalFrames) * 90));
+        if (!configured) {
+          encoder.close();
+          h264Chunks = null; // fall through to JPEG path
+        } else {
+          const YIELD_INTERVAL = 60;
 
-        // Yield to event loop periodically for UI responsiveness
-        if ((f + 1) % YIELD_INTERVAL === 0) {
-          await new Promise((r) => setTimeout(r, 0));
+          for (let f = 0; f < totalFrames; f++) {
+            if (cancelledRef.current) break;
+
+            const timeSec = startSec + f / EXPORT_FPS;
+            const freqData = getFrequencyDataAtTime(processedBuffer, timeSec, 2048);
+
+            renderVisualizerFrame(offCtx, {
+              width: W, height: H, freqData, visStyle, visColor,
+              isPlaying: true, currentTime: timeSec, duration: processedDuration,
+              showSeekBar, showParticles, particleSpeed, reactivity, glowLevel,
+              rotating, title, artist, bgImg, thumbImg,
+            }, renderState);
+
+            // Create VideoFrame directly from canvas (no JPEG encoding!)
+            const frame = new VideoFrame(offCanvas, {
+              timestamp: f * (1_000_000 / EXPORT_FPS), // microseconds
+            });
+            encoder.encode(frame, { keyFrame: f % 150 === 0 });
+            frame.close();
+
+            setExportProgress(Math.round(((f + 1) / totalFrames) * 90));
+
+            if ((f + 1) % YIELD_INTERVAL === 0) {
+              await encoder.flush(); // drain encoded chunks
+              await new Promise((r) => setTimeout(r, 0));
+            }
+          }
+
+          await encoder.flush();
+          encoder.close();
         }
-      }
-      // Flush last frame
-      if (pendingBlob) {
-        const last = await pendingBlob.blob;
-        const buf = new Uint8Array(await last.arrayBuffer());
-        await ffmpeg.writeFile(pendingBlob.name, buf);
       }
 
       if (cancelledRef.current) {
-        // Cleanup partial frames
-        for (let f = 0; f < totalFrames; f++) {
-          try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
-        }
         try { await ffmpeg.deleteFile(audioFSName); } catch {}
         setIsExporting(false);
         setIsPreviewMode(false);
         return;
       }
 
-      // 7. Assemble with FFmpeg
+      // 9. Assemble final MP4
       setIsRemuxing(true);
       setExportProgress(92);
 
-      const ffArgs = [
-        "-framerate", String(EXPORT_FPS),
-        "-i", "frame_%06d.jpg",
-        "-ss", String(startSec),
-        "-t", String(endSec - startSec),
-        "-i", audioFSName,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-ar", "48000",
-        "-ac", "2",
-        "-shortest",
-        "-movflags", "+faststart",
-        "output.mp4",
-      ];
+      if (h264Chunks && h264Chunks.length > 0) {
+        /* ─── WebCodecs path: mux pre-encoded H.264 + audio ─── */
+        const totalH264Size = h264Chunks.reduce((s, c) => s + c.byteLength, 0);
+        const h264Stream = new Uint8Array(totalH264Size);
+        let offset = 0;
+        for (const c of h264Chunks) {
+          h264Stream.set(c, offset);
+          offset += c.byteLength;
+        }
+        h264Chunks = null; // free memory
 
-      await ffmpeg.exec(ffArgs);
+        await ffmpeg.writeFile("video.h264", h264Stream);
+
+        await ffmpeg.exec([
+          "-f", "h264",
+          "-framerate", String(EXPORT_FPS),
+          "-i", "video.h264",
+          "-ss", String(startSec),
+          "-t", String(endSec - startSec),
+          "-i", audioFSName,
+          "-c:v", "copy",          // just copy — already H.264!
+          "-c:a", "aac",
+          "-b:a", "192k",
+          "-ar", "48000",
+          "-ac", "2",
+          "-shortest",
+          "-movflags", "+faststart",
+          "output.mp4",
+        ]);
+
+        try { await ffmpeg.deleteFile("video.h264"); } catch {}
+      } else {
+        /* ─── Fallback: JPEG frames (browsers without WebCodecs) ─── */
+        const YIELD_INTERVAL = 90;
+
+        for (let f = 0; f < totalFrames; f++) {
+          if (cancelledRef.current) break;
+
+          const timeSec = startSec + f / EXPORT_FPS;
+          const freqData = getFrequencyDataAtTime(processedBuffer, timeSec, 2048);
+
+          renderVisualizerFrame(offCtx, {
+            width: W, height: H, freqData, visStyle, visColor,
+            isPlaying: true, currentTime: timeSec, duration: processedDuration,
+            showSeekBar, showParticles, particleSpeed, reactivity, glowLevel,
+            rotating, title, artist, bgImg, thumbImg,
+          }, renderState);
+
+          const blob = await new Promise<Blob>((res) =>
+            offCanvas.toBlob((b) => res(b!), "image/jpeg", 0.82)
+          );
+          const frameBuf = new Uint8Array(await blob.arrayBuffer());
+          await ffmpeg.writeFile(`frame_${String(f).padStart(6, "0")}.jpg`, frameBuf);
+
+          setExportProgress(Math.round(((f + 1) / totalFrames) * 90));
+          if ((f + 1) % YIELD_INTERVAL === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        }
+
+        if (cancelledRef.current) {
+          for (let f = 0; f < totalFrames; f++) {
+            try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
+          }
+          try { await ffmpeg.deleteFile(audioFSName); } catch {}
+          setIsExporting(false);
+          setIsPreviewMode(false);
+          return;
+        }
+
+        setIsRemuxing(true);
+        setExportProgress(92);
+
+        await ffmpeg.exec([
+          "-framerate", String(EXPORT_FPS),
+          "-i", "frame_%06d.jpg",
+          "-ss", String(startSec),
+          "-t", String(endSec - startSec),
+          "-i", audioFSName,
+          "-c:v", "libx264",
+          "-preset", "ultrafast",
+          "-crf", "23",
+          "-pix_fmt", "yuv420p",
+          "-c:a", "aac",
+          "-b:a", "192k",
+          "-ar", "48000",
+          "-ac", "2",
+          "-shortest",
+          "-movflags", "+faststart",
+          "output.mp4",
+        ]);
+
+        // Cleanup JPEG frames
+        for (let f = 0; f < totalFrames; f++) {
+          try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
+        }
+      }
+
       setExportProgress(98);
 
-      // 8. Read result
+      // 10. Read result
       const data = await ffmpeg.readFile("output.mp4");
       const finalBlob = new Blob([data], { type: "video/mp4" });
       const url = URL.createObjectURL(finalBlob);
@@ -482,10 +583,7 @@ export default function MusicVisualizerPanel() {
         setExportUrl(url);
       }
 
-      // 9. Cleanup FFmpeg FS
-      for (let f = 0; f < totalFrames; f++) {
-        try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
-      }
+      // 11. Cleanup FFmpeg FS
       try { await ffmpeg.deleteFile(audioFSName); } catch {}
       try { await ffmpeg.deleteFile("output.mp4"); } catch {}
 
