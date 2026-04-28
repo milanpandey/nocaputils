@@ -188,6 +188,26 @@ button {
   opacity: 0.7;
 }
 
+.tool-art-visualizer {
+  background: 
+    linear-gradient(135deg, rgba(0, 255, 255, 0.15) 0%, transparent 60%),
+    repeating-linear-gradient(180deg, transparent 0px, transparent 4px, rgba(255, 255, 255, 0.05) 4px, rgba(255, 255, 255, 0.05) 8px),
+    linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  position: relative;
+}
+
+.tool-art-visualizer::before {
+  content: "ılılı";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.5rem;
+  color: #00ffff;
+  text-shadow: 4px 4px 0px #000;
+  opacity: 0.8;
+}
+
 .phone-screen {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
@@ -202,4 +222,38 @@ button {
 .subtle-pattern {
   background-image: radial-gradient(rgba(17, 17, 17, 0.08) 0.7px, transparent 0.7px);
   background-size: 16px 16px;
+}
+
+/* ── Visualizer range inputs ── */
+.vis-range {
+  appearance: none;
+  height: 8px;
+  background: var(--bg-panel-muted);
+  border: 2px solid var(--border-main);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.vis-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  border: 3px solid var(--border-main);
+  border-radius: 0;
+  cursor: grab;
+}
+
+.vis-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  border: 3px solid var(--border-main);
+  border-radius: 0;
+  cursor: grab;
+}
+
+.vis-range:focus {
+  outline: none;
+  border-color: var(--accent);
 }

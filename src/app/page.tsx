@@ -46,6 +46,13 @@ const tools = [
     artClass: "tool-art-speed",
   },
   {
+    id: "music-visualizer",
+    name: "Music Visualizer",
+    description: "Audio-reactive videos for YouTube.",
+    status: "Live",
+    artClass: "tool-art-visualizer",
+  },
+  {
     id: "blog",
     name: "The Blog",
     description: "Creator tips & tool updates.",
