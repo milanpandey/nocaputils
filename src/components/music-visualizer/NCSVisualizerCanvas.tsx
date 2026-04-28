@@ -36,7 +36,7 @@ export interface VisualizerProps {
   rotating: boolean;
 }
 
-interface Particle {
+export interface Particle {
   x: number;
   y: number;
   vy: number;
@@ -83,6 +83,278 @@ function drawCoverImage(
     sy = (img.naturalHeight - sh) / 2;
   }
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, w, h);
+}
+
+/* ====================================================================
+   Standalone render function — used by both the live preview loop
+   and the offline export pipeline for pixel-perfect consistency.
+   ==================================================================== */
+
+export interface RenderFrameInput {
+  width: number;
+  height: number;
+  freqData: Uint8Array;
+  visStyle: string;
+  visColor: string;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  showSeekBar: boolean;
+  showParticles: boolean;
+  particleSpeed: number;
+  reactivity: number;
+  glowLevel: number;
+  rotating: boolean;
+  title: string;
+  artist: string;
+  bgImg: HTMLImageElement | null;
+  thumbImg: HTMLImageElement | null;
+}
+
+export interface RenderFrameState {
+  smoothed: Float32Array;
+  particles: Particle[];
+  beat: {
+    rollingAvg: number;
+    lastBeatTime: number;
+    flashAlpha: number;
+    pulseScale: number;
+    glowBoost: number;
+  };
+}
+
+/**
+ * Renders a single visualizer frame. Completely stateless w.r.t. the React
+ * component — all mutable state is passed in via `state` and mutated in-place
+ * (smoothing, beat detection, particles). This allows both the live rAF loop
+ * and the offline exporter to drive the exact same drawing code.
+ */
+export function renderVisualizerFrame(
+  ctx: CanvasRenderingContext2D,
+  input: RenderFrameInput,
+  state: RenderFrameState,
+): void {
+  const { width: W, height: H } = input;
+  const cx = W / 2;
+  const cy = H / 2;
+  const minDim = Math.min(W, H);
+  const circleR = minDim * 0.22;
+  const maxBarH = circleR * 0.65;
+  const NUM_BARS = 180;
+  const isCircular = input.visStyle !== "bars_bottom";
+  const glowMul = input.glowLevel === 0 ? 0.3 : input.glowLevel === 2 ? 2.0 : 1.0;
+  const time = performance.now() / 1000;
+
+  // ── Smooth frequency data ──
+  const freqData = input.freqData;
+  const sm = state.smoothed;
+  const usableBins = Math.min(freqData.length || 0, 420);
+
+  if (usableBins > 0) {
+    for (let i = 0; i < NUM_BARS; i++) {
+      const logPos = Math.pow(i / NUM_BARS, 1.3);
+      const binIdx = Math.floor(logPos * usableBins);
+      const target = freqData[binIdx] || 0;
+      sm[i] = sm[i] * 0.72 + target * 0.28;
+    }
+  } else {
+    for (let i = 0; i < NUM_BARS; i++) {
+      sm[i] = sm[i] * 0.95 + 2 * 0.05;
+    }
+  }
+
+  // ── Beat detection ──
+  const beat = state.beat;
+  let bassEnergy = 0;
+  if (freqData.length > 0) {
+    for (let i = 0; i < 8; i++) bassEnergy += (freqData[i] || 0);
+    bassEnergy /= 8;
+  }
+
+  beat.rollingAvg = beat.rollingAvg * 0.95 + bassEnergy * 0.05;
+  const now = performance.now();
+
+  if (
+    bassEnergy > beat.rollingAvg * 1.45 &&
+    bassEnergy > 80 &&
+    now - beat.lastBeatTime > 200
+  ) {
+    beat.lastBeatTime = now;
+    beat.flashAlpha = 0.15 + (bassEnergy / 255) * 0.18;
+    beat.pulseScale = 1.06 + (bassEnergy / 255) * 0.06;
+    beat.glowBoost = 25 * glowMul;
+  }
+
+  beat.flashAlpha *= 0.92;
+  beat.pulseScale = 1 + (beat.pulseScale - 1) * 0.88;
+  beat.glowBoost *= 0.9;
+  if (beat.flashAlpha < 0.005) beat.flashAlpha = 0;
+
+  let pulse = beat.pulseScale;
+  if (!input.isPlaying && bassEnergy < 10) {
+    pulse = 1 + Math.sin(time * 2) * 0.015;
+  }
+  const glow = beat.glowBoost;
+
+  /* ── 1. BACKGROUND ── */
+  if (input.bgImg) {
+    drawCoverImage(ctx, input.bgImg, W, H);
+    ctx.fillStyle = "rgba(0,0,0,0.38)";
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, minDim * 0.85);
+    grad.addColorStop(0, "#141428");
+    grad.addColorStop(0.5, "#0c0c1e");
+    grad.addColorStop(1, "#060610");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Floating particles
+  const shouldDrawParticles = input.showParticles || !input.bgImg;
+  if (shouldDrawParticles) {
+    const speedMul = input.particleSpeed || 1;
+    for (const pt of state.particles) {
+      pt.y += pt.vy * speedMul;
+      if (pt.y < -0.05) {
+        pt.y = 1.05;
+        pt.x = Math.random();
+      }
+      ctx.fillStyle = `rgba(255,255,255,${pt.opacity})`;
+      ctx.beginPath();
+      ctx.arc(pt.x * W, pt.y * H, pt.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Center halo
+  const haloGrad = ctx.createRadialGradient(cx, cy, circleR * 0.5, cx, cy, circleR * 2.8);
+  haloGrad.addColorStop(0, hexToRGBA(input.visColor, 0.05 + glow * 0.002));
+  haloGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = haloGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  /* ── 2. VISUALIZATION ── */
+  if (isCircular) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(pulse, pulse);
+    if (input.rotating) ctx.rotate(time * 15 * (Math.PI / 180));
+
+    const bSB = 6 * glowMul;
+    const effMaxH = maxBarH * input.reactivity;
+
+    switch (input.visStyle) {
+      case "ncs_bars":
+        _drawRadialBars(ctx, circleR, NUM_BARS, sm, effMaxH, input.visColor, bSB + glow * 0.3);
+        break;
+      case "ncs_wave":
+        _drawCircleWave(ctx, circleR, NUM_BARS, sm, effMaxH * 0.8, input.visColor, 12 * glowMul + glow * 0.3);
+        break;
+      case "ncs_dots":
+        _drawParticleRing(ctx, circleR, NUM_BARS, sm, effMaxH * 0.7, input.visColor, 8 * glowMul + glow * 0.3);
+        break;
+    }
+
+    // Circle ring
+    ctx.beginPath();
+    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
+    ctx.strokeStyle = input.visColor;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = (25 + glow) * glowMul;
+    ctx.shadowColor = input.visColor;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Thumbnail
+    if (input.thumbImg) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, circleR - 3, 0, Math.PI * 2);
+      ctx.clip();
+      const sz = (circleR - 3) * 2;
+      drawCoverImage(ctx, input.thumbImg, sz, sz, -sz / 2, -sz / 2);
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, circleR - 3, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fill();
+    }
+
+    ctx.restore();
+  } else {
+    // bars_bottom
+    const effMaxH = maxBarH * input.reactivity;
+    _drawBottomBars(ctx, W, H, sm, NUM_BARS, effMaxH, input.visColor, 8 * glowMul + glow * 0.3);
+
+    if (input.thumbImg) {
+      const sz = minDim * 0.28;
+      const ty = H * 0.18;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, ty + sz / 2, sz / 2, 0, Math.PI * 2);
+      ctx.clip();
+      drawCoverImage(ctx, input.thumbImg, sz, sz, cx - sz / 2, ty);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(cx, ty + sz / 2, sz / 2, 0, Math.PI * 2);
+      ctx.strokeStyle = input.visColor;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 15 * glowMul;
+      ctx.shadowColor = input.visColor;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  /* ── 3. BEAT FLASH ── */
+  if (beat.flashAlpha > 0.005) {
+    ctx.fillStyle = `rgba(255,255,255,${beat.flashAlpha})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── 4. TEXT OVERLAYS ── */
+  if (input.title || input.artist) {
+    const textX = cx;
+    let textY: number;
+    if (isCircular) {
+      textY = cy + circleR * pulse + minDim * 0.08;
+    } else {
+      const thumbSz = input.thumbImg ? minDim * 0.28 : 0;
+      textY = H * 0.18 + thumbSz + minDim * 0.06;
+    }
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.shadowColor = input.visColor;
+
+    if (input.title) {
+      const fs = Math.max(Math.floor(W * 0.03), 24);
+      ctx.font = `bold ${fs}px "Inter", "Segoe UI", Arial, sans-serif`;
+      ctx.shadowBlur = 15 * glowMul;
+      ctx.fillStyle = "white";
+      ctx.fillText(input.title, textX, textY, W * 0.8);
+    }
+    if (input.artist) {
+      const fs2 = Math.max(Math.floor(W * 0.017), 14);
+      ctx.font = `500 ${fs2}px "Inter", "Segoe UI", Arial, sans-serif`;
+      ctx.shadowBlur = 10 * glowMul;
+      ctx.fillStyle = "rgba(255,255,255,0.78)";
+      const titleOffset = input.title ? W * 0.042 : 0;
+      ctx.fillText(input.artist, textX, textY + titleOffset, W * 0.6);
+    }
+    ctx.restore();
+  }
+
+  /* ── 5. SEEK BAR ── */
+  if (input.showSeekBar && input.duration > 0) {
+    _drawSeekBar(ctx, input.currentTime, input.duration, W, H, input.visColor, glowMul);
+  }
 }
 
 /* ====================================================================
@@ -186,244 +458,32 @@ function NCSVisualizerCanvas(props: VisualizerProps) {
         prevSizeRef.current = { w: W, h: H };
       }
 
-      const cx = W / 2;
-      const cy = H / 2;
-      const minDim = Math.min(W, H);
-      const circleR = minDim * 0.22;
-      const maxBarH = circleR * 0.65;
-      const NUM_BARS = 180;
-      const isCircular = p.visStyle !== "bars_bottom";
-      const glowMul = p.glowLevel === 0 ? 0.3 : p.glowLevel === 2 ? 2.0 : 1.0;
-      const time = performance.now() / 1000;
-
-      // ── Get & smooth frequency data ──
       const freqData = p.getFrequencyData();
-      const sm = smoothedRef.current;
-      const usableBins = Math.min(freqData.length || 0, 420);
 
-      if (usableBins > 0) {
-        for (let i = 0; i < NUM_BARS; i++) {
-          const logPos = Math.pow(i / NUM_BARS, 1.3);
-          const binIdx = Math.floor(logPos * usableBins);
-          const target = freqData[binIdx] || 0;
-          sm[i] = sm[i] * 0.72 + target * 0.28;
-        }
-      } else {
-        // Idle: tiny bars
-        for (let i = 0; i < NUM_BARS; i++) {
-          sm[i] = sm[i] * 0.95 + 2 * 0.05;
-        }
-      }
-
-      // ── Beat detection ──
-      const beat = beatRef.current;
-      let bassEnergy = 0;
-      if (freqData.length > 0) {
-        for (let i = 0; i < 8; i++) bassEnergy += (freqData[i] || 0);
-        bassEnergy /= 8;
-      }
-
-      beat.rollingAvg = beat.rollingAvg * 0.95 + bassEnergy * 0.05;
-      const now = performance.now();
-
-      if (
-        bassEnergy > beat.rollingAvg * 1.45 &&
-        bassEnergy > 80 &&
-        now - beat.lastBeatTime > 200
-      ) {
-        beat.lastBeatTime = now;
-        beat.flashAlpha = 0.15 + (bassEnergy / 255) * 0.18;
-        beat.pulseScale = 1.06 + (bassEnergy / 255) * 0.06;
-        beat.glowBoost = 25 * glowMul;
-      }
-
-      beat.flashAlpha *= 0.92;
-      beat.pulseScale = 1 + (beat.pulseScale - 1) * 0.88;
-      beat.glowBoost *= 0.9;
-      if (beat.flashAlpha < 0.005) beat.flashAlpha = 0;
-
-      // Idle breathing when not playing
-      let pulse = beat.pulseScale;
-      if (!p.isPlaying && bassEnergy < 10) {
-        pulse = 1 + Math.sin(time * 2) * 0.015;
-      }
-      const glow = beat.glowBoost;
-
-      /* ================================================================
-         1. BACKGROUND
-         ================================================================ */
-      if (bgImgRef.current) {
-        drawCoverImage(ctx, bgImgRef.current, W, H);
-        ctx.fillStyle = "rgba(0,0,0,0.38)";
-        ctx.fillRect(0, 0, W, H);
-      } else {
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, minDim * 0.85);
-        grad.addColorStop(0, "#141428");
-        grad.addColorStop(0.5, "#0c0c1e");
-        grad.addColorStop(1, "#060610");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-      }
-
-      // Floating particles — always render when enabled (or default on w/o background)
-      const shouldDrawParticles = p.showParticles || !bgImgRef.current;
-      if (shouldDrawParticles) {
-        const speedMul = p.particleSpeed || 1;
-        const parts = particlesRef.current;
-        for (const pt of parts) {
-          pt.y += pt.vy * speedMul;
-          if (pt.y < -0.05) {
-            pt.y = 1.05;
-            pt.x = Math.random();
-          }
-          ctx.fillStyle = `rgba(255,255,255,${pt.opacity})`;
-          ctx.beginPath();
-          ctx.arc(pt.x * W, pt.y * H, pt.size, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // Center halo
-      const haloGrad = ctx.createRadialGradient(
-        cx, cy, circleR * 0.5,
-        cx, cy, circleR * 2.8
-      );
-      haloGrad.addColorStop(0, hexToRGBA(p.visColor, 0.05 + glow * 0.002));
-      haloGrad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = haloGrad;
-      ctx.fillRect(0, 0, W, H);
-
-      /* ================================================================
-         2. VISUALIZATION
-         ================================================================ */
-      if (isCircular) {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.scale(pulse, pulse);
-        if (p.rotating) ctx.rotate(time * 15 * (Math.PI / 180));
-
-        // Draw style
-        const bSB = 6 * glowMul;
-        const effMaxH = maxBarH * p.reactivity;
-
-        switch (p.visStyle) {
-          case "ncs_bars":
-            _drawRadialBars(ctx, circleR, NUM_BARS, sm, effMaxH, p.visColor, bSB + glow * 0.3);
-            break;
-          case "ncs_wave":
-            _drawCircleWave(ctx, circleR, NUM_BARS, sm, effMaxH * 0.8, p.visColor, 12 * glowMul + glow * 0.3);
-            break;
-          case "ncs_dots":
-            _drawParticleRing(ctx, circleR, NUM_BARS, sm, effMaxH * 0.7, p.visColor, 8 * glowMul + glow * 0.3);
-            break;
-        }
-
-        // ── Circle ring ──
-        ctx.beginPath();
-        ctx.arc(0, 0, circleR, 0, Math.PI * 2);
-        ctx.strokeStyle = p.visColor;
-        ctx.lineWidth = 3;
-        ctx.shadowBlur = (25 + glow) * glowMul;
-        ctx.shadowColor = p.visColor;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // ── Thumbnail ──
-        if (thumbImgRef.current) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(0, 0, circleR - 3, 0, Math.PI * 2);
-          ctx.clip();
-          const sz = (circleR - 3) * 2;
-          drawCoverImage(ctx, thumbImgRef.current, sz, sz, -sz / 2, -sz / 2);
-          ctx.restore();
-        } else {
-          ctx.beginPath();
-          ctx.arc(0, 0, circleR - 3, 0, Math.PI * 2);
-          ctx.fillStyle = "rgba(0,0,0,0.45)";
-          ctx.fill();
-        }
-
-        ctx.restore();
-      } else {
-        // ── bars_bottom ──
-        const effMaxH = maxBarH * p.reactivity;
-        _drawBottomBars(ctx, W, H, sm, NUM_BARS, effMaxH, p.visColor, 8 * glowMul + glow * 0.3);
-
-        // Thumbnail as large circle above bars
-        if (thumbImgRef.current) {
-          const sz = minDim * 0.28;
-          const ty = H * 0.18;
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(cx, ty + sz / 2, sz / 2, 0, Math.PI * 2);
-          ctx.clip();
-          drawCoverImage(ctx, thumbImgRef.current, sz, sz, cx - sz / 2, ty);
-          ctx.restore();
-
-          ctx.beginPath();
-          ctx.arc(cx, ty + sz / 2, sz / 2, 0, Math.PI * 2);
-          ctx.strokeStyle = p.visColor;
-          ctx.lineWidth = 3;
-          ctx.shadowBlur = 15 * glowMul;
-          ctx.shadowColor = p.visColor;
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-        }
-      }
-
-      /* ================================================================
-         3. BEAT FLASH
-         ================================================================ */
-      if (beat.flashAlpha > 0.005) {
-        ctx.fillStyle = `rgba(255,255,255,${beat.flashAlpha})`;
-        ctx.fillRect(0, 0, W, H);
-      }
-
-      /* ================================================================
-         4. TEXT OVERLAYS
-         ================================================================ */
-      if (p.title || p.artist) {
-        const textX = cx;
-        let textY: number;
-        if (isCircular) {
-          textY = cy + circleR * pulse + minDim * 0.08;
-        } else {
-          const thumbSz = thumbImgRef.current ? minDim * 0.28 : 0;
-          textY = H * 0.18 + thumbSz + minDim * 0.06;
-        }
-
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.shadowColor = p.visColor;
-
-        if (p.title) {
-          const fs = Math.max(Math.floor(W * 0.03), 24);
-          ctx.font = `bold ${fs}px "Inter", "Segoe UI", Arial, sans-serif`;
-          ctx.shadowBlur = 15 * glowMul;
-          ctx.fillStyle = "white";
-          ctx.fillText(p.title, textX, textY, W * 0.8);
-        }
-        if (p.artist) {
-          const fs2 = Math.max(Math.floor(W * 0.017), 14);
-          ctx.font = `500 ${fs2}px "Inter", "Segoe UI", Arial, sans-serif`;
-          ctx.shadowBlur = 10 * glowMul;
-          ctx.fillStyle = "rgba(255,255,255,0.78)";
-          const titleOffset = p.title ? W * 0.042 : 0;
-          ctx.fillText(p.artist, textX, textY + titleOffset, W * 0.6);
-        }
-        ctx.restore();
-      }
-
-      /* ================================================================
-         5. SEEK BAR
-         ================================================================ */
-      if (p.showSeekBar && p.duration > 0) {
-        _drawSeekBar(ctx, p.currentTime, p.duration, W, H, p.visColor, glowMul);
-      }
+      renderVisualizerFrame(ctx, {
+        width: W,
+        height: H,
+        freqData,
+        visStyle: p.visStyle,
+        visColor: p.visColor,
+        isPlaying: p.isPlaying,
+        currentTime: p.currentTime,
+        duration: p.duration,
+        showSeekBar: p.showSeekBar,
+        showParticles: p.showParticles,
+        particleSpeed: p.particleSpeed,
+        reactivity: p.reactivity,
+        glowLevel: p.glowLevel,
+        rotating: p.rotating,
+        title: p.title,
+        artist: p.artist,
+        bgImg: bgImgRef.current,
+        thumbImg: thumbImgRef.current,
+      }, {
+        smoothed: smoothedRef.current,
+        particles: particlesRef.current,
+        beat: beatRef.current,
+      });
     };
 
     animId = requestAnimationFrame(render);

@@ -1,8 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import NCSVisualizerCanvas from "./NCSVisualizerCanvas";
-import { useAudioEngine } from "./useAudioEngine";
+import NCSVisualizerCanvas, {
+  renderVisualizerFrame,
+  type Particle,
+  type RenderFrameState,
+} from "./NCSVisualizerCanvas";
+import {
+  useAudioEngine,
+  getFrequencyDataAtTime,
+  renderAudioOffline,
+  audioBufferToWav,
+  type OfflineAudioEffects,
+} from "./useAudioEngine";
 
 /* ======================================================================
    Constants
@@ -51,19 +61,7 @@ function fmtTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-function getPreferredMimeType(): string {
-  const types = [
-    "video/mp4;codecs=avc1",
-    "video/mp4",
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm",
-  ];
-  for (const t of types) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)) return t;
-  }
-  return "video/webm";
-}
+const EXPORT_FPS = 30;
 
 /* ======================================================================
    Component
@@ -107,9 +105,15 @@ export default function MusicVisualizerPanel() {
 
   // ── Export ──
   const [isExporting, setIsExporting] = useState(false);
+  const [isRemuxing, setIsRemuxing] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportUrl, setExportUrl] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // ── Preview ──
+  const [previewStart, setPreviewStart] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   // ── UI ──
   const [isMuted, setIsMuted] = useState(false);
@@ -117,8 +121,8 @@ export default function MusicVisualizerPanel() {
 
   // ── Refs ──
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const ffmpegRef = useRef<any>(null);
+  const cancelledRef = useRef(false);
 
   // ── Audio engine ──
   const engine = useAudioEngine();
@@ -209,91 +213,283 @@ export default function MusicVisualizerPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMuted]);
 
-  /* ────────────────────────────────────────────────────────────────────
-     Export progress tracker
-     ──────────────────────────────────────────────────────────────────── */
-
-  useEffect(() => {
-    if (isExporting && engine.duration > 0) {
-      setExportProgress(Math.round((engine.currentTime / engine.duration) * 100));
-    }
-  }, [isExporting, engine.currentTime, engine.duration]);
+  /* (export progress is now driven directly by the offline render loop) */
 
   /* ────────────────────────────────────────────────────────────────────
      Export handlers
      ──────────────────────────────────────────────────────────────────── */
 
-  const handleExport = useCallback(async () => {
-    if (!canvasRef.current || !engine.isReady) return;
+  /* ────────────────────────────────────────────────────────────────────
+     Load FFmpeg WASM (shared between preview & full export)
+     ──────────────────────────────────────────────────────────────────── */
 
+  const ensureFFmpeg = useCallback(async () => {
+    if (ffmpegRef.current) return ffmpegRef.current;
+    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+    const { toBlobURL } = await import("@ffmpeg/util");
+    const ffmpeg = new FFmpeg();
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+    ffmpegRef.current = ffmpeg;
+    return ffmpeg;
+  }, []);
+
+  /* ────────────────────────────────────────────────────────────────────
+     Offline frame-by-frame renderer (used by both preview & full export)
+     ──────────────────────────────────────────────────────────────────── */
+
+  const offlineRender = useCallback(async (
+    mode: "preview" | "full"
+  ) => {
+    if (!audioFile || !canvasRef.current) return;
+
+    cancelledRef.current = false;
     setIsExporting(true);
+    setIsRemuxing(false);
     setExportProgress(0);
-    setExportUrl("");
     setErrorMsg("");
-    chunksRef.current = [];
-
-    engine.seek(0);
-
-    const canvasStream = canvasRef.current.captureStream(30);
-    const audioStream = engine.getAudioStream();
-
-    if (!audioStream) {
-      setErrorMsg("Could not capture audio stream.");
-      setIsExporting(false);
-      return;
+    if (mode === "preview") {
+      setIsPreviewMode(true);
+      setPreviewUrl("");
+    } else {
+      setIsPreviewMode(false);
+      setExportUrl("");
     }
 
-    const combined = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...audioStream.getAudioTracks(),
-    ]);
-
-    const mimeType = getPreferredMimeType();
+    // Pause live playback so we own the canvas
+    engine.pause();
 
     try {
-      const recorder = new MediaRecorder(combined, {
-        mimeType,
-        videoBitsPerSecond: 8_000_000,
-      });
-      recorderRef.current = recorder;
+      // 1. Decode the raw audio file
+      const arrayBuf = await audioFile.arrayBuffer();
+      const audioCtx = new AudioContext();
+      const rawBuffer = await audioCtx.decodeAudioData(arrayBuf);
+      audioCtx.close();
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+      // 2. Resolve the current audio effect settings
+      let fxSpeed = 1, fxBass = 0, fxReverb = 0, fxPitch = true;
+      switch (audioEffect) {
+        case "bass_boost":
+          fxBass = 14;
+          break;
+        case "slowed_reverb":
+          fxSpeed = 0.85; fxBass = 3; fxReverb = 0.4; fxPitch = false;
+          break;
+        case "nightcore":
+          fxSpeed = 1.25; fxPitch = preservePitch;
+          break;
+        case "custom":
+          fxSpeed = customSpeed; fxBass = customBassGain;
+          fxReverb = customReverbMix; fxPitch = preservePitch;
+          break;
+        // "none" — all defaults
+      }
+
+      const fx: OfflineAudioEffects = {
+        speed: fxSpeed,
+        bassGain: fxBass,
+        reverbMix: fxReverb,
+        preservePitch: fxPitch,
       };
 
-      recorder.onstop = () => {
-        const ext = mimeType.includes("mp4") ? "mp4" : "webm";
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        setExportUrl(URL.createObjectURL(blob));
+      // 3. Render audio through the effect chain offline
+      const processedBuffer = await renderAudioOffline(rawBuffer, fx);
+      const processedDuration = processedBuffer.duration;
+
+      const startSec = mode === "preview" ? Math.min(previewStart / fxSpeed, processedDuration) : 0;
+      const endSec = mode === "preview"
+        ? Math.min(startSec + 10, processedDuration)
+        : processedDuration;
+      const totalFrames = Math.ceil((endSec - startSec) * EXPORT_FPS);
+
+      // 4. Create an offscreen canvas at full export resolution
+      const W = aspectCfg.w;
+      const H = aspectCfg.h;
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = W;
+      offCanvas.height = H;
+      const offCtx = offCanvas.getContext("2d", { alpha: false })!;
+
+      // 5. Load background & thumbnail images for the offscreen canvas
+      const loadImg = (url: string | null): Promise<HTMLImageElement | null> => {
+        if (!url) return Promise.resolve(null);
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = url;
+        });
+      };
+
+      const [bgImg, thumbImg] = await Promise.all([
+        loadImg(bgImageUrl),
+        loadImg(thumbImageUrl),
+      ]);
+
+      // 6. Initialise render state (smoothing, particles, beat detection)
+      const smoothed = new Float32Array(180);
+      const particles: Particle[] = [];
+      for (let i = 0; i < 80; i++) {
+        particles.push({
+          x: Math.random(),
+          y: Math.random(),
+          vy: -(0.0005 + Math.random() * 0.001),
+          size: 0.8 + Math.random() * 1.2,
+          opacity: 0.15 + Math.random() * 0.25,
+        });
+      }
+      const renderState: RenderFrameState = {
+        smoothed,
+        particles,
+        beat: {
+          rollingAvg: 0,
+          lastBeatTime: 0,
+          flashAlpha: 0,
+          pulseScale: 1,
+          glowBoost: 0,
+        },
+      };
+
+      // 7. Load FFmpeg & write the processed audio as WAV
+      const ffmpeg = await ensureFFmpeg();
+      const wavBytes = audioBufferToWav(processedBuffer);
+      const audioFSName = "processed_audio.wav";
+      await ffmpeg.writeFile(audioFSName, wavBytes);
+
+      // 6. Frame-by-frame render loop
+      const BATCH = 30; // yield every 30 frames for UI responsiveness
+
+      for (let f = 0; f < totalFrames; f++) {
+        if (cancelledRef.current) break;
+
+        const timeSec = startSec + f / EXPORT_FPS;
+        // FFT runs against the processed buffer (effects already baked in)
+        const freqData = getFrequencyDataAtTime(processedBuffer, timeSec, 2048);
+
+        renderVisualizerFrame(offCtx, {
+          width: W,
+          height: H,
+          freqData,
+          visStyle,
+          visColor,
+          isPlaying: true,
+          currentTime: timeSec,
+          duration: processedDuration,
+          showSeekBar,
+          showParticles,
+          particleSpeed,
+          reactivity,
+          glowLevel,
+          rotating,
+          title,
+          artist,
+          bgImg,
+          thumbImg,
+        }, renderState);
+
+        // Capture as JPEG and write to FFmpeg FS
+        const blob = await new Promise<Blob>((res) =>
+          offCanvas.toBlob((b) => res(b!), "image/jpeg", 0.92)
+        );
+        const frameBuf = new Uint8Array(await blob.arrayBuffer());
+        const frameName = `frame_${String(f).padStart(6, "0")}.jpg`;
+        await ffmpeg.writeFile(frameName, frameBuf);
+
+        // Update progress
+        setExportProgress(Math.round(((f + 1) / totalFrames) * 90)); // 0-90% for frames
+
+        // Yield to event loop periodically
+        if ((f + 1) % BATCH === 0) {
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+
+      if (cancelledRef.current) {
+        // Cleanup partial frames
+        for (let f = 0; f < totalFrames; f++) {
+          try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
+        }
+        try { await ffmpeg.deleteFile(audioFSName); } catch {}
         setIsExporting(false);
-        setExportProgress(100);
-        engine.setOnEnded(null);
-        // Store extension for download
-        (recorderRef as any)._ext = ext;
-      };
+        setIsPreviewMode(false);
+        return;
+      }
 
-      engine.setOnEnded(() => {
-        if (recorder.state !== "inactive") recorder.stop();
-      });
+      // 7. Assemble with FFmpeg
+      setIsRemuxing(true);
+      setExportProgress(92);
 
-      recorder.start(100);
-      await engine.play();
+      const ffArgs = [
+        "-framerate", String(EXPORT_FPS),
+        "-i", "frame_%06d.jpg",
+        "-ss", String(startSec),
+        "-t", String(endSec - startSec),
+        "-i", audioFSName,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "48000",
+        "-ac", "2",
+        "-shortest",
+        "-movflags", "+faststart",
+        "output.mp4",
+      ];
+
+      await ffmpeg.exec(ffArgs);
+      setExportProgress(98);
+
+      // 8. Read result
+      const data = await ffmpeg.readFile("output.mp4");
+      const finalBlob = new Blob([data], { type: "video/mp4" });
+      const url = URL.createObjectURL(finalBlob);
+
+      if (mode === "preview") {
+        setPreviewUrl(url);
+      } else {
+        setExportUrl(url);
+      }
+
+      // 9. Cleanup FFmpeg FS
+      for (let f = 0; f < totalFrames; f++) {
+        try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
+      }
+      try { await ffmpeg.deleteFile(audioFSName); } catch {}
+      try { await ffmpeg.deleteFile("output.mp4"); } catch {}
+
+      setExportProgress(100);
     } catch (err: any) {
+      console.error("Export failed:", err);
       setErrorMsg(err.message || "Export failed.");
+    } finally {
       setIsExporting(false);
+      setIsRemuxing(false);
+      setIsPreviewMode(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.isReady]);
+  }, [
+    audioFile, engine, previewStart, aspectCfg,
+    bgImageUrl, thumbImageUrl, ensureFFmpeg,
+    visStyle, visColor, showSeekBar, showParticles,
+    particleSpeed, reactivity, glowLevel, rotating,
+    title, artist,
+    audioEffect, preservePitch, customSpeed, customBassGain, customReverbMix,
+  ]);
+
+  const handleExport = useCallback(() => offlineRender("full"), [offlineRender]);
+  const handlePreview = useCallback(() => offlineRender("preview"), [offlineRender]);
 
   const handleCancelExport = useCallback(() => {
-    const r = recorderRef.current;
-    if (r && r.state !== "inactive") r.stop();
-    engine.pause();
-    engine.setOnEnded(null);
+    cancelledRef.current = true;
     setIsExporting(false);
+    setIsRemuxing(false);
     setExportProgress(0);
-    chunksRef.current = [];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsPreviewMode(false);
   }, []);
 
   /* ────────────────────────────────────────────────────────────────────
@@ -302,20 +498,20 @@ export default function MusicVisualizerPanel() {
 
   const effectiveSpeed =
     audioEffect === "slowed_reverb" ? 0.85
-    : audioEffect === "nightcore" ? 1.25
-    : audioEffect === "custom" ? customSpeed
-    : 1.0;
+      : audioEffect === "nightcore" ? 1.25
+        : audioEffect === "custom" ? customSpeed
+          : 1.0;
 
   const effectivePreservePitch =
     audioEffect === "slowed_reverb" ? false
-    : audioEffect === "custom" || audioEffect === "nightcore" ? preservePitch
-    : true;
+      : audioEffect === "custom" || audioEffect === "nightcore" ? preservePitch
+        : true;
 
   const semitoneShift = effectivePreservePitch
     ? 0
     : +(12 * Math.log2(effectiveSpeed)).toFixed(1);
 
-  const downloadExt = (recorderRef as any)?._ext || "webm";
+  const downloadExt = "mp4";
 
   /* ────────────────────────────────────────────────────────────────────
      Drop handler
@@ -352,9 +548,8 @@ export default function MusicVisualizerPanel() {
       {/* ── Drop zone (no audio) ── */}
       {!audioFile ? (
         <div
-          className={`w-full h-80 border-4 border-dashed border-black flex flex-col items-center justify-center bg-[var(--bg-panel)] transition-all cursor-pointer shadow-[8px_8px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[6px_6px_0_0_#000] ${
-            isHovering ? "bg-accent/10" : ""
-          }`}
+          className={`w-full h-80 border-4 border-dashed border-black flex flex-col items-center justify-center bg-[var(--bg-panel)] transition-all cursor-pointer shadow-[8px_8px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[6px_6px_0_0_#000] ${isHovering ? "bg-accent/10" : ""
+            }`}
           onDragOver={(e) => {
             e.preventDefault();
             setIsHovering(true);
@@ -663,11 +858,10 @@ export default function MusicVisualizerPanel() {
                     <button
                       key={a.id}
                       onClick={() => setAspect(a.id)}
-                      className={`border-4 border-black p-3 font-black uppercase transition-all shadow-[4px_4px_0_0_#000] text-sm ${
-                        aspect === a.id
-                          ? "bg-accent text-black translate-x-[2px] translate-y-[2px] shadow-[2px_2px_0_0_#000]"
-                          : "bg-white text-black"
-                      }`}
+                      className={`border-4 border-black p-3 font-black uppercase transition-all shadow-[4px_4px_0_0_#000] text-sm ${aspect === a.id
+                        ? "bg-accent text-black translate-x-[2px] translate-y-[2px] shadow-[2px_2px_0_0_#000]"
+                        : "bg-white text-black"
+                        }`}
                     >
                       {a.label}
                     </button>
@@ -710,11 +904,10 @@ export default function MusicVisualizerPanel() {
                     <button
                       key={c.hex}
                       onClick={() => setVisColor(c.hex)}
-                      className={`w-9 h-9 border-4 border-black transition-all ${
-                        visColor === c.hex
-                          ? "scale-110 shadow-[2px_2px_0_0_#000]"
-                          : "opacity-60 hover:opacity-100"
-                      }`}
+                      className={`w-9 h-9 border-4 border-black transition-all ${visColor === c.hex
+                        ? "scale-110 shadow-[2px_2px_0_0_#000]"
+                        : "opacity-60 hover:opacity-100"
+                        }`}
                       style={{ backgroundColor: c.hex }}
                       title={c.label}
                     />
@@ -748,11 +941,10 @@ export default function MusicVisualizerPanel() {
                     <button
                       key={g.value}
                       onClick={() => setGlowLevel(g.value)}
-                      className={`flex-1 border-4 border-black p-2 font-black uppercase text-xs shadow-[3px_3px_0_0_#000] transition-all ${
-                        glowLevel === g.value
-                          ? "bg-accent text-black translate-x-[1px] translate-y-[1px] shadow-[1px_1px_0_0_#000]"
-                          : "bg-white text-black"
-                      }`}
+                      className={`flex-1 border-4 border-black p-2 font-black uppercase text-xs shadow-[3px_3px_0_0_#000] transition-all ${glowLevel === g.value
+                        ? "bg-accent text-black translate-x-[1px] translate-y-[1px] shadow-[1px_1px_0_0_#000]"
+                        : "bg-white text-black"
+                        }`}
                     >
                       {g.label}
                     </button>
@@ -910,48 +1102,117 @@ export default function MusicVisualizerPanel() {
               </div>
             )}
 
+            {/* Preview start slider */}
+            {engine.duration > 10 && (
+              <div>
+                <div className="flex justify-between text-xs font-black uppercase tracking-widest mb-1 text-[var(--text-soft)]">
+                  <span>Preview Start</span>
+                  <span className="text-[var(--text-main)]">
+                    {fmtTime(previewStart)} / {fmtTime(engine.duration)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.max(0, engine.duration - 10)}
+                  step="1"
+                  value={previewStart}
+                  onChange={(e) => setPreviewStart(Number(e.target.value))}
+                  className="w-full vis-range"
+                  disabled={isExporting}
+                />
+              </div>
+            )}
+
             {/* Progress bar */}
             <div>
               <div className="flex justify-between text-xs font-black uppercase mb-1 text-[var(--text-main)]">
-                <span>{isExporting ? "Recording..." : "Ready"}</span>
+                <span>
+                  {isRemuxing
+                    ? "Encoding MP4..."
+                    : isExporting
+                      ? `Rendering frames${isPreviewMode ? " (Preview)" : ""}...`
+                      : "Ready"}
+                </span>
                 <span>{exportProgress}%</span>
               </div>
               <div className="h-6 bg-[var(--bg-panel-muted)] border-4 border-black relative">
                 <div
-                  className="h-full bg-accent transition-all duration-300"
+                  className={`h-full bg-accent transition-all duration-300 ${isRemuxing ? "animate-pulse" : ""}`}
                   style={{ width: `${exportProgress}%` }}
                 />
               </div>
-              {isExporting && (
+              {isExporting && !isRemuxing && (
                 <p className="text-xs text-[var(--text-soft)] mt-1">
-                  Audio plays in real time during export. You can mute speakers with 🔇.
+                  Rendering offline — no audio plays during export. This is faster than real-time.
                 </p>
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Action buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Preview 10s */}
               <button
-                onClick={isExporting ? handleCancelExport : handleExport}
-                disabled={!engine.isReady}
-                className={`w-full border-4 border-black py-4 text-xl font-black uppercase shadow-[6px_6px_0_0_#000] transition-all ${
-                  isExporting
+                onClick={isExporting && isPreviewMode ? handleCancelExport : handlePreview}
+                disabled={!engine.isReady || (isExporting && !isPreviewMode)}
+                className={`w-full border-4 border-black py-4 text-lg font-black uppercase shadow-[6px_6px_0_0_#000] transition-all ${
+                  isExporting && isPreviewMode
+                    ? "bg-red-500 text-white hover:bg-red-600 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000]"
+                    : "bg-[var(--bg-panel-muted)] text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] disabled:opacity-40"
+                }`}
+              >
+                {isExporting && isPreviewMode ? "Cancel" : "Preview 10s"}
+              </button>
+
+              {/* Export Full */}
+              <button
+                onClick={isExporting && !isPreviewMode ? handleCancelExport : handleExport}
+                disabled={!engine.isReady || (isExporting && isPreviewMode)}
+                className={`w-full border-4 border-black py-4 text-lg font-black uppercase shadow-[6px_6px_0_0_#000] transition-all ${
+                  isExporting && !isPreviewMode
                     ? "bg-red-500 text-white hover:bg-red-600 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000]"
                     : "bg-accent text-black hover:bg-yellow-300 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] disabled:opacity-40"
                 }`}
               >
-                {isExporting ? "Cancel Export" : "Export Full Video"}
+                {isExporting && !isPreviewMode
+                  ? isRemuxing ? "Encoding..." : "Cancel Export"
+                  : "Export Full Video"}
               </button>
 
+              {/* Download */}
               {exportUrl && (
                 <a
                   href={exportUrl}
                   download={`visualizer_export.${downloadExt}`}
-                  className="block w-full text-center border-4 border-black bg-emerald-500 text-white py-4 text-xl font-black uppercase shadow-[6px_6px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] transition-all"
+                  className="block w-full text-center border-4 border-black bg-emerald-500 text-white py-4 text-lg font-black uppercase shadow-[6px_6px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] transition-all"
                 >
                   Download {downloadExt.toUpperCase()}
                 </a>
               )}
             </div>
+
+            {/* Inline preview player */}
+            {previewUrl && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-soft)]">
+                  Preview ({fmtTime(previewStart)} – {fmtTime(Math.min(previewStart + 10, engine.duration))})
+                </h4>
+                <div className="border-4 border-black bg-black">
+                  <video
+                    src={previewUrl}
+                    controls
+                    autoPlay
+                    className="w-full"
+                    style={{
+                      maxHeight: "50vh",
+                      aspectRatio: `${aspectCfg.w}/${aspectCfg.h}`,
+                      margin: "0 auto",
+                      display: "block",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
