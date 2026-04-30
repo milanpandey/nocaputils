@@ -12,18 +12,60 @@ export const metadata: Metadata = {
 export default function BlogIndex() {
     const posts = [
         {
-            slug: "how-to-edit-videos-in-browser",
-            title: "How to Edit Videos Directly in Your Browser (No Software Needed)",
-            date: "Oct 24, 2024",
-            excerpt: "A complete guide to using OPFS and FFmpeg for safe, secure, zero-upload video editing.",
+            slug: "studio-quality-audio-effects",
+            title: "Studio Quality Audio Effects in the Browser",
+            date: "Apr 29, 2026",
+            excerpt: "Apply professional filters, delays, and EQs to your audio files without leaving the browser.",
+            category: "Tech"
+        },
+        {
+            slug: "audio-reactive-music-visualizer",
+            title: "Create Audio-Reactive Videos with the Music Visualizer",
+            date: "Apr 18, 2026",
+            excerpt: "Turn your audio tracks into stunning, audio-reactive visualizers perfect for YouTube.",
+            category: "Release"
+        },
+        {
+            slug: "master-time-with-video-speed-control",
+            title: "Master Time with Video Speed Control",
+            date: "Apr 1, 2026",
+            excerpt: "Speed up or slow down your videos to create dramatic slow-motion or fast-paced timelapses.",
+            category: "Release"
+        },
+        {
+            slug: "extract-pure-audio-video-to-mp3",
+            title: "Extract Pure Audio with Video to MP3",
+            date: "Mar 28, 2026",
+            excerpt: "Need just the audio from a video? Our new extractor gets the job done securely.",
             category: "Tutorial"
         },
         {
-            slug: "why-client-side-processing-matters",
-            title: "Why Client-Side Video Processing is the Future of Privacy",
-            date: "Oct 12, 2024",
-            excerpt: "Your files never leave your device. Here is why nocaputils doesn't have a backend server.",
+            slug: "create-looping-gifs-instantly",
+            title: "Create Looping GIFs Instantly with Video to GIF",
+            date: "Mar 24, 2026",
+            excerpt: "Turn your favorite video clips into high-quality, looping GIFs in seconds.",
+            category: "Release"
+        },
+        {
+            slug: "video-compressor-shrink-files-keep-quality",
+            title: "Video Compressor: Shrink Files, Keep Quality",
+            date: "Mar 24, 2026",
+            excerpt: "Learn how our new Video Compressor reduces file sizes significantly while maintaining crisp visuals.",
             category: "Tech"
+        },
+        {
+            slug: "extract-cinematic-stills-frame-grab",
+            title: "Extract High-Res Cinematic Stills with Frame Grab",
+            date: "Mar 23, 2026",
+            excerpt: "Stop taking blurry screenshots of your videos. Use Frame Grab for perfect, full-resolution stills.",
+            category: "Tutorial"
+        },
+        {
+            slug: "introducing-browser-video-editor",
+            title: "Introducing the Online Video Editor: Trim, Crop, and Filter in Your Browser",
+            date: "Mar 18, 2026",
+            excerpt: "A fast, privacy-first way to edit your videos without leaving your browser.",
+            category: "Release"
         }
     ];
 

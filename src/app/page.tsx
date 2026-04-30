@@ -8,28 +8,28 @@ const tools = [
     name: "Video Editor",
     description: "Trim, crop, and filter in-browser.",
     status: "Live",
-    artClass: "tool-art-grid",
+    artClass: "tool-art-edit",
   },
   {
     id: "video-frame-extractor",
     name: "Frame Grab",
     description: "Extract high-res cinematic stills.",
     status: "Live",
-    artClass: "tool-art-frame",
+    artClass: "tool-art-grab",
   },
   {
     id: "video-to-gif",
     name: "Video to GIF",
     description: "Convert clips to looping GIFs.",
     status: "Live",
-    artClass: "tool-art-wave",
+    artClass: "tool-art-gif",
   },
   {
     id: "compress-video",
-    name: "Compressor",
+    name: "Video Compressor",
     description: "Shrink files, keep quality.",
     status: "Live",
-    artClass: "tool-art-compress",
+    artClass: "tool-art-shrink",
   },
   {
     id: "video-to-mp3",
@@ -40,7 +40,7 @@ const tools = [
   },
   {
     id: "change-video-speed",
-    name: "Speed Control",
+    name: "Video Speed Control",
     description: "Speed up or slow down videos.",
     status: "Live",
     artClass: "tool-art-speed",
@@ -53,11 +53,18 @@ const tools = [
     artClass: "tool-art-visualizer",
   },
   {
+    id: "audio-effects",
+    name: "Audio Effects",
+    description: "Apply filters, delays, and EQs to audio.",
+    status: "Live",
+    artClass: "tool-art-audio",
+  },
+  {
     id: "blog",
     name: "The Blog",
     description: "Creator tips & tool updates.",
     status: "Live",
-    artClass: "tool-art-blog",
+    artClass: "tool-art-pencil",
   },
 ];
 
@@ -163,7 +170,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
               {tools.map((tool) => {
                 const statusClass =
                   tool.status === "Live"
@@ -174,23 +181,23 @@ export default function Home() {
                   <a
                     key={tool.id}
                     href={`/${tool.id}`}
-                    className="neo-button block bg-[var(--bg-panel-muted)] p-3"
+                    className="neo-button block bg-[var(--bg-panel-muted)] p-2"
                   >
-                    <div className="mb-4 border-4 border-[var(--border-main)] bg-[#111827] p-3">
+                    <div className="mb-3 border-[3px] border-[var(--border-main)] bg-[#111827] p-2">
                       <div
                         className={`relative aspect-square border-2 border-[var(--border-main)] ${tool.artClass}`}
                       >
                         <div
-                          className={`absolute right-2 top-2 border-2 border-[var(--border-main)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${statusClass}`}
+                          className={`absolute right-1.5 top-1.5 border-2 border-[var(--border-main)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] ${statusClass}`}
                         >
                           {tool.status}
                         </div>
                       </div>
                     </div>
-                    <h3 className="text-xl font-black uppercase italic tracking-[-0.05em]">
+                    <h3 className="px-1 text-lg font-black uppercase italic tracking-[-0.05em]">
                       {tool.name}
                     </h3>
-                    <p className="mt-2 text-xs font-bold uppercase leading-6 tracking-[0.14em] text-[var(--text-soft)]">
+                    <p className="mt-1 px-1 text-[10px] font-bold uppercase leading-5 tracking-[0.1em] text-[var(--text-soft)]">
                       {tool.description}
                     </p>
                   </a>
