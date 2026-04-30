@@ -21,7 +21,13 @@ const postDatabase: Record<string, PostData> = {
         content: `We are thrilled to launch the nocaputils Online Video Editor. Our goal has always been to make professional video editing accessible and secure. With our new browser-based editor, you can trim clips, crop dimensions, and apply filters instantly.
 
 ### The Power of Client-Side Processing
-Because it runs entirely on your device using WebAssembly and FFmpeg, your videos are never uploaded to a server. This guarantees 100% privacy and blazing fast performance, regardless of your internet connection speed.`
+Because it runs entirely on your device using WebAssembly and FFmpeg, your videos are never uploaded to a server. This guarantees 100% privacy and blazing fast performance, regardless of your internet connection speed.
+
+### Keyboard Shortcuts
+To speed up your editing workflow, we've added the following keyboard shortcuts:
+- **Space**: Play / Pause
+- **Backspace / Delete**: Delete selected clip
+- **← / →**: Move playhead by 1 second (Hold **Shift** for precise frame-by-frame scrubbing)`
     },
     "extract-cinematic-stills-frame-grab": {
         title: "Extract High-Res Cinematic Stills with Frame Grab",
