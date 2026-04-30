@@ -3,48 +3,95 @@ import { Metadata } from 'next';
 import ThemeToggle from "@/components/ThemeToggle";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import TripTeaBanner from "@/components/TripTeaBanner";
 
 interface PostData {
     title: string;
     date: string;
     content: string;
     tags: string[];
+    toolPath?: string;
 }
 
 const postDatabase: Record<string, PostData> = {
-    "how-to-edit-videos-in-browser": {
-        title: "How to Edit Videos Directly in Your Browser (No Software Needed)",
-        date: "Oct 24, 2024",
-        tags: ["Tutorial", "FFmpeg", "WebAssembly"],
-        content: `In today's fast-paced digital world, content creators need tools that are quick, reliable, and most importantly, secure. Traditional video editing often requires bulky software installations or uploading sensitive data to remote servers. At nocaputils, we've pioneered a better way: browser-based, client-side video processing.
+    "introducing-browser-video-editor": {
+        title: "Introducing the Online Video Editor: Trim, Crop, and Filter in Your Browser",
+        date: "Mar 18, 2026",
+        tags: ["Video Editor", "Release", "Privacy"],
+        toolPath: "/online-video-editor",
+        content: `We are thrilled to launch the nocaputils Online Video Editor. Our goal has always been to make professional video editing accessible and secure. With our new browser-based editor, you can trim clips, crop dimensions, and apply filters instantly.
 
-### The Power of WebAssembly
-By leveraging the power of FFmpeg compiled to WebAssembly, our tools can handle complex video manipulations—like trimming, cropping, and compressing—directly on your machine. This means your files never leave your device, ensuring 100% privacy.
-
-### Step-by-Step Guide
-1. **Choose your tool**: Navigate to our Video Editor or Frame Extractor.
-2. **Select your file**: Drop your video into the dashboard.
-3. **Edit with ease**: Use our neo-brutalist interface to make your changes.
-4. **Export locally**: Click download and your processed file is saved instantly.
-
-No registration, no hidden fees, just pure utility.`
+### The Power of Client-Side Processing
+Because it runs entirely on your device using WebAssembly and FFmpeg, your videos are never uploaded to a server. This guarantees 100% privacy and blazing fast performance, regardless of your internet connection speed.`
     },
-    "why-client-side-processing-matters": {
-        title: "Why Client-Side Video Processing is the Future of Privacy",
-        date: "Oct 12, 2024",
-        tags: ["Privacy", "Tech", "Performance"],
-        content: `Privacy is no longer a luxury; it's a fundamental requirement. When you upload a video to a cloud-based editor, you're essentially handing over your data to a third party. But what if the editor came to you?
+    "extract-cinematic-stills-frame-grab": {
+        title: "Extract High-Res Cinematic Stills with Frame Grab",
+        date: "Mar 23, 2026",
+        tags: ["Frame Grab", "Images", "Tutorial"],
+        toolPath: "/video-frame-extractor",
+        content: `Have you ever tried to pause a video and take a screenshot, only to end up with a blurry, low-resolution image? We felt that pain, which is why we built the Frame Grab tool.
 
-### Zero-Server Architecture
-nocaputils is built on a "Zero-Server" philosophy. While we use servers to deliver the website code to you, the actual heavy lifting of video processing happens in your browser's memory. We use modern web technologies like OPFS (Origin Private File System) to manage large files without the overhead of cloud storage.
+### Precision Control
+Now you can upload your video, scrub through frame by frame, and extract the exact moment you want in its original, uncompressed resolution. Whether you are creating thumbnails for YouTube, capturing a beautiful cinematic still, or just saving a memory, Frame Grab makes it effortless and precise.`
+    },
+    "video-compressor-shrink-files-keep-quality": {
+        title: "Video Compressor: Shrink Files, Keep Quality",
+        date: "Mar 24, 2026",
+        tags: ["Compression", "Performance", "Video"],
+        toolPath: "/compress-video",
+        content: `Large video files can be a nightmare to share, upload, or store. That's why we added the Video Compressor to the nocaputils suite.
 
-### Benefits of Local Processing:
-- **Instant Latency**: No waiting for uploads or downloads to a remote server.
-- **Data Sovereignty**: You maintain full control over your source files at all times.
-- **Bandwidth Savings**: Only the final result is "downloaded" from your own browser memory.
+### Advanced Local Encoding
+By leveraging advanced encoding algorithms directly in your browser, you can dramatically reduce the file size of your videos without noticeably degrading the quality. Choose your target bitrate, see real-time estimated file sizes, and compress securely on your own device. Say goodbye to upload limits!`
+    },
+    "create-looping-gifs-instantly": {
+        title: "Create Looping GIFs Instantly with Video to GIF",
+        date: "Mar 24, 2026",
+        tags: ["GIF", "Social Media", "Release"],
+        toolPath: "/video-to-gif",
+        content: `GIFs are the language of the internet, but creating them shouldn't require complex software. Today, we're introducing the Video to GIF converter.
 
-As hackers and data breaches become more common, client-side processing represents a safer, more sustainable path for the web.`
+### Fast and Secure
+Simply load your video, select the start and end points, and hit convert. The entire process happens in your browser memory, ensuring your original clips remain private. You can customize the framerate and resolution to get the perfect balance between smooth animation and file size.`
+    },
+    "extract-pure-audio-video-to-mp3": {
+        title: "Extract Pure Audio with Video to MP3",
+        date: "Mar 28, 2026",
+        tags: ["Audio", "MP3", "Workflow"],
+        toolPath: "/video-to-mp3",
+        content: `Sometimes the best part of a video is the soundtrack. With the new Video to MP3 tool, you can instantly strip the audio track from any video file and save it as a high-quality MP3.
+
+### Workflow Optimization
+Whether you're grabbing a soundbite for a podcast, saving a lecture, or extracting a music track, our tool handles it locally. No need to upload your heavy video files to a random converter website—nocaputils does it all offline.`
+    },
+    "master-time-with-video-speed-control": {
+        title: "Master Time with Video Speed Control",
+        date: "Apr 1, 2026",
+        tags: ["Speed", "Effects", "Video"],
+        toolPath: "/change-video-speed",
+        content: `Time manipulation is a powerful storytelling tool. Our new Video Speed Control utility lets you adjust the playback speed of your videos seamlessly.
+
+### Cinematic Slow-Mo and Timelapses
+Want to highlight a split-second action? Slow it down to create a dramatic slow-motion effect. Need to condense a long process? Speed it up into a snappy timelapse. Our browser-based engine re-encodes the video locally, ensuring smooth playback at any speed.`
+    },
+    "audio-reactive-music-visualizer": {
+        title: "Create Audio-Reactive Videos with the Music Visualizer",
+        date: "Apr 18, 2026",
+        tags: ["Music", "Visualizer", "YouTube"],
+        toolPath: "/music-visualizer",
+        content: `Musicians and podcasters, this one is for you. We've launched a high-performance, NCS-style Music Visualizer. 
+
+### Render Stunning Visuals
+Upload your audio track and an image background, and watch our engine generate dynamic, audio-reactive visual particles that pulse to the beat. Best of all, it features deterministic offline rendering to export perfectly smooth MP4 videos. Customize your frequency bands, colors, and particle counts to match your brand.`
+    },
+    "studio-quality-audio-effects": {
+        title: "Studio Quality Audio Effects in the Browser",
+        date: "Apr 29, 2026",
+        tags: ["Audio", "Effects", "Release"],
+        toolPath: "/audio-effects",
+        content: `We are expanding our toolkit beyond video with the release of the Audio Effects engine! 
+
+### Granular Audio Processing
+You can now apply granular audio processing—including lowpass/highpass filters, delays, pitch shifting, and gain control—directly within your browser. By utilizing the Web Audio API for playback and custom buffer processing for offline export, we ensure zero latency and studio-quality output in a downloadable WAV format. Try it out today!`
     }
 };
 
@@ -97,9 +144,20 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
                         {post.content}
                     </div>
 
-                    <div className="mt-16">
-                        <TripTeaBanner source={`blog_${resolvedParams.slug}`} />
-                    </div>
+                    {post.toolPath && (
+                        <div className="mt-12 pt-8 border-t-4 border-[var(--border-main)] text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div>
+                                <h3 className="text-2xl font-black uppercase italic tracking-[-0.05em] text-[var(--text-main)] mb-2">Ready to try it out?</h3>
+                                <p className="text-sm font-bold uppercase tracking-[0.1em] text-[var(--text-soft)]">100% private, runs entirely in your browser.</p>
+                            </div>
+                            <Link 
+                                href={post.toolPath}
+                                className="neo-button neo-button-theme inline-flex px-8 py-4 text-lg font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap"
+                            >
+                                Try Now →
+                            </Link>
+                        </div>
+                    )}
                 </article>
                 <Footer />
             </div>
