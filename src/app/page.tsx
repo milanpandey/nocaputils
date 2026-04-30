@@ -8,28 +8,28 @@ const tools = [
     name: "Video Editor",
     description: "Trim, crop, and filter in-browser.",
     status: "Live",
-    artClass: "tool-art-grid",
+    artClass: "tool-art-edit",
   },
   {
     id: "video-frame-extractor",
     name: "Frame Grab",
     description: "Extract high-res cinematic stills.",
     status: "Live",
-    artClass: "tool-art-frame",
+    artClass: "tool-art-grab",
   },
   {
     id: "video-to-gif",
     name: "Video to GIF",
     description: "Convert clips to looping GIFs.",
     status: "Live",
-    artClass: "tool-art-wave",
+    artClass: "tool-art-gif",
   },
   {
     id: "compress-video",
-    name: "Compressor",
+    name: "Video Compressor",
     description: "Shrink files, keep quality.",
     status: "Live",
-    artClass: "tool-art-compress",
+    artClass: "tool-art-shrink",
   },
   {
     id: "video-to-mp3",
@@ -40,7 +40,7 @@ const tools = [
   },
   {
     id: "change-video-speed",
-    name: "Speed Control",
+    name: "Video Speed Control",
     description: "Speed up or slow down videos.",
     status: "Live",
     artClass: "tool-art-speed",
@@ -64,7 +64,7 @@ const tools = [
     name: "The Blog",
     description: "Creator tips & tool updates.",
     status: "Live",
-    artClass: "tool-art-blog",
+    artClass: "tool-art-pencil",
   },
 ];
 
