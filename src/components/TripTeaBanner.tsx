@@ -1,8 +1,10 @@
 "use client";
 
-import { getTripTeaLink } from "@/lib/constants";
+import { getTripTeaLink, SHOW_TRIPTEA } from "@/lib/constants";
 
 export default function TripTeaBanner({ source }: { source: string }) {
+  if (!SHOW_TRIPTEA) return null;
+
   return (
     <div className="neo-panel !bg-black text-white p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 overflow-hidden relative group">
       {/* Decorative pattern */}
