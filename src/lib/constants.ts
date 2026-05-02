@@ -1,3 +1,4 @@
+export const SHOW_TRIPTEA = false;
 export const TRIPTEA_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.triptea.app";
 
 /**
@@ -13,6 +14,6 @@ export const getTripTeaLink = (pageIdentifier: string) => {
     utm_campaign: "nocaputils_triptea",
     utm_content: pageIdentifier,
   });
-  
+
   return `${TRIPTEA_PLAY_STORE_URL}&${params.toString()}`;
 };

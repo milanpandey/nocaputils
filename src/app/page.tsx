@@ -1,5 +1,5 @@
 import ThemeToggle from "@/components/ThemeToggle";
-import { getTripTeaLink } from "@/lib/constants";
+import { getTripTeaLink, SHOW_TRIPTEA } from "@/lib/constants";
 import Footer from "@/components/Footer";
 
 const tools = [
@@ -93,7 +93,11 @@ export default function Home() {
                 suite.
               </p>
               <p className="max-w-2xl text-base font-medium leading-7 text-[var(--text-soft)] sm:text-lg">
-                Powered by <span className="font-black text-[var(--text-main)]">TripTea</span>.
+                {SHOW_TRIPTEA && (
+                  <>
+                    Powered by <span className="font-black text-[var(--text-main)]">TripTea</span>.{" "}
+                  </>
+                )}
                 Get professional-grade assets with{" "}
                 <span className="font-black text-[var(--text-main)]">
                   100% private in-browser processing
@@ -114,49 +118,51 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="neo-panel mb-20 grid w-full max-w-6xl grid-cols-1 gap-10 bg-[var(--bg-panel)] p-8 lg:grid-cols-[1.1fr_0.9fr] lg:p-12">
-            <div className="flex flex-col justify-center">
-              <h2 className="mb-6 text-4xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-6xl">
-                Meet{" "}
-                <span className="inline-block border-4 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-black not-italic">
-                  TripTea
-                </span>
-              </h2>
-              <p className="mb-6 max-w-xl text-2xl font-extrabold uppercase leading-[1.25] tracking-[-0.04em]">
-                Simply describe your dream vacation in plain language, and our AI
-                creates a complete, day-by-day itinerary tailored to your preferences.
-              </p>
-              <p className="mb-10 max-w-xl text-lg leading-8 text-[var(--text-soft)]">
-                Whether it&apos;s a romantic getaway to Paris, an adventure trek in the
-                Himalayas, or a family beach vacation, TripTea handles it all.
-              </p>
-                <a
-                  href={getTripTeaLink("homepage")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="neo-button neo-button-theme inline-flex px-8 py-4 text-lg font-black uppercase tracking-[0.2em] transition-colors"
-                >
-                  Download on Google Play
-                </a>
-            </div>
+          {SHOW_TRIPTEA && (
+            <section className="neo-panel mb-20 grid w-full max-w-6xl grid-cols-1 gap-10 bg-[var(--bg-panel)] p-8 lg:grid-cols-[1.1fr_0.9fr] lg:p-12">
+              <div className="flex flex-col justify-center">
+                <h2 className="mb-6 text-4xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-6xl">
+                  Meet{" "}
+                  <span className="inline-block border-4 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-black not-italic">
+                    TripTea
+                  </span>
+                </h2>
+                <p className="mb-6 max-w-xl text-2xl font-extrabold uppercase leading-[1.25] tracking-[-0.04em]">
+                  Simply describe your dream vacation in plain language, and our AI
+                  creates a complete, day-by-day itinerary tailored to your preferences.
+                </p>
+                <p className="mb-10 max-w-xl text-lg leading-8 text-[var(--text-soft)]">
+                  Whether it&apos;s a romantic getaway to Paris, an adventure trek in the
+                  Himalayas, or a family beach vacation, TripTea handles it all.
+                </p>
+                  <a
+                    href={getTripTeaLink("homepage")}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="neo-button neo-button-theme inline-flex px-8 py-4 text-lg font-black uppercase tracking-[0.2em] transition-colors"
+                  >
+                    Download on Google Play
+                  </a>
+              </div>
 
-            <div className="flex items-center justify-center">
-              <div className="relative w-full max-w-[20rem] rotate-[4deg] border-4 border-[var(--border-main)] bg-[var(--accent)] p-4 text-black shadow-[8px_8px_0_0_var(--border-main)]">
-                <div className="absolute -left-2 -top-2 border-2 border-[var(--border-main)] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-black">
-                  New App
-                </div>
-                <div className="phone-screen overflow-hidden rounded-[1.25rem] border-4 border-[var(--border-main)] p-3">
-                  <div className="overflow-hidden rounded-[1rem] border-2 border-[var(--border-main)] bg-white">
-                    <img
-                      src="/media/app_screen.jpg"
-                      alt="TripTea app screen"
-                      className="aspect-[9/16] h-full w-full object-cover object-top"
-                    />
+              <div className="flex items-center justify-center">
+                <div className="relative w-full max-w-[20rem] rotate-[4deg] border-4 border-[var(--border-main)] bg-[var(--accent)] p-4 text-black shadow-[8px_8px_0_0_var(--border-main)]">
+                  <div className="absolute -left-2 -top-2 border-2 border-[var(--border-main)] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-black">
+                    New App
+                  </div>
+                  <div className="phone-screen overflow-hidden rounded-[1.25rem] border-4 border-[var(--border-main)] p-3">
+                    <div className="overflow-hidden rounded-[1rem] border-2 border-[var(--border-main)] bg-white">
+                      <img
+                        src="/media/app_screen.jpg"
+                        alt="TripTea app screen"
+                        className="aspect-[9/16] h-full w-full object-cover object-top"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           <section id="tools" className="mb-20 w-full max-w-6xl">
             <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
