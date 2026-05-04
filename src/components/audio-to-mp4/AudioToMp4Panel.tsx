@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import TripTeaBanner from "../TripTeaBanner";
 
-export default function Mp3ToMp4Panel() {
+export default function AudioToMp4Panel() {
   const [audioSrc, setAudioSrc] = useState<string>("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   
@@ -71,9 +71,14 @@ export default function Mp3ToMp4Panel() {
       }
 
       const ffmpeg = ffmpegRef.current;
-      const inputAudio = "input.mp3";
+      
+      const ext = audioFile.name.split('.').pop()?.toLowerCase() || "mp3";
+      const inputAudio = `input.${ext}`;
       const inputImage = "image.jpg";
       const outputName = "output.mp4";
+
+      const isCopyable = ["mp3", "m4a", "aac"].includes(ext);
+      const audioCodecArgs = isCopyable ? ["-c:a", "copy"] : ["-c:a", "aac", "-b:a", "192k"];
 
       const audioBuffer = await audioFile.arrayBuffer();
       await ffmpeg.writeFile(inputAudio, new Uint8Array(audioBuffer));
@@ -94,7 +99,7 @@ export default function Mp3ToMp4Panel() {
           "-c:v", "libx264",
           "-preset", "ultrafast",
           "-tune", "stillimage",
-          "-c:a", "copy",
+          ...audioCodecArgs,
           "-shortest",
           "-pix_fmt", "yuv420p",
           outputName
@@ -108,14 +113,17 @@ export default function Mp3ToMp4Panel() {
           "-map", "1:a",
           "-c:v", "libx264",
           "-preset", "ultrafast",
-          "-c:a", "copy",
+          ...audioCodecArgs,
           "-shortest",
           "-pix_fmt", "yuv420p",
           outputName
         ];
       }
 
-      await ffmpeg.exec(ffmpegArgs);
+      const ret = await ffmpeg.exec(ffmpegArgs);
+      if (ret !== 0) {
+        throw new Error("FFmpeg conversion failed. Please check your input file.");
+      }
 
       const data = await ffmpeg.readFile(outputName);
       const outBlob = new Blob([data as any], { type: "video/mp4" });
@@ -241,7 +249,7 @@ export default function Mp3ToMp4Panel() {
               
               <div className="space-y-2 mt-6">
                 <p className="text-xs font-bold uppercase text-[var(--text-soft)]">
-                  Audio is stream-copied (no re-encoding) for ultra-fast export. Video is encoded at 1 FPS.
+                  MP3/AAC audio is stream-copied for ultra-fast export. Other formats (WAV) are quickly encoded to AAC. Video is encoded at 1 FPS.
                 </p>
               </div>
 

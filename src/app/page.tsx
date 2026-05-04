@@ -39,8 +39,8 @@ const tools = [
     artClass: "tool-art-mp3",
   },
   {
-    id: "mp3-to-mp4",
-    name: "MP3 to MP4",
+    id: "audio-to-mp4",
+    name: "Audio to MP4",
     description: "Convert audio to video in seconds.",
     status: "Live",
     artClass: "tool-art-mp4",
@@ -96,7 +96,7 @@ export default function Home() {
             <div className="mt-10 flex flex-col items-center gap-5">
               <p className="text-2xl font-extrabold uppercase tracking-[-0.04em] sm:text-3xl">
                 The ultimate{" "}
-                <span className="border-b-[6px] border-[var(--accent)]">nocaputils</span>{" "}
+                <span className="border-2 border-[var(--border-main)] bg-[var(--accent)] px-2 py-1 text-black shadow-[4px_4px_0_0_var(--border-main)]">nocaputils</span>{" "}
                 suite.
               </p>
               <p className="max-w-2xl text-base font-medium leading-7 text-[var(--text-soft)] sm:text-lg">
@@ -224,11 +224,7 @@ export default function Home() {
               Ready to Create?
             </h2>
             <p className="mx-auto mt-8 max-w-2xl text-lg font-extrabold uppercase leading-8 tracking-[0.12em]">
-              Join the creators using{" "}
-              <span className="border-2 border-[var(--border-main)] bg-[#FF00FF] px-2 py-1 text-white">
-                nocaputils
-              </span>{" "}
-              to skip the wait times and keep their data safe.
+              Join the creators on the home page.
             </p>
             <div className="mt-12">
               <a
