@@ -25,7 +25,7 @@ export default function AudioEffectsPage() {
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Free", "9 Presets", "Privacy First", "Instant Export"].map(
+              {["100% Free", "14 Presets", "Privacy First", "WAV + MP3 Export"].map(
                 (label) => (
                   <div
                     key={label}
@@ -39,8 +39,8 @@ export default function AudioEffectsPage() {
 
             <p className="mt-8 max-w-4xl text-xl font-medium leading-9 text-[var(--text-soft)]">
               Apply viral audio effects like slowed + reverb, bass boost, nightcore, and more.
-              Fine-tune with custom controls and export high-quality WAV files — all processed
-              locally in your browser.
+              Fine-tune every parameter with interactive sliders and export as high-quality WAV
+              or MP3 — all processed locally in your browser.
             </p>
           </section>
 
@@ -62,13 +62,14 @@ export default function AudioEffectsPage() {
                     no accounts, no uploads to sketchy servers.
                   </p>
                   <p>
-                    Choose from 9 carefully-tuned presets that cover the most popular audio
-                    trends on social media, or dial in your own settings with granular sliders
-                    for speed, pitch, bass, reverb, and master volume. The real-time preview
+                    Choose from 14 carefully-tuned presets that cover the most popular audio
+                    trends on social media. Every preset exposes its full parameter set —
+                    speed, pitch, bass, treble, lowpass, delay, reverb, and volume — so you
+                    can tweak to perfection or reset with one click. The real-time preview
                     lets you hear exactly what you&apos;re getting before you export.
                   </p>
                   <p>
-                    Your exported WAV files are studio-quality 16-bit PCM — perfect for
+                    Export as studio-quality 16-bit WAV or compressed 192kbps MP3 — perfect for
                     uploading to YouTube, SoundCloud, Spotify, or using in your own video
                     projects. Everything runs on your device, so your unreleased music stays
                     safe.
@@ -87,7 +88,7 @@ export default function AudioEffectsPage() {
                     </p>
                     <p className="mt-2">
                       You can load MP3, WAV, OGG, FLAC, M4A, and any other format your
-                      browser supports. Exports are always high-quality WAV files.
+                      browser supports. Export as lossless WAV or compressed 192kbps MP3.
                     </p>
                   </div>
                   <div>
