@@ -1,14 +1,14 @@
-import Mp3ToMp4Panel from "@/components/mp3-to-mp4/Mp3ToMp4Panel";
+import AudioToMp4Panel from "@/components/audio-to-mp4/AudioToMp4Panel";
 import Header from "@/components/Header";
 import TripTeaBanner from "@/components/TripTeaBanner";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "MP3 to MP4 Converter | nocaputils",
-  description: "Quickly convert MP3 audio to MP4 video with a custom background image. 100% private, browser-based, and lightning fast with no uploads.",
+  title: "Audio to MP4 Converter | nocaputils",
+  description: "Quickly convert audio to MP4 video with a custom background image. 100% private, browser-based, and lightning fast with no uploads.",
 };
 
-export default function Mp3ToMp4Page() {
+export default function AudioToMp4Page() {
   return (
     <div className="subtle-pattern min-h-screen">
       <Header backLink={{ href: "/", label: "← Home" }} />
@@ -17,7 +17,7 @@ export default function Mp3ToMp4Page() {
         <main className="flex flex-1 flex-col items-center">
           <section className="mb-12 max-w-4xl text-center">
             <h1 className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.06em] sm:text-7xl lg:text-[6.4rem]">
-              <span className="block">MP3 to MP4</span>
+              <span className="block">Audio to MP4</span>
               <span className="mt-3 inline-block rotate-[-2deg] border-4 border-[var(--border-main)] bg-[var(--accent)] px-5 py-1 text-black shadow-[6px_6px_0_0_var(--border-main)]">
                 Converter
               </span>
@@ -37,32 +37,32 @@ export default function Mp3ToMp4Page() {
             </div>
 
             <p className="mt-8 max-w-4xl text-xl font-medium leading-9 text-[var(--text-soft)]">
-              Convert your MP3 audio files to MP4 videos in seconds. Just add an optional image and export instantly. Complete privacy, zero uploads.
+              Convert your audio files to MP4 videos in seconds. Just add an optional image and export instantly. Complete privacy, zero uploads.
             </p>
           </section>
 
           <section className="w-full max-w-7xl">
-            <Mp3ToMp4Panel />
+            <AudioToMp4Panel />
           </section>
 
           <section className="mt-16 w-full max-w-6xl">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_0.7fr]">
               <div className="neo-panel bg-[var(--bg-panel)] p-8">
                 <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
-                  How to Convert MP3 to MP4 Quickly
+                  How to Convert Audio (MP3/WAV) to MP4 Quickly
                 </h2>
                 <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
                   <p>
-                    Need to upload a podcast, music track, or voiceover to YouTube or Instagram? They don't accept MP3 files directly. 
-                    <span className="font-black text-[var(--text-main)]">nocaputils</span> uses client-side processing to convert your audio to video instantly, without uploading your data to slow servers. This makes it perfect for quickly creating videos for YouTube.
+                    Need to upload a podcast, music track, or voiceover to YouTube or Instagram? They don't accept audio files directly. 
+                    Whether you are looking to convert <span className="font-black text-[var(--text-main)]">MP3 to MP4</span> or <span className="font-black text-[var(--text-main)]">WAV to MP4</span>, <span className="font-black text-[var(--text-main)]">nocaputils</span> uses client-side processing to convert your audio to video instantly, without uploading your data to slow servers. This makes it perfect for quickly creating videos for YouTube.
                   </p>
                   <p>
-                    Unlike other tools that re-encode the audio and take minutes to finish, our tool simply copies the audio stream directly into an MP4 container along with a 1fps background image. 
-                    This makes the conversion process incredibly fast and maintains the original audio quality perfectly.
+                    Unlike other tools that re-encode the audio and take minutes to finish, our tool simply stream copies supported audio (like MP3) directly into an MP4 container along with a 1fps background image. If you upload a WAV file, it automatically and quickly encodes it to AAC so it fits perfectly.
+                    This makes the conversion process incredibly fast and maintains high audio quality.
                   </p>
                   <p>
-                    Simply select your MP3 file, optionally provide a background image (we provide a default one if you don't), and hit convert. 
-                    Since there's no upload step and no re-encoding, the process takes only seconds.
+                    Simply select your audio file, optionally provide a background image (we provide a default one if you don't), and hit convert. 
+                    Since there's no upload step, the process takes only seconds.
                   </p>
                 </div>
               </div>
@@ -77,7 +77,7 @@ export default function Mp3ToMp4Page() {
                       Why is it so much faster than other tools?
                     </p>
                     <p className="mt-2">
-                      We use a technique called "stream copying" where we skip re-encoding the audio and simply package the existing MP3 audio data into an MP4 container. This saves massive amounts of processing time.
+                      We use a technique called "stream copying" where we skip re-encoding the audio and simply package the existing MP3 data into an MP4 container. For formats like WAV, we use ultra-fast AAC encoding. This saves massive amounts of processing time.
                     </p>
                   </div>
                   <div>

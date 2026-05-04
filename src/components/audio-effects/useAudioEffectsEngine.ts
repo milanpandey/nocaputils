@@ -195,6 +195,49 @@ export function audioBufferToWav(buffer: AudioBuffer): Uint8Array {
   return new Uint8Array(out);
 }
 
+/**
+ * Encode an AudioBuffer into MP3 using in-browser FFmpeg.
+ * First creates a WAV, then transcodes to 192kbps MP3.
+ */
+export async function audioBufferToMp3(
+  buffer: AudioBuffer,
+  onProgress?: (p: number) => void,
+): Promise<Uint8Array> {
+  const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+  const { toBlobURL } = await import("@ffmpeg/util");
+
+  const ffmpeg = new FFmpeg();
+  if (onProgress) {
+    ffmpeg.on("progress", ({ progress: p }) => onProgress(Math.min(p, 1)));
+  }
+
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
+
+  // Write WAV to virtual FS
+  const wavData = audioBufferToWav(buffer);
+  await ffmpeg.writeFile("input.wav", wavData);
+
+  // Transcode to MP3
+  const ret = await ffmpeg.exec([
+    "-i", "input.wav",
+    "-c:a", "libmp3lame",
+    "-b:a", "192k",
+    "output.mp3",
+  ]);
+
+  if (ret !== 0) throw new Error("MP3 encoding failed");
+
+  const mp3Data = await ffmpeg.readFile("output.mp3");
+  await ffmpeg.deleteFile("input.wav");
+  await ffmpeg.deleteFile("output.mp3");
+
+  return mp3Data as Uint8Array;
+}
+
 export function useAudioEffectsEngine() {
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
