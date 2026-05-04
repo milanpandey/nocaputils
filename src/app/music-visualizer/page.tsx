@@ -54,7 +54,7 @@ export default function MusicVisualizerPage() {
                 <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
                   <p>
                     Creating engaging music videos for YouTube, TikTok, or Spotify Canvas used to require
-                    heavy desktop software like After Effects. **nocaputils** changes that by putting
+                    heavy desktop software like After Effects. <span className="font-black text-[var(--text-main)]">nocaputils</span> changes that by putting
                     a powerful rendering engine right inside your browser. No uploads, no waiting in line.
                   </p>
                   <p>

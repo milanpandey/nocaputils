@@ -1,14 +1,14 @@
-import Mp3ConverterPanel from "@/components/video-to-mp3/Mp3ConverterPanel";
+import Mp3ToMp4Panel from "@/components/mp3-to-mp4/Mp3ToMp4Panel";
 import Header from "@/components/Header";
 import TripTeaBanner from "@/components/TripTeaBanner";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "Video to MP3 Converter | nocaputils",
-  description: "Extract high-quality audio from any video file. 100% private, browser-based, and lightning fast with no uploads.",
+  title: "MP3 to MP4 Converter | nocaputils",
+  description: "Quickly convert MP3 audio to MP4 video with a custom background image. 100% private, browser-based, and lightning fast with no uploads.",
 };
 
-export default function VideoToMp3Page() {
+export default function Mp3ToMp4Page() {
   return (
     <div className="subtle-pattern min-h-screen">
       <Header backLink={{ href: "/", label: "← Home" }} />
@@ -17,14 +17,14 @@ export default function VideoToMp3Page() {
         <main className="flex flex-1 flex-col items-center">
           <section className="mb-12 max-w-4xl text-center">
             <h1 className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.06em] sm:text-7xl lg:text-[6.4rem]">
-              <span className="block">Video to MP3</span>
+              <span className="block">MP3 to MP4</span>
               <span className="mt-3 inline-block rotate-[-2deg] border-4 border-[var(--border-main)] bg-[var(--accent)] px-5 py-1 text-black shadow-[6px_6px_0_0_var(--border-main)]">
                 Converter
               </span>
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Free", "320kbps Support", "Privacy First", "No Watermark"].map(
+              {["100% Free", "Ultra Fast", "Privacy First", "No Watermark"].map(
                 (label) => (
                   <div
                     key={label}
@@ -37,36 +37,32 @@ export default function VideoToMp3Page() {
             </div>
 
             <p className="mt-8 max-w-4xl text-xl font-medium leading-9 text-[var(--text-soft)]">
-              Extract high-quality audio from any video file directly in your browser. Complete privacy, zero uploads.
+              Convert your MP3 audio files to MP4 videos in seconds. Just add an optional image and export instantly. Complete privacy, zero uploads.
             </p>
           </section>
 
           <section className="w-full max-w-7xl">
-            <Mp3ConverterPanel />
+            <Mp3ToMp4Panel />
           </section>
 
           <section className="mt-16 w-full max-w-6xl">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_0.7fr]">
               <div className="neo-panel bg-[var(--bg-panel)] p-8">
                 <h2 className="text-3xl font-black uppercase tracking-[-0.05em]">
-                  How to Extract Crystal Clear Audio In-Browser
+                  How to Convert MP3 to MP4 Quickly
                 </h2>
                 <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
                   <p>
-                    Extracting audio from video files once meant uploading massive clips to slow servers,
-                    often sacrificing quality or privacy. <span className="font-black text-[var(--text-main)]">nocaputils</span> uses client-side processing to
-                    convert video to MP3 without your data ever leaving your device.
+                    Need to upload a podcast, music track, or voiceover to YouTube or Instagram? They don't accept MP3 files directly. 
+                    <span className="font-black text-[var(--text-main)]">nocaputils</span> uses client-side processing to convert your audio to video instantly, without uploading your data to slow servers. This makes it perfect for quickly creating videos for YouTube.
                   </p>
                   <p>
-                    Our tool leverages standard encoding libraries to strip the audio stream from your
-                    video container and re-encode it as a high-quality MP3 file. This is perfect for
-                    podcasting, creating custom ringtones, or extracting background music from travel
-                    videos.
+                    Unlike other tools that re-encode the audio and take minutes to finish, our tool simply copies the audio stream directly into an MP4 container along with a 1fps background image. 
+                    This makes the conversion process incredibly fast and maintains the original audio quality perfectly.
                   </p>
                   <p>
-                    Simply select your video file, choose your desired bitrate (up to 320kbps for CD-quality
-                    sound), and hit convert. Since there's no upload step, the process is limited only by
-                    your computer's speed, not your internet bandwidth.
+                    Simply select your MP3 file, optionally provide a background image (we provide a default one if you don't), and hit convert. 
+                    Since there's no upload step and no re-encoding, the process takes only seconds.
                   </p>
                 </div>
               </div>
@@ -78,12 +74,10 @@ export default function VideoToMp3Page() {
                 <div className="mt-6 space-y-5 text-sm leading-7 text-[var(--text-soft)]">
                   <div>
                     <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
-                      What is the best bitrate to use?
+                      Why is it so much faster than other tools?
                     </p>
                     <p className="mt-2">
-                       For most purposes, 192kbps is the "sweet spot" between file size and quality. If you're
-                       working with high-fidelity music or professional voiceovers, choose 320kbps for
-                       maximum clarity.
+                      We use a technique called "stream copying" where we skip re-encoding the audio and simply package the existing MP3 audio data into an MP4 container. This saves massive amounts of processing time.
                     </p>
                   </div>
                   <div>
@@ -91,17 +85,15 @@ export default function VideoToMp3Page() {
                       Is my data safe?
                     </p>
                     <p className="mt-2">
-                      Yes. Unlike other converters, we don't store or even see your video. The conversion
-                      happens entirely within your browser's memory using WebAssembly.
+                      Yes. Unlike other converters, we don't store or even see your files. The conversion happens entirely within your browser's memory using WebAssembly.
                     </p>
                   </div>
                   <div>
                     <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
-                      What video formats can I convert?
+                      What if I don't add an image?
                     </p>
                     <p className="mt-2">
-                      We support all major video formats including MP4, MOV, WebM, and AVI. If your
-                      browser can play the video, we can extract the audio.
+                      If you don't provide an image, we will generate a simple black background frame for your video automatically.
                     </p>
                   </div>
                 </div>
@@ -110,7 +102,7 @@ export default function VideoToMp3Page() {
           </section>
 
           <section className="mt-12 mb-8 w-full max-w-7xl">
-            <TripTeaBanner source="video_to_mp3" />
+            <TripTeaBanner source="mp3_to_mp4" />
           </section>
         </main>
 

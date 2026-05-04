@@ -55,7 +55,7 @@ export default function CompressVideoPage() {
                   <p>
                     Large video files are a major headache for online sharing. Discord has strict limits,
                     emails often bounce if attachments are over 25MB, and social media platforms can
-                    mangle your content during upload. **nocaputils** solves this by providing a
+                    mangle your content during upload. <span className="font-black text-[var(--text-main)]">nocaputils</span> solves this by providing a
                     powerful bitrate calculator and compression engine that runs entirely in your browser.
                   </p>
                   <p>
@@ -92,7 +92,7 @@ export default function CompressVideoPage() {
                       Is it faster than other compressors?
                     </p>
                     <p className="mt-2">
-                       Since there is NO upload or download time, **nocaputils** is often significantly
+                       Since there is NO upload or download time, <span className="font-black text-[var(--text-main)]">nocaputils</span> is often significantly
                        faster than traditional cloud converters, especially for large source files.
                     </p>
                   </div>

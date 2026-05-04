@@ -39,6 +39,13 @@ const tools = [
     artClass: "tool-art-mp3",
   },
   {
+    id: "mp3-to-mp4",
+    name: "MP3 to MP4",
+    description: "Convert audio to video in seconds.",
+    status: "Live",
+    artClass: "tool-art-mp4",
+  },
+  {
     id: "change-video-speed",
     name: "Video Speed Control",
     description: "Speed up or slow down videos.",
