@@ -142,14 +142,14 @@ export default function Home() {
                   Whether it&apos;s a romantic getaway to Paris, an adventure trek in the
                   Himalayas, or a family beach vacation, TripTea handles it all.
                 </p>
-                  <a
-                    href={getTripTeaLink("homepage")}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="neo-button neo-button-theme inline-flex px-8 py-4 text-lg font-black uppercase tracking-[0.2em] transition-colors"
-                  >
-                    Download on Google Play
-                  </a>
+                <a
+                  href={getTripTeaLink("homepage")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="neo-button neo-button-theme inline-flex px-8 py-4 text-lg font-black uppercase tracking-[0.2em] transition-colors"
+                >
+                  Download on Google Play
+                </a>
               </div>
 
               <div className="flex items-center justify-center">
@@ -224,7 +224,7 @@ export default function Home() {
               Ready to Create?
             </h2>
             <p className="mx-auto mt-8 max-w-2xl text-lg font-extrabold uppercase leading-8 tracking-[0.12em]">
-              Join 50,000+ creators using{" "}
+              Join the creators using{" "}
               <span className="border-2 border-[var(--border-main)] bg-[#FF00FF] px-2 py-1 text-white">
                 nocaputils
               </span>{" "}
