@@ -55,7 +55,7 @@ export default function VideoToGifPage() {
                   <p>
                     GIFs are the lifeblood of the modern web, from social media to technical tutorials.
                     However, many online converters are slow, add intrusive watermarks, or compress
-                    your content into a pixelated mess. **nocaputils** changes this by giving you
+                    your content into a pixelated mess. <span className="font-black text-[var(--text-main)]">nocaputils</span> changes this by giving you
                     professional-grade conversion tools directly in your browser.
                   </p>
                   <p>
@@ -101,7 +101,7 @@ export default function VideoToGifPage() {
                       Will there be watermarks?
                     </p>
                     <p className="mt-2">
-                      Never. All tools on **nocaputils** produce clean, high-quality output with zero
+                      Never. All tools on <span className="font-black text-[var(--text-main)]">nocaputils</span> produce clean, high-quality output with zero
                       branding or watermarks.
                     </p>
                   </div>

@@ -55,7 +55,7 @@ export default function ChangeVideoSpeedPage() {
                   <p>
                     From perfect slow-motion effects to fast-forwarding through long screen recordings,
                     controlling video playback speed is an essential tool for creators. Many cloud-based
-                    tools force you to re-upload massive files just to change the speed. **nocaputils** lets
+                    tools force you to re-upload massive files just to change the speed. <span className="font-black text-[var(--text-main)]">nocaputils</span> lets
                     you make these adjustments locally in seconds.
                   </p>
                   <p>

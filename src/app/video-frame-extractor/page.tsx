@@ -54,7 +54,7 @@ export default function VideoFrameExtractorPage() {
                 <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
                   <p>
                     Extracting high-quality stills from video files was once a cumbersome task involving
-                    complicated video editing software or risky online uploads. With **nocaputils**, you
+                    complicated video editing software or risky online uploads. With <span className="font-black text-[var(--text-main)]">nocaputils</span>, you
                     can pull pixel-perfect frames directly in your browser.
                   </p>
                   <p>
