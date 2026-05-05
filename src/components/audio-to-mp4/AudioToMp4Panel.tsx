@@ -71,6 +71,12 @@ export default function AudioToMp4Panel() {
       }
 
       const ffmpeg = ffmpegRef.current;
+
+      // Capture FFmpeg logs for debugging
+      const logs: string[] = [];
+      ffmpeg.on("log", ({ message }: { message: string }) => {
+        logs.push(message);
+      });
       
       const ext = audioFile.name.split('.').pop()?.toLowerCase() || "mp3";
       const inputAudio = `input.${ext}`;
@@ -83,46 +89,46 @@ export default function AudioToMp4Panel() {
       const audioBuffer = await audioFile.arrayBuffer();
       await ffmpeg.writeFile(inputAudio, new Uint8Array(audioBuffer));
 
-      let ffmpegArgs: string[] = [];
-
+      // Prepare the cover image — use user image or generate a black frame
       if (imageFile) {
         const imageBuffer = await imageFile.arrayBuffer();
         await ffmpeg.writeFile(inputImage, new Uint8Array(imageBuffer));
-        
-        ffmpegArgs = [
-          "-loop", "1",
-          "-framerate", "1",
-          "-i", inputImage,
-          "-i", inputAudio,
-          "-map", "0:v",
-          "-map", "1:a",
-          "-c:v", "libx264",
-          "-preset", "ultrafast",
-          "-tune", "stillimage",
-          ...audioCodecArgs,
-          "-shortest",
-          "-pix_fmt", "yuv420p",
-          outputName
-        ];
       } else {
-        ffmpegArgs = [
-          "-f", "lavfi",
-          "-i", "color=c=black:s=1280x720:r=1",
-          "-i", inputAudio,
-          "-map", "0:v",
-          "-map", "1:a",
-          "-c:v", "libx264",
-          "-preset", "ultrafast",
-          ...audioCodecArgs,
-          "-shortest",
-          "-pix_fmt", "yuv420p",
-          outputName
-        ];
+        // Generate a real 1280x720 black JPEG via Canvas (lavfi is unavailable in WASM)
+        const canvas = document.createElement("canvas");
+        canvas.width = 1280;
+        canvas.height = 720;
+        const ctx2d = canvas.getContext("2d")!;
+        ctx2d.fillStyle = "#000000";
+        ctx2d.fillRect(0, 0, 1280, 720);
+        const blackBlob = await new Promise<Blob>((res) =>
+          canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)
+        );
+        const blackBuf = new Uint8Array(await blackBlob.arrayBuffer());
+        await ffmpeg.writeFile(inputImage, blackBuf);
       }
+
+      const ffmpegArgs = [
+        "-loop", "1",
+        "-framerate", "1",
+        "-i", inputImage,
+        "-i", inputAudio,
+        "-map", "0:v",
+        "-map", "1:a",
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-tune", "stillimage",
+        ...audioCodecArgs,
+        "-shortest",
+        "-pix_fmt", "yuv420p",
+        outputName,
+      ];
 
       const ret = await ffmpeg.exec(ffmpegArgs);
       if (ret !== 0) {
-        throw new Error("FFmpeg conversion failed. Please check your input file.");
+        console.error("FFmpeg logs:", logs.join("\n"));
+        throw new Error("FFmpeg conversion failed. Check console for details.");
       }
 
       const data = await ffmpeg.readFile(outputName);
