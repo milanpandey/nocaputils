@@ -96,6 +96,8 @@ type Props = {
   onVideoClipsUpdate: (fn: (clips: Clip[]) => Clip[]) => void;
   onAudioClipsUpdate: (fn: (clips: Clip[]) => Clip[]) => void;
   onStopPlayback: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
   containerWidth: number;
   onContainerResize: (w: number) => void;
 };
@@ -119,6 +121,8 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
     onVideoClipsUpdate,
     onAudioClipsUpdate,
     onStopPlayback,
+    onDragStart,
+    onDragEnd,
     containerWidth,
     onContainerResize,
   },
@@ -372,6 +376,7 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
           onSelectionChange({ track, id: hit.clip.id });
           // Video clips are locked — no move, only trim & select
           if (track === "video" && hit.hit === "move") return;
+          if (onDragStart) onDragStart();
           interactionRef.current =
             hit.hit === "move"
               ? { mode: "move", track, id: hit.clip.id, offset: p.time - hit.clip.timelineStart }
@@ -384,7 +389,7 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
       onStopPlayback();
       onTimeChange(p.time);
     },
-    [canvasPointer, findHit, onSelectionChange, onStopPlayback, onTimeChange],
+    [canvasPointer, findHit, onDragStart, onSelectionChange, onStopPlayback, onTimeChange],
   );
 
   /* ---- global move / up ---- */
@@ -447,8 +452,10 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
   );
 
   const handleUp = useCallback(() => {
+    const wasEdit = interactionRef.current && interactionRef.current.mode !== "scrub";
     interactionRef.current = null;
-  }, []);
+    if (wasEdit && onDragEnd) onDragEnd();
+  }, [onDragEnd]);
 
   useEffect(() => {
     window.addEventListener("pointermove", handleMove);
