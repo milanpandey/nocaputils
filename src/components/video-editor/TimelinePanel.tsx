@@ -53,12 +53,16 @@ export function seekMediaToTimelineTime(
   el: HTMLMediaElement | null,
   clips: EnrichedClip[],
   time: number,
-) {
-  if (!el || !clips.length) return;
+): boolean {
+  if (!el || !clips.length) return false;
   const clip = getClipAtTime(clips, time);
-  if (!clip) { el.pause(); return; }
+  if (!clip) { el.pause(); return false; }
   const src = clip.sourceStart + (time - clip.timelineStart);
-  if (Math.abs(el.currentTime - src) > 0.12) el.currentTime = src;
+  if (Math.abs(el.currentTime - src) > 0.12) {
+    el.currentTime = src;
+    return true;
+  }
+  return false;
 }
 
 function clamp(v: number, min: number, max: number) {

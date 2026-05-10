@@ -354,9 +354,11 @@ export default function VideoEditor() {
       // Sync video
       const v = previewRef.current?.getElement();
       if (v) {
-        seekMediaToTimelineTime(v, videoSegRef.current, next);
+        const didSeek = seekMediaToTimelineTime(v, videoSegRef.current, next);
         if (getClipAtTime(videoSegRef.current, next)) {
-          if (v.paused) void v.play().catch(() => {});
+          // Re-invoke play() after a seek to reset the browser's audio decoder,
+          // which can stall when seeking a non-paused element (e.g. crossing clip boundaries).
+          if (v.paused || didSeek) void v.play().catch(() => {});
         } else {
           v.pause();
         }
@@ -365,9 +367,9 @@ export default function VideoEditor() {
       // Sync audio
       const a = audioRef.current;
       if (a) {
-        seekMediaToTimelineTime(a, audioSegRef.current, next);
+        const didSeekA = seekMediaToTimelineTime(a, audioSegRef.current, next);
         if (getClipAtTime(audioSegRef.current, next) && !mutedRef.current) {
-          if (a.paused) void a.play().catch(() => {});
+          if (a.paused || didSeekA) void a.play().catch(() => {});
         } else {
           a.pause();
         }
