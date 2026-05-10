@@ -110,6 +110,8 @@ export default function OnlineVideoEditor() {
                       <li><strong>← →</strong> — Seek ±1 second</li>
                       <li><strong>Shift + ← →</strong> — Seek ±1 frame (1/30s)</li>
                       <li><strong>Delete / Backspace</strong> — Delete selected clip</li>
+                      <li><strong>Ctrl + Z</strong> — Undo last action</li>
+                      <li><strong>Ctrl + Shift + Z</strong> — Redo</li>
                     </ul>
                   </div>
                 </div>

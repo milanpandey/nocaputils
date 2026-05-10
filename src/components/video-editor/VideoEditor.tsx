@@ -14,6 +14,7 @@ import TimelinePanel, {
   type TrackType,
 } from "./TimelinePanel";
 import ExportPanel from "./ExportPanel";
+import { useUndoHistory, type UndoableState } from "./useUndoHistory";
 
 type FilterPreset = "none" | "grayscale" | "sepia" | "vintage";
 type CropPreset = "free" | "16:9" | "1:1" | "9:16";
@@ -100,6 +101,85 @@ export default function VideoEditor() {
   const rafRef = useRef<number | null>(null);
   const playClockStart = useRef(0);
   const playTimelineStart = useRef(0);
+  const sliderCommitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ---- undo / redo ---- */
+  const { pushState, undo, redo, canUndo, canRedo, clearHistory } = useUndoHistory();
+
+  /** Snapshot current state (call BEFORE mutating). */
+  const snapshotState = useCallback((): UndoableState => ({
+    videoClips, audioClips, selection,
+    cropPreset, cropMode, rotation, flipH, flipV,
+    brightness, contrast, saturation, filterPreset,
+    textOverlay, textSize, textY,
+    playbackRate, volume, muted,
+  }), [
+    videoClips, audioClips, selection,
+    cropPreset, cropMode, rotation, flipH, flipV,
+    brightness, contrast, saturation, filterPreset,
+    textOverlay, textSize, textY,
+    playbackRate, volume, muted,
+  ]);
+
+  /** Apply a full snapshot back to all setters. */
+  const applyState = useCallback((s: UndoableState) => {
+    setVideoClips(s.videoClips);
+    setAudioClips(s.audioClips);
+    setSelection(s.selection);
+    setCropPreset(s.cropPreset);
+    setCropMode(s.cropMode);
+    setRotation(s.rotation);
+    setFlipH(s.flipH);
+    setFlipV(s.flipV);
+    setBrightness(s.brightness);
+    setContrast(s.contrast);
+    setSaturation(s.saturation);
+    setFilterPreset(s.filterPreset);
+    setTextOverlay(s.textOverlay);
+    setTextSize(s.textSize);
+    setTextY(s.textY);
+    setPlaybackRate(s.playbackRate);
+    setVolume(s.volume);
+    setMuted(s.muted);
+  }, []);
+
+  /** Push snapshot then call a mutating action. */
+  const commit = useCallback((action: () => void) => {
+    pushState(snapshotState());
+    action();
+  }, [pushState, snapshotState]);
+
+  /**
+   * For slider changes: debounce so dragging creates only one undo entry.
+   * On the first tick of a drag we snapshot; subsequent ticks within 600ms
+   * share that same snapshot.
+   */
+  const sliderSnapshotRef = useRef<UndoableState | null>(null);
+  const commitSlider = useCallback((action: () => void) => {
+    // Snapshot only on the first tick of a drag gesture
+    if (!sliderSnapshotRef.current) {
+      sliderSnapshotRef.current = snapshotState();
+    }
+    action();
+    // Reset the debounce timer
+    if (sliderCommitTimer.current) clearTimeout(sliderCommitTimer.current);
+    sliderCommitTimer.current = setTimeout(() => {
+      if (sliderSnapshotRef.current) {
+        pushState(sliderSnapshotRef.current);
+        sliderSnapshotRef.current = null;
+      }
+    }, 600);
+  }, [pushState, snapshotState]);
+
+  const handleUndo = useCallback(() => {
+    const prev = undo(snapshotState());
+    if (prev) applyState(prev);
+  }, [applyState, snapshotState, undo]);
+
+  const handleRedo = useCallback(() => {
+    const next = redo(snapshotState());
+    if (next) applyState(next);
+  }, [applyState, snapshotState, redo]);
 
   /* ---- derived ---- */
   const videoSegments = useMemo(() => enrichClips(videoClips), [videoClips]);
@@ -151,7 +231,8 @@ export default function VideoEditor() {
     setCurrentTime(0);
     setSelection(null);
     setIsPlaying(false);
-  }, []);
+    clearHistory();
+  }, [clearHistory]);
 
   const handleAudioFile = useCallback(async (file: File) => {
     setAudioSrc((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
@@ -185,38 +266,42 @@ export default function VideoEditor() {
     if (!clip) return;
     if (currentTime <= clip.timelineStart + MIN_CLIP_DURATION || currentTime >= clip.timelineEnd - MIN_CLIP_DURATION) return;
 
-    const splitSrc = clip.sourceStart + (currentTime - clip.timelineStart);
-    const newClip: Clip = { id: clipIdRef.current++, sourceStart: splitSrc, sourceEnd: clip.sourceEnd, timelineStart: currentTime };
-    const updater = (items: Clip[]) =>
-      items.flatMap((i) => (i.id !== clip.id ? [i] : [{ ...i, sourceEnd: splitSrc }, newClip]));
+    commit(() => {
+      const splitSrc = clip.sourceStart + (currentTime - clip.timelineStart);
+      const newClip: Clip = { id: clipIdRef.current++, sourceStart: splitSrc, sourceEnd: clip.sourceEnd, timelineStart: currentTime };
+      const updater = (items: Clip[]) =>
+        items.flatMap((i) => (i.id !== clip.id ? [i] : [{ ...i, sourceEnd: splitSrc }, newClip]));
 
-    if (selection.track === "video") setVideoClips(updater);
-    else setAudioClips(updater);
-    setSelection({ track: selection.track, id: newClip.id });
-  }, [audioSegments, currentTime, selection, videoSegments]);
+      if (selection.track === "video") setVideoClips(updater);
+      else setAudioClips(updater);
+      setSelection({ track: selection.track, id: newClip.id });
+    });
+  }, [audioSegments, commit, currentTime, selection, videoSegments]);
 
   const deleteSelected = useCallback(() => {
     if (!selection) return;
 
-    // Remove the clip, then repack to close gaps
-    const repack = (items: Clip[]): Clip[] => {
-      const remaining = items
-        .filter((i) => i.id !== selection.id)
-        .sort((a, b) => a.timelineStart - b.timelineStart);
-      // Shift each clip so they're contiguous (no gaps)
-      let cursor = 0;
-      return remaining.map((clip) => {
-        const duration = clip.sourceEnd - clip.sourceStart;
-        const repacked = { ...clip, timelineStart: cursor };
-        cursor += duration;
-        return repacked;
-      });
-    };
+    commit(() => {
+      // Remove the clip, then repack to close gaps
+      const repack = (items: Clip[]): Clip[] => {
+        const remaining = items
+          .filter((i) => i.id !== selection.id)
+          .sort((a, b) => a.timelineStart - b.timelineStart);
+        // Shift each clip so they're contiguous (no gaps)
+        let cursor = 0;
+        return remaining.map((clip) => {
+          const duration = clip.sourceEnd - clip.sourceStart;
+          const repacked = { ...clip, timelineStart: cursor };
+          cursor += duration;
+          return repacked;
+        });
+      };
 
-    if (selection.track === "video") setVideoClips(repack);
-    else setAudioClips(repack);
-    setSelection(null);
-  }, [selection]);
+      if (selection.track === "video") setVideoClips(repack);
+      else setAudioClips(repack);
+      setSelection(null);
+    });
+  }, [commit, selection]);
 
   const clearAudio = useCallback(() => {
     stopPlayback();
@@ -269,9 +354,11 @@ export default function VideoEditor() {
       // Sync video
       const v = previewRef.current?.getElement();
       if (v) {
-        seekMediaToTimelineTime(v, videoSegRef.current, next);
+        const didSeek = seekMediaToTimelineTime(v, videoSegRef.current, next);
         if (getClipAtTime(videoSegRef.current, next)) {
-          if (v.paused) void v.play().catch(() => {});
+          // Re-invoke play() after a seek to reset the browser's audio decoder,
+          // which can stall when seeking a non-paused element (e.g. crossing clip boundaries).
+          if (v.paused || didSeek) void v.play().catch(() => {});
         } else {
           v.pause();
         }
@@ -280,9 +367,9 @@ export default function VideoEditor() {
       // Sync audio
       const a = audioRef.current;
       if (a) {
-        seekMediaToTimelineTime(a, audioSegRef.current, next);
+        const didSeekA = seekMediaToTimelineTime(a, audioSegRef.current, next);
         if (getClipAtTime(audioSegRef.current, next) && !mutedRef.current) {
-          if (a.paused) void a.play().catch(() => {});
+          if (a.paused || didSeekA) void a.play().catch(() => {});
         } else {
           a.pause();
         }
@@ -342,6 +429,19 @@ export default function VideoEditor() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
+      // Undo: Ctrl+Z / Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      // Redo: Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y / Cmd+Y
+      if ((e.ctrlKey || e.metaKey) && ((e.key === "z" && e.shiftKey) || e.key === "y")) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
       switch (e.key) {
         case "Delete":
         case "Backspace":
@@ -363,7 +463,19 @@ export default function VideoEditor() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [deleteSelected, selection, togglePlayback, totalDuration]);
+  }, [deleteSelected, handleRedo, handleUndo, selection, togglePlayback, totalDuration]);
+
+  /** Capture state before a timeline drag starts, push it to undo on drag end. */
+  const dragSnapshotRef = useRef<UndoableState | null>(null);
+  const handleTimelineDragStart = useCallback(() => {
+    dragSnapshotRef.current = snapshotState();
+  }, [snapshotState]);
+  const handleTimelineDragEnd = useCallback(() => {
+    if (dragSnapshotRef.current) {
+      pushState(dragSnapshotRef.current);
+      dragSnapshotRef.current = null;
+    }
+  }, [pushState]);
 
   const onVideoLoaded = useCallback((duration: number) => {
     setVideoDuration(duration);
@@ -506,6 +618,24 @@ export default function VideoEditor() {
             </button>
             <button
               type="button"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="neo-button bg-[var(--bg-panel)] px-3 py-2 text-xs font-black uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-40"
+              title="Undo (Ctrl+Z)"
+            >
+              ↩ Undo
+            </button>
+            <button
+              type="button"
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="neo-button bg-[var(--bg-panel)] px-3 py-2 text-xs font-black uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-40"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              ↪ Redo
+            </button>
+            <button
+              type="button"
               onClick={splitSelected}
               disabled={!selection}
               className="neo-button bg-[var(--accent)] px-3 py-2 text-xs font-black uppercase tracking-wider text-black disabled:cursor-not-allowed disabled:opacity-40"
@@ -545,35 +675,35 @@ export default function VideoEditor() {
             <ToolPanel
               activeTab={activeTab}
               cropPreset={cropPreset}
-              onCropPreset={setCropPreset}
+              onCropPreset={(v) => commit(() => setCropPreset(v))}
               cropMode={cropMode}
-              onCropMode={setCropMode}
-              onRotate={(d) => setRotation((v) => v + d)}
-              onFlipH={() => setFlipH((v) => !v)}
-              onFlipV={() => setFlipV((v) => !v)}
+              onCropMode={(v) => commit(() => setCropMode(v))}
+              onRotate={(d) => commit(() => setRotation((v) => v + d))}
+              onFlipH={() => commit(() => setFlipH((v) => !v))}
+              onFlipV={() => commit(() => setFlipV((v) => !v))}
               audioSrc={audioSrc}
               onUploadAudio={() => audioInputRef.current?.click()}
               onClearAudio={clearAudio}
               playbackRate={playbackRate}
-              onPlaybackRate={setPlaybackRate}
+              onPlaybackRate={(v) => commitSlider(() => setPlaybackRate(v))}
               volume={volume}
-              onVolume={setVolume}
+              onVolume={(v) => commitSlider(() => setVolume(v))}
               muted={muted}
-              onToggleMute={() => setMuted((v) => !v)}
+              onToggleMute={() => commit(() => setMuted((v) => !v))}
               filterPreset={filterPreset}
-              onFilterPreset={setFilterPreset}
+              onFilterPreset={(v) => commit(() => setFilterPreset(v))}
               brightness={brightness}
-              onBrightness={setBrightness}
+              onBrightness={(v) => commitSlider(() => setBrightness(v))}
               contrast={contrast}
-              onContrast={setContrast}
+              onContrast={(v) => commitSlider(() => setContrast(v))}
               saturation={saturation}
-              onSaturation={setSaturation}
+              onSaturation={(v) => commitSlider(() => setSaturation(v))}
               textOverlay={textOverlay}
-              onTextOverlay={setTextOverlay}
+              onTextOverlay={(v) => commitSlider(() => setTextOverlay(v))}
               textSize={textSize}
-              onTextSize={setTextSize}
+              onTextSize={(v) => commitSlider(() => setTextSize(v))}
               textY={textY}
-              onTextY={setTextY}
+              onTextY={(v) => commitSlider(() => setTextY(v))}
               selectedClipInfo={selectedClipInfo}
             />
           </div>
@@ -602,35 +732,35 @@ export default function VideoEditor() {
           <ToolPanel
             activeTab={activeTab}
             cropPreset={cropPreset}
-            onCropPreset={setCropPreset}
+            onCropPreset={(v) => commit(() => setCropPreset(v))}
             cropMode={cropMode}
-            onCropMode={setCropMode}
-            onRotate={(d) => setRotation((v) => v + d)}
-            onFlipH={() => setFlipH((v) => !v)}
-            onFlipV={() => setFlipV((v) => !v)}
+            onCropMode={(v) => commit(() => setCropMode(v))}
+            onRotate={(d) => commit(() => setRotation((v) => v + d))}
+            onFlipH={() => commit(() => setFlipH((v) => !v))}
+            onFlipV={() => commit(() => setFlipV((v) => !v))}
             audioSrc={audioSrc}
             onUploadAudio={() => audioInputRef.current?.click()}
             onClearAudio={clearAudio}
             playbackRate={playbackRate}
-            onPlaybackRate={setPlaybackRate}
+            onPlaybackRate={(v) => commitSlider(() => setPlaybackRate(v))}
             volume={volume}
-            onVolume={setVolume}
+            onVolume={(v) => commitSlider(() => setVolume(v))}
             muted={muted}
-            onToggleMute={() => setMuted((v) => !v)}
+            onToggleMute={() => commit(() => setMuted((v) => !v))}
             filterPreset={filterPreset}
-            onFilterPreset={setFilterPreset}
+            onFilterPreset={(v) => commit(() => setFilterPreset(v))}
             brightness={brightness}
-            onBrightness={setBrightness}
+            onBrightness={(v) => commitSlider(() => setBrightness(v))}
             contrast={contrast}
-            onContrast={setContrast}
+            onContrast={(v) => commitSlider(() => setContrast(v))}
             saturation={saturation}
-            onSaturation={setSaturation}
+            onSaturation={(v) => commitSlider(() => setSaturation(v))}
             textOverlay={textOverlay}
-            onTextOverlay={setTextOverlay}
+            onTextOverlay={(v) => commitSlider(() => setTextOverlay(v))}
             textSize={textSize}
-            onTextSize={setTextSize}
+            onTextSize={(v) => commitSlider(() => setTextSize(v))}
             textY={textY}
-            onTextY={setTextY}
+            onTextY={(v) => commitSlider(() => setTextY(v))}
             selectedClipInfo={selectedClipInfo}
           />
         </div>
@@ -651,6 +781,8 @@ export default function VideoEditor() {
         onVideoClipsUpdate={(fn) => setVideoClips(fn)}
         onAudioClipsUpdate={(fn) => setAudioClips(fn)}
         onStopPlayback={stopPlayback}
+        onDragStart={handleTimelineDragStart}
+        onDragEnd={handleTimelineDragEnd}
         containerWidth={containerWidth}
         onContainerResize={setContainerWidth}
       />
