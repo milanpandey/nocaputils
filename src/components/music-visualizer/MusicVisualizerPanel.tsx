@@ -498,6 +498,8 @@ export default function MusicVisualizerPanel() {
           "-ar", "48000",
           "-ac", "2",
           "-shortest",
+          "-brand", "mp42",
+          "-tag:v", "avc1",
           "-movflags", "+faststart",
           "output.mp4",
         ]);
@@ -560,6 +562,8 @@ export default function MusicVisualizerPanel() {
           "-ar", "48000",
           "-ac", "2",
           "-shortest",
+          "-brand", "mp42",
+          "-tag:v", "avc1",
           "-movflags", "+faststart",
           "output.mp4",
         ]);

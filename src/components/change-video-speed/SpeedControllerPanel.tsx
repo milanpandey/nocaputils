@@ -159,6 +159,7 @@ export default function SpeedControllerPanel() {
       }
 
       args.push("-preset", "ultrafast");
+      args.push("-brand", "mp42");
       args.push("output.mp4");
 
       await ffmpeg.exec(args);

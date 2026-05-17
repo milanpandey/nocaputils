@@ -140,6 +140,7 @@ export default function CompressorPanel() {
          args.push("-an");
       }
 
+      args.push("-brand", "mp42");
       args.push("output.mp4");
 
       // Execute compression

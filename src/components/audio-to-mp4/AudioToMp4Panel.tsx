@@ -121,6 +121,8 @@ export default function AudioToMp4Panel() {
         "-tune", "stillimage",
         ...audioCodecArgs,
         "-shortest",
+        "-brand", "mp42",
+        "-tag:v", "avc1",
         "-pix_fmt", "yuv420p",
         outputName,
       ];

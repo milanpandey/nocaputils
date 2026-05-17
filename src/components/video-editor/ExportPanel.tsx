@@ -229,6 +229,7 @@ export default function ExportPanel({
           "-c:v", "copy",
           "-c:a", "aac",
           "-shortest",
+          "-brand", "mp42",
           "-y", "output.mp4",
         ]);
       } else {
@@ -236,6 +237,7 @@ export default function ExportPanel({
         await ffmpeg.exec([
           "-i", "video_only.mp4",
           "-c", "copy",
+          "-brand", "mp42",
           "-y", "output.mp4",
         ]);
       }
