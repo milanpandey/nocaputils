@@ -297,7 +297,7 @@ export default function AudioToMp4Panel() {
                   </div>
                   <a
                     href={mp4Url}
-                    download={`${audioFile.name.replace(/\.[^/.]+$/, "")}.mp4`}
+                    download={`${audioFile.name.replace(/\.[^/.]+$/, "")}_video.mp4`}
                     className="block w-full text-center border-4 border-black bg-neo-blue text-white py-4 text-xl font-black uppercase shadow-[6px_6px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000]"
                   >
                     Download MP4

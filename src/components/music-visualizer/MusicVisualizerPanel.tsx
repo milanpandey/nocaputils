@@ -1361,7 +1361,7 @@ export default function MusicVisualizerPanel() {
               {exportUrl && (
                 <a
                   href={exportUrl}
-                  download={`visualizer_export.${downloadExt}`}
+                  download={`${audioFile?.name.replace(/\.[^/.]+$/, "") || "visualizer"}_${visStyle}_vis.${downloadExt}`}
                   className="block w-full text-center border-4 border-black bg-emerald-500 text-white py-4 text-lg font-black uppercase shadow-[6px_6px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] transition-all"
                 >
                   Download {downloadExt.toUpperCase()}

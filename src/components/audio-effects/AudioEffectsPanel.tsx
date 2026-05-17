@@ -411,7 +411,7 @@ export default function AudioEffectsPanel() {
                 </button>
                 {downloadUrl && (
                   <a href={downloadUrl}
-                    download={`${fileName.replace(/\.[^.]+$/, "")}_fx.${exportFormat}`}
+                    download={`${fileName.replace(/\.[^.]+$/, "")}_${preset}_fx.${exportFormat}`}
                     className="neo-button bg-[var(--success)] px-6 py-3 text-sm font-black uppercase tracking-widest text-black flex-1 min-w-[200px] text-center">
                     ⬇ Download .{exportFormat.toUpperCase()}
                   </a>
