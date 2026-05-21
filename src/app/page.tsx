@@ -219,6 +219,57 @@ export default function Home() {
             </div>
           </section>
 
+          {/* ── Games Section Card ── */}
+          <section id="games" className="mb-20 w-full max-w-6xl">
+            <a
+              href="/games"
+              className="neo-button group relative block overflow-hidden bg-[var(--bg-panel)] p-0"
+            >
+              {/* Bauhaus accent bar */}
+              <div className="flex h-2">
+                <div className="flex-1 bg-[#E63946]" />
+                <div className="flex-1 bg-[#457B9D]" />
+                <div className="flex-1 bg-[#F4D35E]" />
+              </div>
+
+              <div className="flex flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:px-10 sm:py-10">
+                {/* Geometric decorations */}
+                <div className="flex shrink-0 items-center gap-3">
+                  <div className="h-14 w-14 rounded-full border-4 border-[var(--border-main)] bg-[#E63946]" />
+                  <div className="h-14 w-14 border-4 border-[var(--border-main)] bg-[#457B9D]" />
+                  <div
+                    className="border-[var(--border-main)]"
+                    style={{
+                      width: 0,
+                      height: 0,
+                      borderLeft: "28px solid transparent",
+                      borderRight: "28px solid transparent",
+                      borderBottom: "56px solid #F4D35E",
+                    }}
+                  />
+                </div>
+
+                {/* Text */}
+                <div className="flex-1">
+                  <h2 className="mb-2 text-3xl font-black uppercase leading-none tracking-[-0.04em] sm:text-4xl">
+                    <span className="inline-block border-4 border-[var(--border-main)] bg-[#E63946] px-3 py-1 text-white shadow-[4px_4px_0_0_var(--border-main)]">
+                      Games
+                    </span>
+                  </h2>
+                  <p className="text-sm font-bold uppercase leading-6 tracking-[0.1em] text-[var(--text-soft)]">
+                    &quot;Where&apos;s the Letter?&quot; is live — more coming soon.
+                  </p>
+                </div>
+
+                {/* Arrow */}
+                <div className="text-3xl font-black text-[var(--text-soft)] transition-all group-hover:translate-x-2 group-hover:text-[#E63946]">
+                  →
+                </div>
+              </div>
+            </a>
+          </section>
+
+
           <section className="neo-panel mb-24 w-full max-w-6xl !bg-[var(--bg-panel)] px-6 py-16 text-center text-[var(--text-main)] sm:px-10 sm:py-20">
             <h2 className="text-5xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-7xl">
               Ready to Create?
