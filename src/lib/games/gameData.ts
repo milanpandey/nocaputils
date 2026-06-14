@@ -273,7 +273,7 @@ export interface AnimalSound {
 export const ANIMAL_SOUNDS: AnimalSound[] = [
   { id: "cow", emoji: "🐄", name: "Cow", sound: "Mooooo", audioFile: "/sounds/animals/cow.mp3" },
   { id: "dog", emoji: "🐶", name: "Dog", sound: "Woof woof!", audioFile: "/sounds/animals/dog.ogg" },
-  { id: "cat", emoji: "🐱", name: "Cat", sound: "Meeeow", audioFile: "/sounds/animals/cat.ogg" },
+  { id: "cat", emoji: "🐱", name: "Cat", sound: "Meeeow", audioFile: "/sounds/animals/cat.mp3" },
   { id: "pig", emoji: "🐷", name: "Pig", sound: "Oink oink!", audioFile: "/sounds/animals/pig.mp3" },
   { id: "chicken", emoji: "🐔", name: "Chicken", sound: "Bawk bawk bawk!", audioFile: "/sounds/animals/chicken.mp3" },
   { id: "horse", emoji: "🐴", name: "Horse", sound: "Neighhh", audioFile: "/sounds/animals/horse.ogg" },
@@ -282,6 +282,22 @@ export const ANIMAL_SOUNDS: AnimalSound[] = [
   { id: "crow", emoji: "🐦‍⬛", name: "Crow", sound: "Caw caw!", audioFile: "/sounds/animals/crow.mp3" },
   { id: "owl", emoji: "🦉", name: "Owl", sound: "Hoot hoot!", audioFile: "/sounds/animals/owl.mp3" },
   { id: "mouse", emoji: "🐭", name: "Mouse", sound: "Squeak squeak!", audioFile: "/sounds/animals/mouse.ogg" },
+  { id: "rooster", emoji: "🐓", name: "Rooster", sound: "Cock-a-doodle-doo!", audioFile: "/sounds/animals/rooster.mp3" },
+  { id: "turkey", emoji: "🦃", name: "Turkey", sound: "Gobble gobble", audioFile: "/sounds/animals/turkey.mp3" },
+  { id: "lion", emoji: "🦁", name: "Lion", sound: "Roar!", audioFile: "/sounds/animals/lion.mp3" },
+  { id: "tiger", emoji: "🐯", name: "Tiger", sound: "Roar!", audioFile: "/sounds/animals/tiger.mp3" },
+  { id: "elephant", emoji: "🐘", name: "Elephant", sound: "Trumpet!", audioFile: "/sounds/animals/elephant.mp3" },
+  { id: "duck", emoji: "🦆", name: "Duck", sound: "Quack quack", audioFile: "/sounds/animals/duck.mp3" },
+  { id: "frog", emoji: "🐸", name: "Frog", sound: "Ribbit ribbit", audioFile: "/sounds/animals/frog.mp3" },
+  { id: "raccoon", emoji: "🦝", name: "Raccoon", sound: "Chitter chatter", audioFile: "/sounds/animals/raccoon.mp3" },
+  { id: "alligator", emoji: "🐊", name: "Alligator", sound: "Hiss!", audioFile: "/sounds/animals/alligator.mp3" },
+  { id: "zebra", emoji: "🦓", name: "Zebra", sound: "Bray!", audioFile: "/sounds/animals/zebra.mp3" },
+  { id: "penguin", emoji: "🐧", name: "Penguin", sound: "Honk!", audioFile: "/sounds/animals/penguin.mp3" },
+  { id: "moose", emoji: "🫎", name: "Moose", sound: "Bellow!", audioFile: "/sounds/animals/moose.mp3" },
+  { id: "wolf", emoji: "🐺", name: "Wolf", sound: "Awooo!", audioFile: "/sounds/animals/wolf.mp3" },
+  { id: "leopard", emoji: "🐆", name: "Leopard", sound: "Roar!", audioFile: "/sounds/animals/leopard.mp3" },
+  { id: "hyena", emoji: "🐕", name: "Hyena", sound: "Hehehehehe!", audioFile: "/sounds/animals/hyena.mp3" },
+  { id: "camel", emoji: "🐫", name: "Camel", sound: "Grunt!", audioFile: "/sounds/animals/camel.mp3" },
 ];
 
 // ═══════════════════════════════════════════════════════════════
