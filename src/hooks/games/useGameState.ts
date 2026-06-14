@@ -11,6 +11,14 @@ import {
   VOICE_STREAK,
   VOICE_NEW_RECORD,
   pickRandom,
+  SPEECH_PROMPT,
+  SPEECH_CELEBRATE,
+  SPEECH_ENCOURAGE,
+  SPEECH_COMFORT,
+  SPEECH_STREAK,
+  SPEECH_RECORD,
+  SPEECH_HINT,
+  type SpeechProfile,
 } from "@/lib/games/gameData";
 
 export type GamePhase =
@@ -67,6 +75,7 @@ export function useGameState({ speak }: UseGameStateOptions) {
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [wrongKey, setWrongKey] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
 
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -74,6 +83,7 @@ export function useGameState({ speak }: UseGameStateOptions) {
 
   // Load high score on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHighScore(loadHighScore());
   }, []);
 
@@ -84,8 +94,9 @@ export function useGameState({ speak }: UseGameStateOptions) {
   }, []);
 
   const speakIfEnabled = useCallback(
-    (text: string, rate?: number, pitch?: number) => {
-      if (soundEnabled) speak(text, rate, pitch);
+    (text: string, profile?: SpeechProfile) => {
+      if (soundEnabled) return speak(text, profile?.rate, profile?.pitch);
+      return Promise.resolve();
     },
     [speak, soundEnabled]
   );
@@ -98,6 +109,7 @@ export function useGameState({ speak }: UseGameStateOptions) {
     setWrongKey(null);
     setIsNewRecord(false);
     setPhase("showing");
+    setRoundStartTime(null);
 
     // Brief delay then speak the prompt
     phaseTimerRef.current = setTimeout(() => {
@@ -105,22 +117,26 @@ export function useGameState({ speak }: UseGameStateOptions) {
         mode === "numbers"
           ? VOICE_PROMPT_NUMBER(char)
           : VOICE_PROMPT_LETTER(char.toUpperCase());
-      speakIfEnabled(prompt);
-      setPhase("awaiting");
+      speakIfEnabled(prompt, SPEECH_PROMPT).catch(() => {});
 
-      // Auto-hint after 10 seconds
-      hintTimerRef.current = setTimeout(() => {
-        const hintText =
-          mode === "numbers"
-            ? `The number is ${char}. Can you press ${char}?`
-            : `The letter is ${char.toUpperCase()}. Can you press ${char.toUpperCase()}?`;
-        speakIfEnabled(hintText);
+      phaseTimerRef.current = setTimeout(() => {
+        setPhase("awaiting");
+        setRoundStartTime(Date.now());
 
-        // Auto-advance after another 10 seconds (20s total)
-        autoAdvanceTimerRef.current = setTimeout(() => {
-          setPhase("next");
-        }, 10000);
-      }, 10000);
+        // Auto-hint after 15 seconds
+        hintTimerRef.current = setTimeout(() => {
+          const hintText =
+            mode === "numbers"
+              ? `The number is ${char}. Can you press ${char}?`
+              : `The letter is ${char.toUpperCase()}. Can you press ${char.toUpperCase()}?`;
+          speakIfEnabled(hintText, SPEECH_HINT).catch(() => {});
+
+          // Auto-advance after another 15 seconds (30s total)
+          autoAdvanceTimerRef.current = setTimeout(() => {
+            setPhase("next");
+          }, 15000);
+        }, 15000);
+      }, 1000);
     }, 600);
   }, [mode, caseMode, currentChar, clearTimers, speakIfEnabled]);
 
@@ -131,9 +147,10 @@ export function useGameState({ speak }: UseGameStateOptions) {
     nextCharacter();
   }, [nextCharacter]);
 
-  const handleCorrect = useCallback(() => {
+  const handleCorrect = useCallback(async () => {
     clearTimers();
     setPhase("correct");
+    setRoundStartTime(null);
 
     const newStreak = streak + 1;
     const newTotal = totalCorrect + 1;
@@ -142,9 +159,9 @@ export function useGameState({ speak }: UseGameStateOptions) {
 
     // Check for streak milestone
     if (VOICE_STREAK[newStreak]) {
-      speakIfEnabled(VOICE_STREAK[newStreak]);
+      await speakIfEnabled(VOICE_STREAK[newStreak], SPEECH_STREAK);
     } else {
-      speakIfEnabled(pickRandom(VOICE_CORRECT));
+      await speakIfEnabled(pickRandom(VOICE_CORRECT), SPEECH_CELEBRATE);
     }
 
     // Check for new high score
@@ -161,7 +178,7 @@ export function useGameState({ speak }: UseGameStateOptions) {
         newRecord = true;
         setIsNewRecord(true);
         // Speak new record after the correct celebration
-        setTimeout(() => speakIfEnabled(VOICE_NEW_RECORD), 1200);
+        await speakIfEnabled(VOICE_NEW_RECORD, SPEECH_RECORD);
       }
     }
 
@@ -169,11 +186,11 @@ export function useGameState({ speak }: UseGameStateOptions) {
     phaseTimerRef.current = setTimeout(() => {
       if (newRecord) setIsNewRecord(false);
       nextCharacter();
-    }, newRecord ? 2500 : 1500);
+    }, 500);
   }, [streak, totalCorrect, clearTimers, nextCharacter, speakIfEnabled]);
 
   const handleWrong = useCallback(
-    (pressedKey: string) => {
+    async (pressedKey: string) => {
       if (phase !== "awaiting") return;
 
       const newAttempts = attempts + 1;
@@ -187,21 +204,22 @@ export function useGameState({ speak }: UseGameStateOptions) {
         // Failed — reveal the answer
         clearTimers();
         setPhase("failed");
+        setRoundStartTime(null);
         const isNum = mode === "numbers";
-        speakIfEnabled(VOICE_FAIL(currentChar.toUpperCase(), isNum));
+        await speakIfEnabled(VOICE_FAIL(currentChar.toUpperCase(), isNum), SPEECH_COMFORT);
         setStreak(0);
 
         // Auto-advance after reveal
         phaseTimerRef.current = setTimeout(() => {
           nextCharacter();
-        }, 3000);
+        }, 1000);
       } else {
         setPhase("wrong");
-        speakIfEnabled(pickRandom(VOICE_WRONG));
+        speakIfEnabled(pickRandom(VOICE_WRONG), SPEECH_ENCOURAGE).catch(() => {});
 
         phaseTimerRef.current = setTimeout(() => {
           setPhase("awaiting");
-        }, 800);
+        }, 1000);
       }
     },
     [phase, attempts, mode, currentChar, clearTimers, nextCharacter, speakIfEnabled]
@@ -229,6 +247,7 @@ export function useGameState({ speak }: UseGameStateOptions) {
   // Auto-advance from "next" phase
   useEffect(() => {
     if (phase === "next") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       nextCharacter();
     }
   }, [phase, nextCharacter]);
@@ -246,6 +265,7 @@ export function useGameState({ speak }: UseGameStateOptions) {
     isNewRecord,
     wrongKey,
     soundEnabled,
+    roundStartTime,
 
     // Actions
     startGame,

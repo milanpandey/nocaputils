@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { PHONICS_MAP, getCharColor } from "@/lib/games/gameData";
 import type { GamePhase } from "@/hooks/games/useGameState";
 
@@ -26,22 +27,26 @@ export default function CharacterDisplay({ char, phase, isNewRecord }: Character
   else if (isFailed) animClass = "wtl-reveal";
   else if (isShowing) animClass = "wtl-enter";
 
+  const confettiStyles = useMemo(() => {
+    return Array.from({ length: 20 }).map((_, i) => ({
+      // eslint-disable-next-line react-hooks/purity
+      left: `${Math.random() * 100}%`,
+      // eslint-disable-next-line react-hooks/purity
+      animationDelay: `${Math.random() * 0.3}s`,
+      backgroundColor: ["#E63946", "#457B9D", "#F4D35E", "#2A9D8F", "#E76F51"][i % 5],
+    }));
+  }, []);
+
   return (
     <div className="wtl-character-area" aria-live="polite">
       {/* Confetti on correct */}
       {isCorrect && (
         <div className="wtl-confetti" aria-hidden="true">
-          {Array.from({ length: 20 }).map((_, i) => (
+          {confettiStyles.map((style, i) => (
             <span
               key={i}
               className="wtl-confetti-piece"
-              style={{
-                left: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 0.3}s`,
-                backgroundColor: ["#E63946", "#457B9D", "#F4D35E", "#2A9D8F", "#E76F51"][
-                  i % 5
-                ],
-              }}
+              style={style}
             />
           ))}
         </div>

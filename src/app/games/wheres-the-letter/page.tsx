@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description:
     "A free, voice-driven educational game for toddlers ages 2–6. Teaches letter recognition, number recognition, and keyboard skills through playful interaction. No downloads, no ads, no data collection.",
   keywords:
-    "where's the letter, toddler keyboard game, letter recognition game, phonics game, kids typing game, educational game toddlers, learn alphabet game, free learning game, keyboard learning kids, number recognition game",
+    "where's the letter, toddler keyboard game, letter recognition game, phonics game, kids typing game, educational game toddlers, learn alphabet game, free learning game, keyboard learning kids, number recognition game, games for kids, games for toddlers, games for toddlers and little kids, learn letters, learn numbers",
   openGraph: {
     title: "Where's the Letter? — Free Toddler Learning Game",
     description:

@@ -8,6 +8,7 @@ import CharacterDisplay from "./CharacterDisplay";
 import OnScreenKeyboard from "./OnScreenKeyboard";
 import StreakCounter from "./StreakCounter";
 import GameHeader from "./GameHeader";
+import TimerBar from "./TimerBar";
 
 export default function GameClient() {
   const { speak, setEnabled, isSupported } = useSpeech();
@@ -24,6 +25,7 @@ export default function GameClient() {
     isNewRecord,
     wrongKey,
     soundEnabled,
+    roundStartTime,
     startGame,
     handleInput,
     setMode,
@@ -138,6 +140,8 @@ export default function GameClient() {
             phase={phase}
             isNewRecord={isNewRecord}
           />
+
+          <TimerBar startTime={roundStartTime} durationMs={30000} />
 
           {/* Attempt dots */}
           <div className="wtl-attempts" aria-label={`${3 - attempts} attempts remaining`}>

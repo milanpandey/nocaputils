@@ -11,28 +11,54 @@ const games = [
     color: "#E63946",
     ages: "Ages 2–6",
   },
-];
-
-const comingSoon = [
   {
+    id: "memory-match",
     name: "Memory Match",
-    description: "Classic memory card game with fun themes.",
+    description: "Classic memory card game with fun animal, food, and vehicle themes.",
+    status: "Live" as const,
     emoji: "🧠",
     color: "#457B9D",
+    ages: "Ages 2–6",
   },
   {
-    name: "Shape Builder",
-    description: "Drag and match geometric shapes.",
-    emoji: "🔺",
-    color: "#F4D35E",
-  },
-  {
+    id: "color-quest",
     name: "Color Quest",
-    description: "Learn colors through interactive puzzles.",
+    description: "Learn colors through interactive voice-guided puzzles.",
+    status: "Live" as const,
     emoji: "🎨",
     color: "#2A9D8F",
+    ages: "Ages 2–5",
+  },
+  {
+    id: "count-along",
+    name: "Count Along",
+    description: "Count the objects and tap the right number! Progressive counting fun.",
+    status: "Live" as const,
+    emoji: "🔢",
+    color: "#F77F00",
+    ages: "Ages 2–6",
+  },
+  {
+    id: "sound-safari",
+    name: "Sound Safari",
+    description: "Listen to animal sounds and find the matching animal!",
+    status: "Live" as const,
+    emoji: "🎵",
+    color: "#6A4C93",
+    ages: "Ages 2–5",
+  },
+  {
+    id: "shape-builder",
+    name: "Shape Builder",
+    description: "Match geometric shapes — circles, triangles, stars, and more.",
+    status: "Live" as const,
+    emoji: "🔺",
+    color: "#F4D35E",
+    ages: "Ages 2–5",
   },
 ];
+
+const comingSoon: { name: string; description: string; emoji: string; color: string }[] = [];
 
 export default function GamesHub() {
   return (
@@ -104,38 +130,34 @@ export default function GamesHub() {
           </section>
 
           {/* ── Coming Soon ── */}
-          <section className="mb-20 w-full max-w-5xl">
-            <h2 className="bauhaus-section-title">
-              <span className="bauhaus-section-dot" style={{ background: "#457B9D" }} aria-hidden="true" />
-              Coming Soon
-            </h2>
-
-            <div className="bauhaus-coming-grid">
-              {comingSoon.map((game) => (
-                <div
-                  key={game.name}
-                  className="bauhaus-coming-card"
-                >
-                  <div className="bauhaus-coming-accent" style={{ background: game.color }} />
-                  <span className="bauhaus-coming-emoji">{game.emoji}</span>
-                  <h3 className="bauhaus-coming-name">{game.name}</h3>
-                  <p className="bauhaus-coming-desc">{game.description}</p>
-                  <span className="bauhaus-coming-label">Coming Soon</span>
+          {comingSoon.length > 0 && (
+            <section className="mb-20 w-full max-w-5xl">
+              <h2 className="bauhaus-section-title">
+                <span className="bauhaus-section-dot" style={{ background: "#457B9D" }} aria-hidden="true" />
+                Coming Soon
+              </h2>
+              <div className="bauhaus-coming-grid">
+                {comingSoon.map((game) => (
+                  <div key={game.name} className="bauhaus-coming-card">
+                    <div className="bauhaus-coming-accent" style={{ background: game.color }} />
+                    <span className="bauhaus-coming-emoji">{game.emoji}</span>
+                    <h3 className="bauhaus-coming-name">{game.name}</h3>
+                    <p className="bauhaus-coming-desc">{game.description}</p>
+                    <span className="bauhaus-coming-label">Coming Soon</span>
+                  </div>
+                ))}
+                <div className="bauhaus-coming-card bauhaus-coming-card--more">
+                  <div className="bauhaus-more-pattern" aria-hidden="true">
+                    <span className="bauhaus-more-circle" />
+                    <span className="bauhaus-more-square" />
+                    <span className="bauhaus-more-triangle" />
+                  </div>
+                  <h3 className="bauhaus-coming-name">More to come...</h3>
+                  <p className="bauhaus-coming-desc">New games are in the works. Stay tuned!</p>
                 </div>
-              ))}
-
-              {/* More placeholder */}
-              <div className="bauhaus-coming-card bauhaus-coming-card--more">
-                <div className="bauhaus-more-pattern" aria-hidden="true">
-                  <span className="bauhaus-more-circle" />
-                  <span className="bauhaus-more-square" />
-                  <span className="bauhaus-more-triangle" />
-                </div>
-                <h3 className="bauhaus-coming-name">More to come...</h3>
-                <p className="bauhaus-coming-desc">New games are in the works. Stay tuned!</p>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
         </main>
 
         <Footer />

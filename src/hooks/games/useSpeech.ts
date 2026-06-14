@@ -40,6 +40,7 @@ export function useSpeech() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsSupported(true);
 
     const loadVoices = () => {
@@ -57,24 +58,38 @@ export function useSpeech() {
   }, []);
 
   const speak = useCallback(
-    (text: string, rate = 0.85, pitch = 1.1) => {
-      if (!isSupported || !enabledRef.current) return;
+    (text: string, rate = 0.85, pitch = 1.1): Promise<void> => {
+      return new Promise((resolve) => {
+        if (!isSupported || !enabledRef.current) return resolve();
 
-      const synth = window.speechSynthesis;
-      synth.cancel(); // stop any current speech
+        const synth = window.speechSynthesis;
+        synth.cancel(); // stop any current speech
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      if (voiceRef.current) {
-        utterance.voice = voiceRef.current;
-      }
-      utterance.rate = rate;
-      utterance.pitch = pitch;
+        const utterance = new SpeechSynthesisUtterance(text);
+        if (voiceRef.current) {
+          utterance.voice = voiceRef.current;
+        }
+        utterance.rate = rate;
+        utterance.pitch = pitch;
 
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+        let hasResolved = false;
+        const complete = () => {
+          if (!hasResolved) {
+            hasResolved = true;
+            setIsSpeaking(false);
+            resolve();
+          }
+        };
 
-      synth.speak(utterance);
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = complete;
+        utterance.onerror = complete;
+
+        synth.speak(utterance);
+
+        // Fallback timeout in case onend never fires (common browser bug)
+        setTimeout(complete, text.length * 100 + 3000);
+      });
     },
     [isSupported]
   );

@@ -257,7 +257,7 @@ export default function Home() {
                     </span>
                   </h2>
                   <p className="text-sm font-bold uppercase leading-6 tracking-[0.1em] text-[var(--text-soft)]">
-                    &quot;Where&apos;s the Letter?&quot; is live — more coming soon.
+                    6 free learning games for kids — play now!
                   </p>
                 </div>
 
