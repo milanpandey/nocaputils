@@ -51,7 +51,7 @@ function saveHighScore(hs: HighScore) {
 }
 
 interface UseMemoryStateOptions {
-  speak: (text: string, rate?: number, pitch?: number) => void;
+  speak: (text: string, rate?: number, pitch?: number) => Promise<void>;
   soundEnabled: boolean;
 }
 

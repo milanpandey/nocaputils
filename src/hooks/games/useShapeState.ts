@@ -43,7 +43,7 @@ function saveHighScore(hs: HighScore) {
 }
 
 interface UseShapeStateOptions {
-  speak: (text: string, rate?: number, pitch?: number) => void;
+  speak: (text: string, rate?: number, pitch?: number) => Promise<void>;
   soundEnabled: boolean;
 }
 

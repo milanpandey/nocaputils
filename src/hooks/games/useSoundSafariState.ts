@@ -18,7 +18,7 @@ import {
   type SpeechProfile,
 } from "@/lib/games/gameData";
 
-export type SafariPhase = "idle" | "playing-sound" | "awaiting" | "correct" | "wrong" | "failed";
+export type SafariPhase = "idle" | "playing-sound" | "prompting" | "awaiting" | "correct" | "wrong" | "failed";
 
 interface HighScore {
   streak: number;
@@ -43,7 +43,7 @@ function saveHighScore(hs: HighScore) {
 }
 
 interface UseSoundSafariStateOptions {
-  speak: (text: string, rate?: number, pitch?: number) => void;
+  speak: (text: string, rate?: number, pitch?: number) => Promise<void>;
   soundEnabled: boolean;
 }
 

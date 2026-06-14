@@ -60,7 +60,7 @@ function saveHighScore(hs: HighScore) {
 }
 
 interface UseGameStateOptions {
-  speak: (text: string, rate?: number, pitch?: number) => void;
+  speak: (text: string, rate?: number, pitch?: number) => Promise<void>;
 }
 
 export function useGameState({ speak }: UseGameStateOptions) {
