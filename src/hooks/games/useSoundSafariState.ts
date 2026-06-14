@@ -125,8 +125,8 @@ export function useSoundSafariState({ speak, soundEnabled }: UseSoundSafariState
     if (validTargets.length === 0) validTargets = ANIMAL_SOUNDS;
     const target = pickRandom(validTargets);
 
-    // Keep history of last 4 targets to prevent repetition
-    recentTargetsRef.current = [target.id, ...recentTargetsRef.current].slice(0, 4);
+    // Keep history of last 12 targets to prevent repetition
+    recentTargetsRef.current = [target.id, ...recentTargetsRef.current].slice(0, 12);
 
     // Build choices: include target + random others
     const otherAnimals = [...ANIMAL_SOUNDS]
