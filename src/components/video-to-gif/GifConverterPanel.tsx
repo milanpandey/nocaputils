@@ -376,7 +376,7 @@ export default function GifConverterPanel() {
                 
                 <a
                   href={gifUrl}
-                  download="exported_loop.gif"
+                  download={`${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_loop.gif`}
                   className="block w-full text-center border-2 border-black bg-[#99ff99] text-black py-4 text-sm font-black tracking-[0.1em] uppercase shadow-[4px_4px_0_0_#000] hover:bg-[#b3ffb3] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000] transition-all"
                 >
                   Download GIF

@@ -180,7 +180,7 @@ export default function ExtractorPanel() {
         const url = URL.createObjectURL(zipBlob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `extracted_frames_${addedFrames}.zip`;
+        a.download = `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frames_${addedFrames}.zip`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -334,7 +334,7 @@ export default function ExtractorPanel() {
               </div>
               
               <button 
-                onClick={() => captureFrame(`frame-${formatTime(currentTime).replace(/:/g, '-')}.jpg`)}
+                onClick={() => captureFrame(`${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frame_${formatTime(currentTime).replace(/:/g, '-')}.jpg`)}
                 className="w-full bg-[#d7fc70] text-black border-4 border-black py-4 font-black uppercase text-sm shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:shadow-[2px_2px_0_0_#000]"
               >
                 📸 Capture Current Frame
@@ -342,13 +342,13 @@ export default function ExtractorPanel() {
               
               <div className="grid grid-cols-2 gap-4">
                 <button 
-                  onClick={() => seekAndCapture(0, "first-frame.jpg")}
+                  onClick={() => seekAndCapture(0, `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_first_frame.jpg`)}
                   className="bg-[#222222] text-[#d7fc70] border-2 border-black py-3 font-black uppercase text-xs shadow-[3px_3px_0_0_#000] hover:bg-[#2a2a2a]"
                 >
                   First Frame
                 </button>
                 <button 
-                  onClick={() => seekAndCapture(Math.max(0, duration - 0.05), "last-frame.jpg")}
+                  onClick={() => seekAndCapture(Math.max(0, duration - 0.05), `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_last_frame.jpg`)}
                   className="bg-[#222222] text-[#d7fc70] border-2 border-black py-3 font-black uppercase text-xs shadow-[3px_3px_0_0_#000] hover:bg-[#2a2a2a]"
                 >
                   Last Frame
@@ -394,13 +394,13 @@ export default function ExtractorPanel() {
 
               <div className="grid grid-cols-2 gap-4">
                 <button 
-                  onClick={() => seekAndCapture(exactTimeMs / 1000, `frame-${exactTimeMs}ms.jpg`)}
+                  onClick={() => seekAndCapture(exactTimeMs / 1000, `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frame_${exactTimeMs}ms.jpg`)}
                   className="w-full bg-[#ff33ff] text-black border-4 border-black py-3 font-black uppercase text-sm shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:shadow-[2px_2px_0_0_#000]"
                 >
                   Capture MS
                 </button>
                 <button 
-                  onClick={() => seekAndCapture(exactFrameIndex / assumedFps, `frame-${exactFrameIndex}.jpg`)}
+                  onClick={() => seekAndCapture(exactFrameIndex / assumedFps, `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frame_idx_${exactFrameIndex}.jpg`)}
                   className="w-full bg-[#ff33ff] text-black border-4 border-black py-3 font-black uppercase text-sm shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:shadow-[2px_2px_0_0_#000]"
                 >
                   Capture FRM
