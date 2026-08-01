@@ -220,7 +220,7 @@ export default function Home() {
           </section>
 
           {/* ── Games Section Card ── */}
-          <section id="games" className="mb-20 w-full max-w-6xl">
+          <section id="games" className="mb-12 w-full max-w-6xl">
             <a
               href="/games"
               className="neo-button group relative block overflow-hidden bg-[var(--bg-panel)] p-0"
@@ -263,6 +263,45 @@ export default function Home() {
 
                 {/* Arrow */}
                 <div className="text-3xl font-black text-[var(--text-soft)] transition-all group-hover:translate-x-2 group-hover:text-[#E63946]">
+                  →
+                </div>
+              </div>
+            </a>
+          </section>
+
+          {/* ── Personality Tests Section Card ── */}
+          <section id="personality" className="mb-20 w-full max-w-6xl">
+            <a
+              href="/personality"
+              className="neo-button group relative block overflow-hidden bg-[var(--bg-panel)] p-0"
+            >
+              {/* Accent bar */}
+              <div className="flex h-2">
+                <div className="flex-1 bg-[#9C27B0]" />
+                <div className="flex-1 bg-[#2A9D8F]" />
+                <div className="flex-1 bg-[#F77F00]" />
+              </div>
+
+              <div className="flex flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:px-10 sm:py-10">
+                {/* Symbolism */}
+                <div className="flex shrink-0 items-center justify-center text-4xl">
+                  🦋 🔮 ✨
+                </div>
+
+                {/* Text */}
+                <div className="flex-1">
+                  <h2 className="mb-2 text-3xl font-black uppercase leading-none tracking-[-0.04em] sm:text-4xl">
+                    <span className="inline-block border-4 border-[var(--border-main)] bg-[#9C27B0] px-3 py-1 text-white shadow-[4px_4px_0_0_var(--border-main)]">
+                      Personality Tests
+                    </span>
+                  </h2>
+                  <p className="text-sm font-bold uppercase leading-6 tracking-[0.1em] text-[var(--text-soft)]">
+                    Free. Private. Insightful. Try Rorschach Inkblot Explorer &amp; more!
+                  </p>
+                </div>
+
+                {/* Arrow */}
+                <div className="text-3xl font-black text-[var(--text-soft)] transition-all group-hover:translate-x-2 group-hover:text-[#9C27B0]">
                   →
                 </div>
               </div>
