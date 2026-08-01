@@ -5,12 +5,21 @@ const tests = [
   {
     id: "rorschach-test",
     name: "Rorschach Test",
-    description: "Explore 5 interactive inkblots, choose what you see, and discover your perceptual archetype!",
+    description: "Explore 10 interactive inkblots, choose what you see, and discover your perceptual archetype!",
     status: "Live" as const,
     emoji: "🦋",
     color: "#9C27B0",
     ages: "All Ages",
   },
+  {
+    id: "color-quest",
+    name: "Color Quest",
+    description: "Discover your true personality color in this fun, quick, mini-adventure!",
+    status: "Live" as const,
+    emoji: "🎨",
+    color: "#F77F00",
+    ages: "4-12 Years",
+  }
 ];
 
 const comingSoon: { name: string; description: string; emoji: string; color: string }[] = [];

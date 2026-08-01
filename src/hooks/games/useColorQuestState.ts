@@ -1,230 +1,225 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
-  GAME_COLORS,
-  COLOR_OBJECTS,
-  VOICE_CORRECT,
-  VOICE_WRONG,
-  VOICE_STREAK,
-  VOICE_NEW_RECORD,
-  pickRandom,
-  SPEECH_CELEBRATE,
-  SPEECH_ENCOURAGE,
-  SPEECH_STREAK,
-  SPEECH_RECORD,
-  SPEECH_PROMPT,
-  SPEECH_COMFORT,
-  type GameColor,
-  type SpeechProfile,
-} from "@/lib/games/gameData";
+  QUESTION_PACKS,
+  PERSONALITIES,
+  BADGES,
+  type CQQuestion,
+  type CQChoice,
+  type PersonalityColor,
+  type PersonalityProfile,
+  type CQBadge,
+} from "@/lib/games/colorQuestData";
 
-export type CQPhase = "idle" | "prompting" | "awaiting" | "correct" | "wrong" | "failed";
-
-interface Choice {
-  color: GameColor;
-  objectEmoji: string;
-  objectName: string;
-  isCorrect: boolean;
+export interface CQResult {
+  date: string;
+  dominant: PersonalityProfile;
+  secondary: PersonalityProfile;
+  badge: CQBadge;
+  scores: Record<PersonalityColor, number>;
 }
 
-interface HighScore {
-  streak: number;
-  total: number;
-}
-
-const LS_KEY = "cq_highscore";
-
-function loadHighScore(): HighScore {
-  if (typeof window === "undefined") return { streak: 0, total: 0 };
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return { streak: 0, total: 0 };
-}
-
-function saveHighScore(hs: HighScore) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(hs));
-  } catch { /* ignore */ }
-}
-
-interface UseColorQuestStateOptions {
-  speak: (text: string, rate?: number, pitch?: number) => Promise<void>;
+export function useColorQuestState({
+  speak,
+  soundEnabled,
+}: {
+  speak: (text: string) => void;
   soundEnabled: boolean;
-}
+}) {
+  const [phase, setPhase] = useState<"idle" | "playing" | "complete">("idle");
+  const [questions, setQuestions] = useState<CQQuestion[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<CQChoice[]>([]);
+  const [result, setResult] = useState<CQResult | null>(null);
+  const [history, setHistory] = useState<CQResult[]>([]);
+  const [canResume, setCanResume] = useState(false);
 
-export function useColorQuestState({ speak, soundEnabled }: UseColorQuestStateOptions) {
-  const [phase, setPhase] = useState<CQPhase>("idle");
-  const [choices, setChoices] = useState<Choice[]>([]);
-  const [targetColor, setTargetColor] = useState<GameColor | null>(null);
-  const [targetObject, setTargetObject] = useState("");
-  const [round, setRound] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [totalCorrect, setTotalCorrect] = useState(0);
-  const [attempts, setAttempts] = useState(0);
-  const [highScore, setHighScore] = useState<HighScore>({ streak: 0, total: 0 });
-  const [isNewRecord, setIsNewRecord] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
+  // Load history & potential resume state on mount
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHighScore(loadHighScore());
+    try {
+      const savedHistory = localStorage.getItem("nocaputils_cq_history");
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+
+      const savedProgress = localStorage.getItem("nocaputils_cq_progress");
+      if (savedProgress) {
+        const parsed = JSON.parse(savedProgress);
+        if (parsed.answers && parsed.answers.length > 0 && parsed.answers.length < 10) {
+          setCanResume(true);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to read LocalStorage", e);
+    }
   }, []);
 
-  const speakIfEnabled = useCallback(
-    (text: string, profile?: SpeechProfile) => {
-      if (soundEnabled) return speak(text, profile?.rate, profile?.pitch);
-      return Promise.resolve();
+  // Save progress automatically
+  useEffect(() => {
+    if (phase === "playing") {
+      try {
+        localStorage.setItem(
+          "nocaputils_cq_progress",
+          JSON.stringify({ questions, answers, currentIndex })
+        );
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [phase, questions, answers, currentIndex]);
+
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  const startGame = useCallback(
+    (resume = false) => {
+      if (resume) {
+        try {
+          const savedProgress = localStorage.getItem("nocaputils_cq_progress");
+          if (savedProgress) {
+            const parsed = JSON.parse(savedProgress);
+            setQuestions(parsed.questions);
+            setAnswers(parsed.answers);
+            setCurrentIndex(parsed.currentIndex);
+            setPhase("playing");
+            return;
+          }
+        } catch (e) {
+          console.warn("Could not resume");
+        }
+      }
+
+      const pack = QUESTION_PACKS.classic;
+      setQuestions(shuffleArray(pack));
+      setCurrentIndex(0);
+      setAnswers([]);
+      setPhase("playing");
+      setCanResume(false);
+      localStorage.removeItem("nocaputils_cq_progress");
+
+      if (soundEnabled) {
+        speak("Welcome to Color Quest! Let's start the adventure.");
+      }
     },
-    [speak, soundEnabled]
+    [soundEnabled, speak]
   );
 
-  const generateRound = useCallback((roundNum: number) => {
-    // More colors as rounds progress
-    const numChoices = Math.min(3 + Math.floor(roundNum / 3), 6);
-    const shuffledColors = [...GAME_COLORS].sort(() => Math.random() - 0.5);
-    const selectedColors = shuffledColors.slice(0, numChoices);
-    const obj = pickRandom(COLOR_OBJECTS);
-    const correctIdx = Math.floor(Math.random() * numChoices);
-
-    const newChoices: Choice[] = selectedColors.map((color, i) => ({
-      color,
-      objectEmoji: obj.emoji,
-      objectName: obj.name,
-      isCorrect: i === correctIdx,
-    }));
-
-    return {
-      choices: newChoices,
-      targetColor: selectedColors[correctIdx],
-      objectName: obj.name,
+  const calculateResult = useCallback((finalAnswers: CQChoice[]) => {
+    const scores: Record<PersonalityColor, number> = {
+      red: 0,
+      blue: 0,
+      green: 0,
+      yellow: 0,
     };
+
+    finalAnswers.forEach((ans) => {
+      scores[ans.color] += 1;
+    });
+
+    // Sort by score
+    const sortedColors = (Object.keys(scores) as PersonalityColor[]).sort((a, b) => {
+      if (scores[b] !== scores[a]) return scores[b] - scores[a];
+      
+      // Tie breaker: check last 3 answers
+      const last3 = finalAnswers.slice(-3);
+      const aRecent = last3.filter((ans) => ans.color === a).length;
+      const bRecent = last3.filter((ans) => ans.color === b).length;
+      return bRecent - aRecent;
+    });
+
+    const dominantColor = sortedColors[0];
+    const secondaryColor = sortedColors[1];
+
+    const dominant = PERSONALITIES[dominantColor];
+    const secondary = PERSONALITIES[secondaryColor];
+
+    // Assign a badge
+    let badge = BADGES[0];
+    if (dominantColor === "red") badge = BADGES.find(b => b.id === "treasure") || BADGES[0];
+    if (dominantColor === "blue") badge = BADGES.find(b => b.id === "puzzle") || BADGES[0];
+    if (dominantColor === "green") badge = BADGES.find(b => b.id === "animal") || BADGES[0];
+    if (dominantColor === "yellow") badge = BADGES.find(b => b.id === "rainbow") || BADGES[0];
+
+    const newResult: CQResult = {
+      date: new Date().toLocaleDateString(),
+      dominant,
+      secondary,
+      badge,
+      scores,
+    };
+
+    setResult(newResult);
+    
+    // Save to history
+    setHistory((prev) => {
+      const updated = [newResult, ...prev].slice(0, 5); // Keep last 5
+      try {
+        localStorage.setItem("nocaputils_cq_history", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // Clear progress
+    try {
+      localStorage.removeItem("nocaputils_cq_progress");
+    } catch (e) {}
   }, []);
 
-  const nextRound = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    const newRound = round + 1;
-    setRound(newRound);
-    setAttempts(0);
-    setSelectedIndex(null);
-    setIsNewRecord(false);
+  const selectChoice = useCallback(
+    (choice: CQChoice) => {
+      if (phase !== "playing") return;
 
-    const { choices: newChoices, targetColor: newTarget, objectName } = generateRound(newRound);
-    setChoices(newChoices);
-    setTargetColor(newTarget);
-    setTargetObject(objectName);
-    setPhase("prompting");
+      const newAnswers = [...answers, choice];
+      setAnswers(newAnswers);
 
-    timerRef.current = setTimeout(() => {
-      speakIfEnabled(
-        `Find the ${newTarget.name.toLowerCase()} ${objectName}!`,
-        SPEECH_PROMPT
-      ).catch(() => {});
-      
-      timerRef.current = setTimeout(() => {
-        setPhase("awaiting");
-      }, 1000);
-    }, 400);
-  }, [round, generateRound, speakIfEnabled]);
+      if (soundEnabled) {
+        speak(choice.speechText);
+      }
 
-  const startGame = useCallback(() => {
-    setStreak(0);
-    setTotalCorrect(0);
-    setRound(0);
-    setIsNewRecord(false);
-    nextRound();
-  }, [nextRound]);
-
-  const handleSelect = useCallback(
-    async (index: number) => {
-      if (phase !== "awaiting") return;
-      setSelectedIndex(index);
-
-      if (choices[index].isCorrect) {
-        setPhase("correct");
-        const newStreak = streak + 1;
-        const newTotal = totalCorrect + 1;
-        setStreak(newStreak);
-        setTotalCorrect(newTotal);
-
-        if (VOICE_STREAK[newStreak]) {
-          await speakIfEnabled(VOICE_STREAK[newStreak], SPEECH_STREAK);
-        } else {
-          const color = choices[index].color.name.toLowerCase();
-          await speakIfEnabled(
-            `${pickRandom(VOICE_CORRECT)} You found the ${color} ${targetObject}!`,
-            SPEECH_CELEBRATE
-          );
-        }
-
-        // Check high score
-        const currentHS = loadHighScore();
-        if (newStreak > currentHS.streak || newTotal > currentHS.total) {
-          const updated = {
-            streak: Math.max(newStreak, currentHS.streak),
-            total: Math.max(newTotal, currentHS.total),
-          };
-          saveHighScore(updated);
-          setHighScore(updated);
-          if (newStreak > currentHS.streak && currentHS.streak > 0) {
-            setIsNewRecord(true);
-            await speakIfEnabled(VOICE_NEW_RECORD, SPEECH_RECORD);
-          }
-        }
-
-        timerRef.current = setTimeout(() => {
-          nextRound();
-        }, 500);
+      if (currentIndex < questions.length - 1) {
+        setCurrentIndex((prev) => prev + 1);
       } else {
-        const newAttempts = attempts + 1;
-        setAttempts(newAttempts);
-
-        if (newAttempts >= 2) {
-          setPhase("failed");
-          setStreak(0);
-          await speakIfEnabled(
-            `That's okay! This is the ${targetColor?.name.toLowerCase()} ${targetObject}!`,
-            SPEECH_COMFORT
-          );
-          timerRef.current = setTimeout(() => {
-            nextRound();
-          }, 1000);
-        } else {
-          setPhase("wrong");
-          speakIfEnabled(pickRandom(VOICE_WRONG), SPEECH_ENCOURAGE).catch(() => {});
-          timerRef.current = setTimeout(() => {
-            setSelectedIndex(null);
-            setPhase("awaiting");
+        setPhase("complete");
+        calculateResult(newAnswers);
+        if (soundEnabled) {
+          setTimeout(() => {
+            speak("All done! Your magical result is ready!");
           }, 1000);
         }
       }
     },
-    [phase, choices, streak, totalCorrect, attempts, targetColor, targetObject, speakIfEnabled, nextRound]
+    [phase, answers, currentIndex, questions.length, soundEnabled, speak, calculateResult]
   );
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+  const goBack = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1);
+      setAnswers((prev) => prev.slice(0, -1));
+    }
+  }, [currentIndex]);
+
+  const resetGame = useCallback(() => {
+    setPhase("idle");
+    setResult(null);
   }, []);
 
   return {
     phase,
-    choices,
-    targetColor,
-    targetObject,
-    round,
-    streak,
-    totalCorrect,
-    attempts,
-    highScore,
-    isNewRecord,
-    selectedIndex,
+    questions,
+    currentIndex,
+    currentQuestion: questions[currentIndex],
+    answers,
+    result,
+    history,
+    canResume,
     startGame,
-    handleSelect,
+    selectChoice,
+    goBack,
+    resetGame,
   };
 }

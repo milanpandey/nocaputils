@@ -1,27 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSpeech } from "@/hooks/games/useSpeech";
 import { useColorQuestState } from "@/hooks/games/useColorQuestState";
+import { STRINGS, PERSONALITIES } from "@/lib/games/colorQuestData";
 
 export default function ColorQuestClient() {
   const { speak, setEnabled, isSupported } = useSpeech();
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showCompare, setShowCompare] = useState(false);
 
   const {
     phase,
-    choices,
-    targetColor,
-    targetObject,
-    round,
-    streak,
-    totalCorrect,
-    attempts,
-    highScore,
-    isNewRecord,
-    selectedIndex,
+    questions,
+    currentIndex,
+    currentQuestion,
+    result,
+    history,
+    canResume,
     startGame,
-    handleSelect,
+    selectChoice,
+    goBack,
+    resetGame,
   } = useColorQuestState({ speak, soundEnabled });
 
   useEffect(() => {
@@ -32,131 +32,263 @@ export default function ColorQuestClient() {
     setSoundEnabled((prev) => !prev);
   }, []);
 
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
+  const shareResult = useCallback(() => {
+    if (navigator.share && result) {
+      navigator.share({
+        title: "Color Quest Personality",
+        text: `I got ${result.dominant.title} in Color Quest! I'm a ${result.dominant.superpower}!`,
+        url: window.location.href,
+      }).catch(console.error);
+    } else {
+      alert("Sharing is not supported on this device, but you can print your certificate!");
+    }
+  }, [result]);
+
   const isIdle = phase === "idle";
+  const isComplete = phase === "complete" && result;
 
   return (
     <div className="cq-game">
-      <header className="cq-header">
-        <a href="/games" className="cq-back-link">
+      {/* ── Header (Hidden when printing) ── */}
+      <header className="cq-header print-hidden">
+        <a href="/personality" className="cq-back-link">
           <span aria-hidden="true">←</span>
-          <span className="cq-back-text">Games</span>
+          <span className="cq-back-text">Personality</span>
         </a>
+
         <div className="cq-header-controls">
           <button
             type="button"
             className={`cq-sound-btn ${!soundEnabled ? "cq-sound-btn--muted" : ""}`}
             onClick={handleSoundToggle}
-            aria-label={soundEnabled ? "Mute sound" : "Unmute sound"}
+            aria-label={soundEnabled ? "Mute voice narration" : "Enable voice narration"}
           >
             {soundEnabled ? "🔊" : "🔇"}
           </button>
         </div>
       </header>
 
-      {isIdle ? (
+      {isIdle && (
         <div className="cq-start-screen">
-          <div className="cq-start-decoration" aria-hidden="true">
-            <span className="cq-deco-blob" style={{ background: "#E63946" }} />
-            <span className="cq-deco-blob" style={{ background: "#457B9D" }} />
-            <span className="cq-deco-blob" style={{ background: "#F4D35E" }} />
-            <span className="cq-deco-blob" style={{ background: "#2A9D8F" }} />
+          <div className="cq-hero-emojis" aria-hidden="true">
+            <span className="cq-hero-emoji">🦁</span>
+            <span className="cq-hero-emoji">🦉</span>
+            <span className="cq-hero-emoji">🐼</span>
+            <span className="cq-hero-emoji">🐒</span>
           </div>
+          
+          <h1 className="cq-start-title">{STRINGS.startTitle}</h1>
+          <p className="cq-start-subtitle">{STRINGS.startSubtitle}</p>
+          
+          <div className="cq-start-actions">
+            <button className="cq-primary-btn" onClick={() => startGame(false)} type="button">
+              <span className="cq-btn-text">{STRINGS.startBtn}</span>
+              <span className="cq-btn-icon" aria-hidden="true">🚀</span>
+            </button>
 
-          <h2 className="cq-start-title">Color<br />Quest</h2>
-          <p className="cq-start-subtitle">
-            Find the right color!
-            <br />
-            <span className="cq-start-hint">Listen and tap the matching color.</span>
-          </p>
-
-          <button className="cq-start-btn" onClick={startGame} type="button">
-            <span>Let&apos;s Play!</span>
-            <span aria-hidden="true">🎨</span>
-          </button>
-
-          {highScore.streak > 0 && (
-            <div className="cq-start-highscore">
-              🏆 Best streak: <strong>{highScore.streak}</strong>
-            </div>
-          )}
+            {canResume && (
+              <button className="cq-secondary-btn" onClick={() => startGame(true)} type="button">
+                {STRINGS.resumeBtn}
+              </button>
+            )}
+          </div>
 
           {!isSupported && (
-            <p className="cq-tts-warning">
-              ⚠️ Voice prompts are not supported in your browser.
-            </p>
+            <p className="cq-tts-warning">⚠️ Voice prompts are not supported in your browser.</p>
           )}
         </div>
-      ) : (
-        <div className="cq-game-area">
-          {/* Score bar */}
-          <div className="cq-score-bar">
-            <div className="cq-score-pill">
-              <span className="cq-score-value">{totalCorrect}</span>
-              <span className="cq-score-label">Correct</span>
-            </div>
-            {streak >= 2 && (
-              <div className="cq-score-pill cq-score-pill--streak">
-                <span>🔥</span>
-                <span className="cq-score-value">{streak}</span>
-              </div>
-            )}
-            <div className="cq-score-pill">
-              <span className="cq-score-value">R{round}</span>
-              <span className="cq-score-label">Round</span>
+      )}
+
+      {phase === "playing" && currentQuestion && (
+        <div className="cq-play-screen">
+          <div className="cq-progress">
+            <span className="cq-progress-text">
+              {STRINGS.questionPrefix} <strong>{currentIndex + 1}</strong> / {questions.length}
+            </span>
+            <div className="cq-progress-bar-container">
+              <div 
+                className="cq-progress-bar-fill" 
+                style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+              />
             </div>
           </div>
 
-          {isNewRecord && <div className="cq-new-record">🏆 New Record!</div>}
-
-          {/* Prompt */}
-          <div className="cq-prompt">
-            <div className="cq-prompt-text">
-              Find the{" "}
-              <span
-                className="cq-prompt-color"
-                style={{ color: targetColor?.hex }}
-              >
-                {targetColor?.name}
-              </span>
-              {" "}{targetObject}!
+          <div className="cq-question-card">
+            <div className="cq-question-hero">
+              <span className="cq-question-emoji" aria-hidden="true">{currentQuestion.emoji}</span>
+              <h2 className="cq-question-title">{currentQuestion.title}</h2>
+              <p className="cq-question-speech">{currentQuestion.speechText}</p>
             </div>
-
-            {/* Attempt dots */}
-            <div className="cq-attempts">
-              {[0, 1].map((i) => (
-                <span
-                  key={i}
-                  className={`cq-attempt-dot ${i < attempts ? "cq-attempt-dot--used" : ""}`}
-                />
+            
+            <div className="cq-choices-grid">
+              {currentQuestion.choices.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className="cq-choice-btn"
+                  onClick={() => selectChoice(choice)}
+                  aria-label={choice.label}
+                >
+                  <span className="cq-choice-emoji" aria-hidden="true">{choice.emoji}</span>
+                  <span className="cq-choice-label">{choice.label}</span>
+                </button>
               ))}
             </div>
           </div>
-
-          {/* Choices grid */}
-          <div className="cq-choices">
-            {choices.map((choice, index) => {
-              const isSelected = selectedIndex === index;
-              const isCorrectAnswer = choice.isCorrect;
-              const showCorrect = (phase === "correct" || phase === "failed") && isCorrectAnswer;
-              const showWrong = isSelected && (phase === "wrong" || (phase === "failed" && !isCorrectAnswer));
-
-              return (
-                <button
-                  key={`${choice.color.name}-${index}`}
-                  type="button"
-                  className={`cq-choice ${showCorrect ? "cq-choice--correct" : ""} ${showWrong ? "cq-choice--wrong" : ""}`}
-                  onClick={() => handleSelect(index)}
-                  disabled={phase !== "awaiting"}
-                  style={{ "--cq-color": choice.color.hex, "--cq-color-dark": choice.color.darkHex } as React.CSSProperties}
-                >
-                  <span className="cq-choice-emoji">{choice.objectEmoji}</span>
-                  <span className="cq-choice-color-name">{choice.color.name}</span>
-                </button>
-              );
-            })}
+          
+          <div className="cq-play-actions">
+            <button 
+              className="cq-ghost-btn" 
+              onClick={goBack} 
+              disabled={currentIndex === 0}
+              type="button"
+            >
+              ← Back
+            </button>
           </div>
         </div>
       )}
+
+      {isComplete && !showCompare && (
+        <div className="cq-report-screen">
+          <div className="cq-report-card">
+            
+            {/* Certificate Header (Only visible when printing) */}
+            <div className="cq-print-header">
+              <h2>Color Quest Certificate</h2>
+              <p>Awarded on {result.date}</p>
+            </div>
+
+            {/* Confetti (Hidden on print) */}
+            <div className="cq-confetti print-hidden" aria-hidden="true">🎉🎊✨</div>
+
+            <h1 className="cq-report-hero-title">{STRINGS.reportHero}</h1>
+            
+            <div className="cq-dominant-profile" style={{ borderColor: result.dominant.colorHex }}>
+              <span className="cq-profile-emoji">{result.dominant.emoji}</span>
+              <h2 className="cq-profile-title" style={{ color: result.dominant.colorHex }}>
+                {result.dominant.title}
+              </h2>
+            </div>
+
+            <div className="cq-report-grid">
+              <div className="cq-report-box">
+                <h3>{STRINGS.superpowerTitle}</h3>
+                <p><strong>{result.dominant.superpower}</strong></p>
+              </div>
+
+              <div className="cq-report-box">
+                <h3>{STRINGS.specialtiesTitle}</h3>
+                <ul className="cq-traits-list">
+                  {result.dominant.specialties.map(t => (
+                    <li key={t}>✓ {t}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="cq-report-box cq-report-box--growth">
+              <h3>{STRINGS.growthTitle}</h3>
+              <p>{result.dominant.growthTip}</p>
+            </div>
+
+            <div className="cq-badge-box">
+              <h3>{STRINGS.badgeTitle}</h3>
+              <div className="cq-badge-display">
+                <span className="cq-badge-emoji">{result.badge.emoji}</span>
+                <div className="cq-badge-info">
+                  <strong>{result.badge.title}</strong>
+                  <p>{result.badge.description}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="cq-mix-box">
+              <h3>{STRINGS.mixTitle}</h3>
+              <div className="cq-bars">
+                {(Object.entries(result.scores) as [keyof typeof PERSONALITIES, number][])
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([color, score]) => {
+                    const profile = PERSONALITIES[color];
+                    const percent = (score / questions.length) * 100;
+                    return (
+                      <div key={color} className="cq-bar-row">
+                        <span className="cq-bar-label" title={profile.title}>
+                          {profile.emoji}
+                        </span>
+                        <div className="cq-bar-track">
+                          <div 
+                            className="cq-bar-fill"
+                            style={{ 
+                              width: `${percent}%`, 
+                              backgroundColor: profile.colorHex,
+                              minWidth: percent > 0 ? '10px' : '0' 
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                })}
+              </div>
+            </div>
+
+            <div className="cq-report-actions print-hidden">
+              <button className="cq-primary-btn" onClick={shareResult} type="button">
+                <span className="cq-btn-icon">📤</span>
+                <span className="cq-btn-text">{STRINGS.btnShare}</span>
+              </button>
+              <button className="cq-secondary-btn" onClick={handlePrint} type="button">
+                🖨️ {STRINGS.btnPrint}
+              </button>
+              {history.length > 1 && (
+                <button className="cq-secondary-btn" onClick={() => setShowCompare(true)} type="button">
+                  ⚖️ {STRINGS.btnCompare}
+                </button>
+              )}
+              <button className="cq-ghost-btn" onClick={resetGame} type="button">
+                🔄 {STRINGS.btnReplay}
+              </button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+
+      {isComplete && showCompare && (
+        <div className="cq-compare-screen">
+          <div className="cq-compare-header">
+            <h2>{STRINGS.compareTitle}</h2>
+            <button className="cq-ghost-btn" onClick={() => setShowCompare(false)}>
+              {STRINGS.closeBtn}
+            </button>
+          </div>
+          
+          <div className="cq-compare-grid">
+            <div className="cq-compare-col">
+              <div className="cq-compare-label">{STRINGS.compareCurrent}</div>
+              <div className="cq-compare-card" style={{ borderColor: result.dominant.colorHex }}>
+                <span className="cq-profile-emoji">{result.dominant.emoji}</span>
+                <h3>{result.dominant.title}</h3>
+                <span className="cq-compare-date">{result.date}</span>
+              </div>
+            </div>
+
+            <div className="cq-compare-col">
+              <div className="cq-compare-label">{STRINGS.comparePrevious}</div>
+              <div className="cq-compare-card" style={{ borderColor: history[1].dominant.colorHex }}>
+                <span className="cq-profile-emoji">{history[1].dominant.emoji}</span>
+                <h3>{history[1].dominant.title}</h3>
+                <span className="cq-compare-date">{history[1].date}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
