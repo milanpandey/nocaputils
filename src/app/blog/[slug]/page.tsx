@@ -13,6 +13,30 @@ interface PostData {
 }
 
 const postDatabase: Record<string, PostData> = {
+    "introducing-personality-tests": {
+        title: "Introducing Personality Tests: Discover Your Archetype and True Colors",
+        date: "Aug 1, 2026",
+        tags: ["Personality", "Release", "Games"],
+        toolPath: "/personality",
+        content: `Today, we are beyond excited to announce a brand-new section on nocaputils: **Personality Tests**! 
+
+While we've historically focused on video and audio utilities, we wanted to build something fun, interactive, and beautifully designed for all ages to enjoy. And true to the nocaputils promise, these tests run 100% in your browser. No servers. No tracking. Complete privacy.
+
+### The Rorschach Inkblot Explorer
+Dive into the mysterious world of inkblots! We've created 10 stunning, colorful inkblot shapes. As you interact with them, you choose what you see from a list of fun, kid-friendly options. At the end, our engine calculates your **Perceptual Archetype**—whether you're a Nature Lover, Fantasy Dreamer, or Sky Watcher. 
+
+It comes with interactive 3D rotation, flipping, and full text-to-speech voice narration!
+
+### Color Quest (Mini MBTI)
+Perfect for kids (and the young at heart), Color Quest takes you on a fast-paced, 10-question adventure through fun scenarios like finding a treasure chest or encountering a friendly alien. Your choices reveal your true personality color: Are you a Brave Lion ❤️, a Wise Owl 💙, a Kind Panda 💚, or a Happy Monkey 💛?
+
+At the end, you even get a beautiful printable certificate to show off your new "Fun Badge" and personality traits!
+
+### What's Next?
+This is just the beginning. The Personality hub will be expanding with more interactive, psychology-inspired (but purely entertainment-focused) games in the near future. 
+
+Head over to the Personality Hub to take a test right now!`
+    },
     "introducing-browser-video-editor": {
         title: "Introducing the Online Video Editor: Trim, Crop, and Filter in Your Browser",
         date: "Mar 18, 2026",

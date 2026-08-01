@@ -12,6 +12,13 @@ export const metadata: Metadata = {
 export default function BlogIndex() {
     const posts = [
         {
+            slug: "introducing-personality-tests",
+            title: "Introducing Personality Tests: Discover Your Archetype and True Colors",
+            date: "Aug 1, 2026",
+            excerpt: "We're expanding into fun, private, self-reflection games with the launch of our new Rorschach Inkblot Explorer and Color Quest tests.",
+            category: "Release"
+        },
+        {
             slug: "studio-quality-audio-effects",
             title: "Studio Quality Audio Effects in the Browser",
             date: "Apr 29, 2026",
