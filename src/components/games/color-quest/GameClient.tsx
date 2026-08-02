@@ -85,7 +85,7 @@ export default function ColorQuestClient() {
           <p className="cq-start-subtitle">{STRINGS.startSubtitle}</p>
           
           <div className="cq-start-actions">
-            <button className="cq-primary-btn" onClick={() => startGame(false)} type="button">
+            <button className="cq-start-btn" onClick={() => startGame(false)} type="button">
               <span className="cq-btn-text">{STRINGS.startBtn}</span>
               <span className="cq-btn-icon" aria-hidden="true">🚀</span>
             </button>
@@ -105,15 +105,21 @@ export default function ColorQuestClient() {
 
       {phase === "playing" && currentQuestion && (
         <div className="cq-play-screen">
-          <div className="cq-progress">
-            <span className="cq-progress-text">
-              {STRINGS.questionPrefix} <strong>{currentIndex + 1}</strong> / {questions.length}
-            </span>
-            <div className="cq-progress-bar-container">
-              <div 
-                className="cq-progress-bar-fill" 
-                style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-              />
+          {/* Progress bar with pill and dots */}
+          <div className="cq-progress-bar">
+            <div className="cq-progress-pill">
+              <span className="cq-progress-icon">🎨</span>
+              <span className="cq-progress-text">
+                Question <strong>{currentIndex + 1}</strong> of {questions.length}
+              </span>
+            </div>
+            <div className="cq-progress-dots">
+              {questions.map((_, i) => (
+                <span
+                  key={i}
+                  className={`cq-dot ${i === currentIndex ? "cq-dot--active" : i < currentIndex ? "cq-dot--done" : ""}`}
+                />
+              ))}
             </div>
           </div>
 
@@ -121,22 +127,30 @@ export default function ColorQuestClient() {
             <div className="cq-question-hero">
               <span className="cq-question-emoji" aria-hidden="true">{currentQuestion.emoji}</span>
               <h2 className="cq-question-title">{currentQuestion.title}</h2>
-              <p className="cq-question-speech">{currentQuestion.speechText}</p>
+              <p className="cq-question-speech">&ldquo;{currentQuestion.speechText}&rdquo;</p>
             </div>
             
             <div className="cq-choices-grid">
-              {currentQuestion.choices.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  className="cq-choice-btn"
-                  onClick={() => selectChoice(choice)}
-                  aria-label={choice.label}
-                >
-                  <span className="cq-choice-emoji" aria-hidden="true">{choice.emoji}</span>
-                  <span className="cq-choice-label">{choice.label}</span>
-                </button>
-              ))}
+              {currentQuestion.choices.map((choice) => {
+                const colorClassMap: Record<string, string> = {
+                  red: "cq-choice-btn--red",
+                  blue: "cq-choice-btn--blue",
+                  green: "cq-choice-btn--green",
+                  yellow: "cq-choice-btn--yellow",
+                };
+                return (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    className={`cq-choice-btn ${colorClassMap[choice.color] || ""}`}
+                    onClick={() => selectChoice(choice)}
+                    aria-label={choice.label}
+                  >
+                    <span className="cq-choice-emoji" aria-hidden="true">{choice.emoji}</span>
+                    <span className="cq-choice-label">{choice.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           
@@ -147,7 +161,7 @@ export default function ColorQuestClient() {
               disabled={currentIndex === 0}
               type="button"
             >
-              ← Back
+              ← Back to previous question
             </button>
           </div>
         </div>
@@ -164,12 +178,15 @@ export default function ColorQuestClient() {
             </div>
 
             {/* Confetti (Hidden on print) */}
-            <div className="cq-confetti print-hidden" aria-hidden="true">🎉🎊✨</div>
+            <div className="cq-confetti print-hidden" aria-hidden="true">🎉 🎊 ✨</div>
 
             <h1 className="cq-report-hero-title">{STRINGS.reportHero}</h1>
             
             <div className="cq-dominant-profile" style={{ borderColor: result.dominant.colorHex }}>
               <span className="cq-profile-emoji">{result.dominant.emoji}</span>
+              <span className="cq-profile-badge" style={{ backgroundColor: result.dominant.colorHex }}>
+                {result.dominant.superpower}
+              </span>
               <h2 className="cq-profile-title" style={{ color: result.dominant.colorHex }}>
                 {result.dominant.title}
               </h2>
@@ -178,7 +195,9 @@ export default function ColorQuestClient() {
             <div className="cq-report-grid">
               <div className="cq-report-box">
                 <h3>{STRINGS.superpowerTitle}</h3>
-                <p><strong>{result.dominant.superpower}</strong></p>
+                <p className="cq-superpower-highlight">
+                  <strong>{result.dominant.superpower}</strong>
+                </p>
               </div>
 
               <div className="cq-report-box">
@@ -214,7 +233,7 @@ export default function ColorQuestClient() {
                   .sort((a, b) => b[1] - a[1])
                   .map(([color, score]) => {
                     const profile = PERSONALITIES[color];
-                    const percent = (score / questions.length) * 100;
+                    const percent = Math.round((score / questions.length) * 100);
                     return (
                       <div key={color} className="cq-bar-row">
                         <span className="cq-bar-label" title={profile.title}>
@@ -226,10 +245,11 @@ export default function ColorQuestClient() {
                             style={{ 
                               width: `${percent}%`, 
                               backgroundColor: profile.colorHex,
-                              minWidth: percent > 0 ? '10px' : '0' 
+                              minWidth: percent > 0 ? '12px' : '0' 
                             }}
                           />
                         </div>
+                        <span className="cq-bar-percent">{percent}%</span>
                       </div>
                     );
                 })}
@@ -237,7 +257,7 @@ export default function ColorQuestClient() {
             </div>
 
             <div className="cq-report-actions print-hidden">
-              <button className="cq-primary-btn" onClick={shareResult} type="button">
+              <button className="cq-start-btn" onClick={shareResult} type="button">
                 <span className="cq-btn-icon">📤</span>
                 <span className="cq-btn-text">{STRINGS.btnShare}</span>
               </button>
