@@ -20,6 +20,9 @@ export default function PdfMergeClient() {
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Track if user has modified ordering or compression options
+  const [hasUserEdited, setHasUserEdited] = useState(false);
+
   // Sub-action / Compression & Tradeoff Settings
   const [enableCompression, setEnableCompression] = useState(false);
   const [compressionPreset, setCompressionPreset] = useState<"original" | "balanced" | "max">("balanced");
@@ -69,7 +72,6 @@ export default function PdfMergeClient() {
         const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const pageCount = pdfDoc.numPages;
 
-        // Render first page preview
         let previewUrl = "";
         try {
           const page = await pdfDoc.getPage(1);
@@ -110,6 +112,7 @@ export default function PdfMergeClient() {
 
   const moveUp = (index: number) => {
     if (index === 0) return;
+    setHasUserEdited(true);
     setPdfItems(prev => {
       const updated = [...prev];
       const temp = updated[index - 1];
@@ -121,6 +124,7 @@ export default function PdfMergeClient() {
 
   const moveDown = (index: number) => {
     if (index === pdfItems.length - 1) return;
+    setHasUserEdited(true);
     setPdfItems(prev => {
       const updated = [...prev];
       const temp = updated[index + 1];
@@ -131,11 +135,17 @@ export default function PdfMergeClient() {
   };
 
   const removeItem = (id: string) => {
+    setHasUserEdited(true);
     setPdfItems(prev => prev.filter(item => item.id !== id));
   };
 
   const totalPages = pdfItems.reduce((sum, item) => sum + item.pageCount, 0);
   const totalSizeBytes = pdfItems.reduce((sum, item) => sum + item.sizeBytes, 0);
+
+  // Dynamic Final Size Estimator calculation
+  const estimatedFinalSizeBytes = enableCompression
+    ? Math.round(totalSizeBytes * (compressionPreset === "max" ? 0.35 : compressionPreset === "balanced" ? 0.55 : 0.80))
+    : totalSizeBytes;
 
   // Merge PDFs using pdf-lib
   const mergePdfs = useCallback(async () => {
@@ -150,7 +160,6 @@ export default function PdfMergeClient() {
       const mergedPdf = await PDFDocument.create();
 
       if (enableCompression) {
-        // PDF Compression Mode: Render pages to optimized compressed JPEG streams
         const pdfjsLib = await import("pdfjs-dist");
         pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -192,7 +201,6 @@ export default function PdfMergeClient() {
           }
         }
       } else {
-        // Direct High-Fidelity Copy Mode (Uncompressed Original)
         for (let i = 0; i < pdfItems.length; i++) {
           const item = pdfItems[i];
           setStatusMsg(`Merging file ${i + 1} of ${pdfItems.length}: ${item.name}...`);
@@ -292,21 +300,37 @@ export default function PdfMergeClient() {
             <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
               <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h3 className="text-xl font-black uppercase text-[var(--text-main)]">
-                    Merge Queue ({pdfItems.length} Files)
-                  </h3>
-                  <p className="text-xs font-bold uppercase text-[var(--text-soft)] tracking-wider">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-black uppercase text-[var(--text-main)]">
+                      Merge Queue ({pdfItems.length} Files)
+                    </h3>
+                    {hasUserEdited && (
+                      <div className="flex items-center gap-2 bg-black text-white px-3 py-1 border-2 border-black text-[11px] font-black uppercase tracking-wider">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#10B981]"></span>
+                        </span>
+                        <span>Live Sync Active</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs font-bold uppercase text-[var(--text-soft)] tracking-wider mt-1">
                     Total Pages: <strong>{totalPages}</strong> | Combined Input Size: <strong>{formatFileSize(totalSizeBytes)}</strong>
                   </p>
                 </div>
 
-                <button
-                  onClick={mergePdfs}
-                  disabled={isProcessing}
-                  className="neo-button bg-[#E63946] text-white font-black uppercase px-8 py-3 text-base flex items-center gap-2"
-                >
-                  <span>📥 Download Merged PDF</span>
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    onClick={mergePdfs}
+                    disabled={isProcessing}
+                    className="neo-button bg-[#E63946] text-white font-black uppercase px-8 py-3 text-base flex items-center gap-2"
+                  >
+                    <span>📥 Download Merged PDF</span>
+                  </button>
+                  <span className="text-[11px] font-black uppercase text-[#2A9D8F]">
+                    Estimated Output Size: ~{formatFileSize(estimatedFinalSizeBytes)}
+                  </span>
+                </div>
               </div>
 
               {/* Compression Sub-Action & Quality Tradeoffs */}
@@ -316,7 +340,10 @@ export default function PdfMergeClient() {
                     <input
                       type="checkbox"
                       checked={enableCompression}
-                      onChange={(e) => setEnableCompression(e.target.checked)}
+                      onChange={(e) => {
+                        setEnableCompression(e.target.checked);
+                        setHasUserEdited(true);
+                      }}
                       className="w-5 h-5 accent-[#457B9D] border-2 border-black"
                     />
                     <span className="text-sm font-black uppercase text-[var(--text-main)]">
@@ -332,7 +359,7 @@ export default function PdfMergeClient() {
                 {enableCompression && (
                   <div className="mt-4 pt-4 border-t-2 border-black grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div
-                      onClick={() => setCompressionPreset("original")}
+                      onClick={() => { setCompressionPreset("original"); setHasUserEdited(true); }}
                       className={`p-3 border-2 border-black cursor-pointer ${compressionPreset === "original" ? "bg-[#457B9D] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                     >
                       <h4 className="font-black text-xs uppercase">High Quality</h4>
@@ -340,7 +367,7 @@ export default function PdfMergeClient() {
                     </div>
 
                     <div
-                      onClick={() => setCompressionPreset("balanced")}
+                      onClick={() => { setCompressionPreset("balanced"); setHasUserEdited(true); }}
                       className={`p-3 border-2 border-black cursor-pointer ${compressionPreset === "balanced" ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                     >
                       <h4 className="font-black text-xs uppercase">Balanced (Recommended)</h4>
@@ -348,7 +375,7 @@ export default function PdfMergeClient() {
                     </div>
 
                     <div
-                      onClick={() => setCompressionPreset("max")}
+                      onClick={() => { setCompressionPreset("max"); setHasUserEdited(true); }}
                       className={`p-3 border-2 border-black cursor-pointer ${compressionPreset === "max" ? "bg-[#E63946] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                     >
                       <h4 className="font-black text-xs uppercase">Max Compression</h4>
@@ -398,7 +425,7 @@ export default function PdfMergeClient() {
                       </div>
 
                       <div>
-                        <span className="bg-black text-white px-2 py-0.5 text-[10px] font-black uppercase mr-2">
+                        <span className="bg-black text-[#FFF] px-2 py-0.5 text-[10px] font-black uppercase mr-2">
                           #{idx + 1}
                         </span>
                         <span className="font-black text-sm text-[var(--text-main)] break-all">

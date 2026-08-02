@@ -21,6 +21,15 @@ const tools = [
     badge: "Reorder & Merge",
   },
   {
+    id: "compress-pdf",
+    name: "Compress PDF",
+    description: "Shrink PDF file size in your browser with interactive quality presets and file size estimators.",
+    status: "Live" as const,
+    emoji: "📦",
+    color: "#F4D35E",
+    badge: "Size Savings",
+  },
+  {
     id: "file-bills",
     name: "File Bills",
     description: "Organize receipt photos & PDFs into a compiled printable PDF and Excel summary ledger.",
@@ -30,13 +39,13 @@ const tools = [
     badge: "PDF + Excel",
   },
   {
-    id: "compress-pdf",
-    name: "Compress PDF",
-    description: "Shrink PDF file size in your browser with interactive quality presets and file size estimators.",
+    id: "merge-excel",
+    name: "Merge Excel",
+    description: "Combine up to 5 Excel & CSV files into one multi-tab workbook with format conversion options.",
     status: "Live" as const,
-    emoji: "📦",
-    color: "#F4D35E",
-    badge: "Size Savings",
+    emoji: "📊",
+    color: "#9C27B0",
+    badge: "Multi-Tab Merge",
   },
 ];
 
@@ -80,7 +89,7 @@ export default function WorkplaceUtilitiesHub() {
               Workplace Tools
             </h2>
 
-            <div className="bauhaus-game-grid">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {tools.map((tool) => (
                 <a
                   key={tool.id}

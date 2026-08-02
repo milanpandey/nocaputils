@@ -30,6 +30,45 @@ export default function FileBillsClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stitchInputRef = useRef<HTMLInputElement>(null);
 
+  // Batch-wide QA scanner & duplicate evaluator across raw & stitched items
+  const reevaluateAllQAFlags = (items: ReceiptItem[]): ReceiptItem[] => {
+    // 1. Batch Currency Anomaly Resolver
+    const currencyCounts: Record<string, number> = {};
+    items.forEach(item => {
+      if (item.currencyDetected) {
+        currencyCounts[item.currency] = (currencyCounts[item.currency] || 0) + 1;
+      }
+    });
+
+    const sortedCurrencies = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1]);
+    const dominantCurrency = sortedCurrencies.length > 0 ? sortedCurrencies[0][0] : "AED";
+    const dominantCount = sortedCurrencies.length > 0 ? sortedCurrencies[0][1] : 0;
+
+    const alignedItems = items.map(item => {
+      if (!item.currencyDetected || (dominantCount >= 2 && currencyCounts[item.currency] === 1)) {
+        return { ...item, currency: dominantCurrency };
+      }
+      return item;
+    });
+
+    // 2. Global Duplicate Key Scanner across ALL items (raw + stitched)
+    const seenKeys = new Map<string, string>();
+    const evaluatedItems = alignedItems.map(item => {
+      const key = `${item.date}_${item.amount}_${item.billName.toLowerCase().trim()}`;
+      const isDuplicate = seenKeys.has(key) && item.amount > 0;
+      if (!isDuplicate && item.amount > 0) {
+        seenKeys.set(key, item.id);
+      }
+
+      const qaFlags = evaluateQAFlags(item, isDuplicate);
+      return { ...item, qaFlags };
+    });
+
+    // 3. Sort by date & re-index itemNo
+    return evaluatedItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                          .map((item, idx) => ({ ...item, itemNo: idx + 1 }));
+  };
+
   const processUploadedFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
@@ -54,43 +93,7 @@ export default function FileBillsClient() {
         newItems.push(...parsedResult);
       }
 
-      setReceipts(prev => {
-        let combined = [...prev, ...newItems];
-
-        // 1. Batch Currency Anomaly Resolver:
-        const currencyCounts: Record<string, number> = {};
-        combined.forEach(item => {
-          if (item.currencyDetected) {
-            currencyCounts[item.currency] = (currencyCounts[item.currency] || 0) + 1;
-          }
-        });
-
-        const sortedCurrencies = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1]);
-        const dominantCurrency = sortedCurrencies.length > 0 ? sortedCurrencies[0][0] : "AED";
-        const dominantCount = sortedCurrencies.length > 0 ? sortedCurrencies[0][1] : 0;
-
-        combined = combined.map(item => {
-          if (!item.currencyDetected || (dominantCount >= 2 && currencyCounts[item.currency] === 1)) {
-            return { ...item, currency: dominantCurrency };
-          }
-          return item;
-        });
-
-        // 2. Duplicate Check Scanner
-        const seenKeys = new Map<string, string>();
-        combined = combined.map(item => {
-          const key = `${item.date}_${item.amount}_${item.billName.toLowerCase()}`;
-          const isDuplicate = seenKeys.has(key) && item.amount > 0;
-          if (!isDuplicate) seenKeys.set(key, item.id);
-
-          const qaFlags = evaluateQAFlags(item, isDuplicate);
-          return { ...item, qaFlags };
-        });
-
-        return combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                       .map((item, idx) => ({ ...item, itemNo: idx + 1 }));
-      });
-
+      setReceipts(prev => reevaluateAllQAFlags([...prev, ...newItems]));
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("Receipt parsing error:", err);
@@ -132,24 +135,8 @@ export default function FileBillsClient() {
       setStitchedReportCount(prev => prev + 1);
       setHasUserEdited(true);
 
-      setReceipts(prev => {
-        let combined = [...prev, ...stitchedItems];
-
-        // Re-evaluate duplicates across stitched collection
-        const seenKeys = new Map<string, string>();
-        combined = combined.map(item => {
-          const key = `${item.date}_${item.amount}_${item.billName.toLowerCase()}`;
-          const isDuplicate = seenKeys.has(key) && item.amount > 0;
-          if (!isDuplicate) seenKeys.set(key, item.id);
-
-          const qaFlags = evaluateQAFlags(item, isDuplicate);
-          return { ...item, qaFlags };
-        });
-
-        return combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                       .map((item, idx) => ({ ...item, itemNo: idx + 1 }));
-      });
-
+      // Re-evaluate duplicates & flags across combined raw + stitched collection
+      setReceipts(prev => reevaluateAllQAFlags([...prev, ...stitchedItems]));
       setStatusMsg("");
     } catch (err) {
       console.error("Report stitch error:", err);
@@ -164,24 +151,13 @@ export default function FileBillsClient() {
     setHasUserEdited(true);
     setReceipts(prev => {
       const updated = prev.map(r => (r.id === id ? { ...r, [field]: value } : r));
-
-      const seenKeys = new Map<string, string>();
-      return updated.map(item => {
-        const key = `${item.date}_${item.amount}_${item.billName.toLowerCase()}`;
-        const isDuplicate = seenKeys.has(key) && item.amount > 0;
-        if (!isDuplicate) seenKeys.set(key, item.id);
-
-        const qaFlags = evaluateQAFlags(item, isDuplicate);
-        return { ...item, qaFlags };
-      });
+      return reevaluateAllQAFlags(updated);
     });
   };
 
   const removeReceipt = (id: string) => {
     setHasUserEdited(true);
-    setReceipts(prev =>
-      prev.filter(r => r.id !== id).map((item, idx) => ({ ...item, itemNo: idx + 1 }))
-    );
+    setReceipts(prev => reevaluateAllQAFlags(prev.filter(r => r.id !== id)));
   };
 
   // Date Window calculation
@@ -196,7 +172,7 @@ export default function FileBillsClient() {
   const dominantBatchCurrency = sortedBatchCurrencies.length > 0 ? sortedBatchCurrencies[0][0] : "AED";
   const dominantSymbol = CURRENCY_MAP[dominantBatchCurrency]?.symbol || dominantBatchCurrency;
 
-  // Exact Sum Calculation in Batch Dominant Currency
+  // Exact Sum Calculation across ALL receipts (raw + stitched) in Batch Dominant Currency
   const totalAmount = receipts.reduce((sum, r) => {
     if (r.currency === dominantBatchCurrency) {
       return sum + (r.amount || 0);
@@ -474,7 +450,7 @@ export default function FileBillsClient() {
               <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <h3 className="text-xl font-black uppercase text-[var(--text-main)]">
-                    Expense Summary ({receipts.length} Bills)
+                    Expense Summary ({receipts.length} Bills Total)
                   </h3>
                   <p className="text-xs font-bold uppercase text-[var(--text-soft)] tracking-wider">
                     Project: <strong>{projectCode}</strong> | Dept: <strong>{deptCode}</strong> | Window: <strong>{startDate}</strong> to <strong>{endDate}</strong>
