@@ -119,6 +119,11 @@ export default function ArchiveFilesClient() {
       const downloadUrl = URL.createObjectURL(content);
       const filename = `${customArchiveName.trim() || "Workplace_Archive"}.zip`;
 
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      link.click();
+
       setResultStats({
         originalBytes: totalInputBytes,
         zippedBytes: content.size,
