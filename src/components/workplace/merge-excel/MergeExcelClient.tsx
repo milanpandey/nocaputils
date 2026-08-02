@@ -21,8 +21,6 @@ export default function MergeExcelClient() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  // Output Format Choice (.xlsx, .xls, .csv)
   const [outputFormat, setOutputFormat] = useState<"xlsx" | "xls" | "csv">("xlsx");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +40,7 @@ export default function MergeExcelClient() {
     });
 
     if (fileArray.length === 0) {
-      setError("Please select valid Excel (.xlsx, .xls) or CSV (.csv) files.");
+      setError("Invalid file selection. Please select valid Microsoft Excel (.xlsx, .xls) or CSV (.csv) workbooks.");
       return;
     }
 
@@ -62,7 +60,7 @@ export default function MergeExcelClient() {
 
       for (let i = 0; i < filesToProcess.length; i++) {
         const file = filesToProcess[i];
-        setStatusMsg(`Parsing sheets for ${file.name}...`);
+        setStatusMsg(`Parsing worksheet tabs for ${file.name}...`);
 
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
@@ -84,7 +82,7 @@ export default function MergeExcelClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("Excel read error:", err);
-      setError("Failed to read Excel workbook. Please check file format.");
+      setError("Failed to read Excel workbook. Please verify file integrity.");
     } finally {
       setIsProcessing(false);
     }
@@ -119,7 +117,6 @@ export default function MergeExcelClient() {
   const totalSheets = excelItems.reduce((sum, item) => sum + item.sheetCount, 0);
   const totalSizeBytes = excelItems.reduce((sum, item) => sum + item.sizeBytes, 0);
 
-  // Merge Excel Workbooks
   const mergeWorkbooks = useCallback(async () => {
     if (excelItems.length === 0) return;
 
@@ -151,7 +148,7 @@ export default function MergeExcelClient() {
         }
       }
 
-      setStatusMsg("Exporting merged file stream...");
+      setStatusMsg("Exporting consolidated Excel binary stream...");
       const bookType = outputFormat === "csv" ? "csv" : outputFormat === "xls" ? "biff8" : "xlsx";
       const fileExt = outputFormat === "csv" ? "csv" : outputFormat === "xls" ? "xls" : "xlsx";
 
@@ -168,7 +165,7 @@ export default function MergeExcelClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("Excel Merge error:", err);
-      setError("Failed to merge Excel files.");
+      setError("Failed to merge Excel workbooks.");
     } finally {
       setIsProcessing(false);
     }
@@ -178,32 +175,35 @@ export default function MergeExcelClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link">
+          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
           </a>
           <ThemeToggle />
         </div>
 
-        <main className="flex flex-1 flex-col items-center">
+        <main className="flex flex-1 flex-col items-center" id="main-content">
           <div className="mb-10 text-center max-w-3xl">
             <div className="inline-block border-4 border-black bg-[#9C27B0] px-4 py-1 text-white text-sm font-black uppercase shadow-[4px_4px_0_0_#000] mb-4">
-              Multi-Tab Excel Merger
+              Enterprise Excel Workbook Merger
             </div>
             <h1 className="text-4xl sm:text-6xl font-black uppercase tracking-tight leading-none text-[var(--text-main)] mb-4">
               Merge Excel
             </h1>
             <p className="text-lg font-bold text-[var(--text-soft)]">
-              Combine up to 5 Excel &amp; CSV workbooks into one multi-tab master workbook. Preserves all sheet tabs in your exact serial order.
+              Combine up to 5 Excel &amp; CSV workbooks into a single multi-tab master workbook. Preserves all sheet tabs in your exact serial order.
             </p>
           </div>
 
-          {/* Upload Drop Zone */}
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
               onClick={() => fileInputRef.current?.click()}
-              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+              tabIndex={0}
+              role="button"
+              aria-label="Upload Excel or CSV files to merge (Up to 5 files)"
+              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
             >
               <input
                 type="file"
@@ -212,8 +212,10 @@ export default function MergeExcelClient() {
                 accept=".xlsx,.xls,.csv"
                 onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
                 className="hidden"
+                id="merge-excel-input"
+                aria-label="Select Excel or CSV files"
               />
-              <span className="text-5xl mb-3">📊</span>
+              <span className="text-5xl mb-3" aria-hidden="true">📊</span>
               <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
                 Upload Excel / CSV Files to Merge (Up to 5)
               </h2>
@@ -226,19 +228,18 @@ export default function MergeExcelClient() {
             </div>
 
             {isProcessing && (
-              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm">
+              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm" role="status">
                 ⏳ {statusMsg}
               </div>
             )}
 
             {error && (
-              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm">
+              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm" role="alert">
                 ⚠️ {error}
               </div>
             )}
           </div>
 
-          {/* Merge Workspace & Output Options */}
           {excelItems.length > 0 && (
             <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
               <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -255,7 +256,8 @@ export default function MergeExcelClient() {
                   <select
                     value={outputFormat}
                     onChange={(e) => setOutputFormat(e.target.value as "xlsx" | "xls" | "csv")}
-                    className="border-3 border-black p-2.5 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)] uppercase"
+                    aria-label="Select Output File Format"
+                    className="border-3 border-black p-2.5 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)] uppercase focus:ring-2 focus:ring-black"
                   >
                     <option value="xlsx">Format: .XLSX (Modern Excel)</option>
                     <option value="xls">Format: .XLS (Legacy Excel)</option>
@@ -265,6 +267,7 @@ export default function MergeExcelClient() {
                   <button
                     onClick={mergeWorkbooks}
                     disabled={isProcessing}
+                    aria-label="Download merged Excel workbook"
                     className="neo-button bg-[#9C27B0] text-white font-black uppercase px-6 py-3 text-sm flex items-center gap-2 whitespace-nowrap"
                   >
                     <span>📊 Download Merged Excel</span>
@@ -272,7 +275,6 @@ export default function MergeExcelClient() {
                 </div>
               </div>
 
-              {/* File List & Serial Tab Calling */}
               <div className="flex flex-col gap-4">
                 <h4 className="text-sm font-black uppercase text-[var(--text-main)] tracking-wider">
                   Set Workbook Tab Order (Serial Sequence):
@@ -288,7 +290,8 @@ export default function MergeExcelClient() {
                         <button
                           onClick={() => moveUp(idx)}
                           disabled={idx === 0}
-                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#9C27B0]"
+                          aria-label={`Move ${item.name} up in merge queue`}
+                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#9C27B0] focus:ring-2 focus:ring-white"
                           title="Move Up"
                         >
                           ▲
@@ -296,14 +299,15 @@ export default function MergeExcelClient() {
                         <button
                           onClick={() => moveDown(idx)}
                           disabled={idx === excelItems.length - 1}
-                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#9C27B0]"
+                          aria-label={`Move ${item.name} down in merge queue`}
+                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#9C27B0] focus:ring-2 focus:ring-white"
                           title="Move Down"
                         >
                           ▼
                         </button>
                       </div>
 
-                      <div className="w-12 h-12 border-2 border-black bg-[#9C27B0] text-white flex items-center justify-center shrink-0 font-black text-xl">
+                      <div className="w-12 h-12 border-2 border-black bg-[#9C27B0] text-white flex items-center justify-center shrink-0 font-black text-xl" aria-hidden="true">
                         📊
                       </div>
 
@@ -324,6 +328,7 @@ export default function MergeExcelClient() {
 
                     <button
                       onClick={() => removeItem(item.id)}
+                      aria-label={`Remove workbook ${item.name}`}
                       className="text-xs font-black uppercase bg-[#E63946] text-white px-3 py-1.5 border-2 border-black hover:bg-black self-end sm:self-center"
                     >
                       Remove
@@ -335,7 +340,7 @@ export default function MergeExcelClient() {
           )}
 
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel-muted)] p-6 text-center text-xs font-bold uppercase tracking-wider text-[var(--text-soft)] mb-12">
-            🔒 <strong>100% Private Processing:</strong> Excel workbook tab merging executes locally inside your browser memory. Zero server uploads.
+            🔒 <strong>Enterprise Security &amp; Privacy:</strong> Excel workbook tab merging executes locally inside browser memory. Zero server uploads.
           </div>
         </main>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import { parseReceiptFile, parseExcelLedgerFile, parsePdfReceiptFile, evaluateQAFlags, type ReceiptItem } from "@/lib/workplace/receiptParser";
@@ -18,21 +18,25 @@ export default function FileBillsClient() {
   const [projectCode, setProjectCode] = useState("PRJ-2026-EXP");
   const [deptCode, setDeptCode] = useState("FIN-001");
 
-  // Track if user has modified any fields
   const [hasUserEdited, setHasUserEdited] = useState(false);
-
-  // Stitch Report Tracking (Max 1 report stitch)
   const [stitchedReportCount, setStitchedReportCount] = useState(0);
-
-  // Inline Image Preview Modal State
   const [previewItem, setPreviewItem] = useState<ReceiptItem | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stitchInputRef = useRef<HTMLInputElement>(null);
 
-  // Batch-wide QA scanner & duplicate evaluator across raw & stitched items
+  // Keyboard Escape Listener to close Lightbox Modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewItem(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const reevaluateAllQAFlags = (items: ReceiptItem[]): ReceiptItem[] => {
-    // 1. Batch Currency Anomaly Resolver
     const currencyCounts: Record<string, number> = {};
     items.forEach(item => {
       if (item.currencyDetected) {
@@ -51,7 +55,6 @@ export default function FileBillsClient() {
       return item;
     });
 
-    // 2. Global Duplicate Key Scanner across ALL items (raw + stitched)
     const seenKeys = new Map<string, string>();
     const evaluatedItems = alignedItems.map(item => {
       const key = `${item.date}_${item.amount}_${item.billName.toLowerCase().trim()}`;
@@ -64,7 +67,6 @@ export default function FileBillsClient() {
       return { ...item, qaFlags };
     });
 
-    // 3. Sort by date & re-index itemNo
     return evaluatedItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                           .map((item, idx) => ({ ...item, itemNo: idx + 1 }));
   };
@@ -103,7 +105,6 @@ export default function FileBillsClient() {
     }
   }, [receipts]);
 
-  // Stitch Existing Report (PDF or Excel .xlsx)
   const handleStitchReport = useCallback(async (files: FileList | File[]) => {
     if (stitchedReportCount >= 1) {
       setError("Maximum limit of 1 stitched report per batch reached.");
@@ -134,8 +135,6 @@ export default function FileBillsClient() {
 
       setStitchedReportCount(prev => prev + 1);
       setHasUserEdited(true);
-
-      // Re-evaluate duplicates & flags across combined raw + stitched collection
       setReceipts(prev => reevaluateAllQAFlags([...prev, ...stitchedItems]));
       setStatusMsg("");
     } catch (err) {
@@ -146,7 +145,6 @@ export default function FileBillsClient() {
     }
   }, [receipts, stitchedReportCount]);
 
-  // Live Re-evaluation of Policy QA Flags on User Edits
   const updateReceipt = <K extends keyof ReceiptItem>(id: string, field: K, value: ReceiptItem[K]) => {
     setHasUserEdited(true);
     setReceipts(prev => {
@@ -160,19 +158,16 @@ export default function FileBillsClient() {
     setReceipts(prev => reevaluateAllQAFlags(prev.filter(r => r.id !== id)));
   };
 
-  // Date Window calculation
   const dates = receipts.map(r => new Date(r.date).getTime()).filter(t => !isNaN(t));
   const startDate = dates.length > 0 ? new Date(Math.min(...dates)).toISOString().split("T")[0] : "N/A";
   const endDate = dates.length > 0 ? new Date(Math.max(...dates)).toISOString().split("T")[0] : "N/A";
 
-  // Dominant Batch Currency
   const batchCurrencies: Record<string, number> = {};
   receipts.forEach(r => { batchCurrencies[r.currency] = (batchCurrencies[r.currency] || 0) + 1; });
   const sortedBatchCurrencies = Object.entries(batchCurrencies).sort((a, b) => b[1] - a[1]);
   const dominantBatchCurrency = sortedBatchCurrencies.length > 0 ? sortedBatchCurrencies[0][0] : "AED";
   const dominantSymbol = CURRENCY_MAP[dominantBatchCurrency]?.symbol || dominantBatchCurrency;
 
-  // Exact Sum Calculation across ALL receipts (raw + stitched) in Batch Dominant Currency
   const totalAmount = receipts.reduce((sum, r) => {
     if (r.currency === dominantBatchCurrency) {
       return sum + (r.amount || 0);
@@ -183,7 +178,6 @@ export default function FileBillsClient() {
     return sum + converted;
   }, 0);
 
-  // Download PDF
   const downloadPrintablePdf = useCallback(() => {
     if (receipts.length === 0) return;
 
@@ -282,7 +276,6 @@ export default function FileBillsClient() {
     doc.save(`Expense_Bills_Ledger_${startDate}_to_${endDate}.pdf`);
   }, [receipts, startDate, endDate, totalAmount, projectCode, deptCode, dominantBatchCurrency, dominantSymbol]);
 
-  // Download Excel
   const downloadExcelLedger = useCallback(() => {
     if (receipts.length === 0) return;
 
@@ -328,16 +321,16 @@ export default function FileBillsClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link">
+          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
           </a>
           <ThemeToggle />
         </div>
 
-        <main className="flex flex-1 flex-col items-center">
+        <main className="flex flex-1 flex-col items-center" id="main-content">
           <div className="mb-10 text-center max-w-3xl">
             <div className="inline-block border-4 border-black bg-[#2A9D8F] px-4 py-1 text-white text-sm font-black uppercase shadow-[4px_4px_0_0_#000] mb-4">
-              Receipt Organizer &amp; Compliance QA
+              Enterprise Receipt Compliance QA
             </div>
             <h1 className="text-4xl sm:text-6xl font-black uppercase tracking-tight leading-none text-[var(--text-main)] mb-4">
               File Bills
@@ -347,30 +340,31 @@ export default function FileBillsClient() {
             </p>
           </div>
 
-          {/* Upload Drop Zone & Corporate Header Inputs */}
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
+                <label htmlFor="project-code-input" className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
                   Project Code
                 </label>
                 <input
+                  id="project-code-input"
                   type="text"
                   value={projectCode}
                   onChange={(e) => { setProjectCode(e.target.value); setHasUserEdited(true); }}
-                  className="w-full border-3 border-black p-2.5 font-bold text-sm bg-[var(--bg-page)] text-[var(--text-main)]"
+                  className="w-full border-3 border-black p-2.5 font-bold text-sm bg-[var(--bg-page)] text-[var(--text-main)] focus:ring-2 focus:ring-black"
                   placeholder="e.g. PRJ-2026-EXP"
                 />
               </div>
               <div>
-                <label className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
+                <label htmlFor="dept-code-input" className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
                   Department Code
                 </label>
                 <input
+                  id="dept-code-input"
                   type="text"
                   value={deptCode}
                   onChange={(e) => { setDeptCode(e.target.value); setHasUserEdited(true); }}
-                  className="w-full border-3 border-black p-2.5 font-bold text-sm bg-[var(--bg-page)] text-[var(--text-main)]"
+                  className="w-full border-3 border-black p-2.5 font-bold text-sm bg-[var(--bg-page)] text-[var(--text-main)] focus:ring-2 focus:ring-black"
                   placeholder="e.g. FIN-001"
                 />
               </div>
@@ -380,7 +374,11 @@ export default function FileBillsClient() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && processUploadedFiles(e.dataTransfer.files); }}
               onClick={() => fileInputRef.current?.click()}
-              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+              tabIndex={0}
+              role="button"
+              aria-label="Upload receipt images or PDFs (Up to 20 files)"
+              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
             >
               <input
                 type="file"
@@ -389,8 +387,10 @@ export default function FileBillsClient() {
                 accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
                 onChange={(e) => e.target.files && processUploadedFiles(e.target.files)}
                 className="hidden"
+                id="file-bills-input"
+                aria-label="Select Receipt Files"
               />
-              <span className="text-5xl mb-3">🧾</span>
+              <span className="text-5xl mb-3" aria-hidden="true">🧾</span>
               <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
                 Upload Receipts (Images &amp; PDFs - Up to 20)
               </h2>
@@ -402,7 +402,6 @@ export default function FileBillsClient() {
               </span>
             </div>
 
-            {/* Stitching Option for Existing Ledger / PDF Report */}
             <div className="mt-6 border-3 border-black bg-[var(--bg-page)] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-left">
                 <span className="text-xs font-black uppercase text-[#2A9D8F] block">
@@ -419,11 +418,14 @@ export default function FileBillsClient() {
                 accept="application/pdf,.pdf,.xlsx,.xls,.csv"
                 onChange={(e) => e.target.files && handleStitchReport(e.target.files)}
                 className="hidden"
+                id="file-stitch-input"
+                aria-label="Select Report to Stitch"
               />
 
               <button
                 onClick={() => stitchInputRef.current?.click()}
                 disabled={stitchedReportCount >= 1}
+                aria-label="Stitch existing expense report into master ledger"
                 className="neo-button bg-[#2A9D8F] text-white font-black uppercase px-4 py-2 text-xs whitespace-nowrap disabled:opacity-50"
               >
                 {stitchedReportCount >= 1 ? "✓ 1 Report Stitched" : "+ Stitch Existing Report"}
@@ -431,22 +433,20 @@ export default function FileBillsClient() {
             </div>
 
             {isProcessing && (
-              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm">
+              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm" role="status">
                 ⏳ {statusMsg}
               </div>
             )}
 
             {error && (
-              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm">
+              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm" role="alert">
                 ⚠️ {error}
               </div>
             )}
           </div>
 
-          {/* Verification & Edit Ledger */}
           {receipts.length > 0 && (
             <div className="w-full max-w-5xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
-              {/* Executive Summary Bar */}
               <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <h3 className="text-xl font-black uppercase text-[var(--text-main)]">
@@ -466,15 +466,14 @@ export default function FileBillsClient() {
                 </div>
               </div>
 
-              {/* Action Buttons + Pulsing Green LED Indicator */}
               <div className="flex flex-wrap gap-4 mb-8 justify-between items-center">
                 <div className="flex items-center gap-3">
                   <h4 className="text-lg font-black uppercase text-[var(--text-main)]">
                     Ledger Items (Sorted by Date)
                   </h4>
                   {hasUserEdited && (
-                    <div className="flex items-center gap-2 bg-black text-white px-3 py-1 border-2 border-black text-[11px] font-black uppercase tracking-wider">
-                      <span className="relative flex h-2.5 w-2.5">
+                    <div className="flex items-center gap-2 bg-black text-white px-3 py-1 border-2 border-black text-[11px] font-black uppercase tracking-wider" role="status">
+                      <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#10B981]"></span>
                       </span>
@@ -486,12 +485,14 @@ export default function FileBillsClient() {
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={downloadPrintablePdf}
+                    aria-label="Download Printable PDF Expense Ledger"
                     className="neo-button bg-[#E63946] text-white font-black uppercase px-6 py-3 text-sm flex items-center gap-2"
                   >
                     <span>📄 Download Printable PDF</span>
                   </button>
                   <button
                     onClick={downloadExcelLedger}
+                    aria-label="Download Excel Expense Ledger File"
                     className="neo-button bg-[#2A9D8F] text-white font-black uppercase px-6 py-3 text-sm flex items-center gap-2"
                   >
                     <span>📊 Download Excel Ledger (.xlsx)</span>
@@ -499,7 +500,6 @@ export default function FileBillsClient() {
                 </div>
               </div>
 
-              {/* Receipt Cards Grid */}
               <div className="flex flex-col gap-6">
                 {receipts.map(r => {
                   const isRed = r.qaFlags.isDuplicate || r.qaFlags.isFutureDate || r.qaFlags.isOffensive;
@@ -516,16 +516,19 @@ export default function FileBillsClient() {
                       key={r.id}
                       className={`border-4 p-5 grid grid-cols-1 md:grid-cols-[110px_1fr_auto] gap-6 items-center transition-colors ${cardBorderColor}`}
                     >
-                      {/* Preview Scan Thumbnail + Zoom Button */}
                       <div className="flex flex-col items-center gap-2">
                         <div
                           onClick={() => setPreviewItem(r)}
-                          className="relative aspect-[3/4] w-full border-2 border-black overflow-hidden bg-black flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity group"
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setPreviewItem(r); }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Preview receipt scan for ${r.billName}`}
+                          className="relative aspect-[3/4] w-full border-2 border-black overflow-hidden bg-black flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity group focus:ring-2 focus:ring-black"
                           title="Click to preview scan"
                         >
                           <img
                             src={r.enhancedDataUrl}
-                            alt={r.billName}
+                            alt={`Scan preview of ${r.billName}`}
                             className="w-full h-full object-contain"
                           />
                           <span className="absolute top-1 left-1 bg-black text-white px-1.5 py-0.5 text-[10px] font-black">
@@ -537,11 +540,9 @@ export default function FileBillsClient() {
                         </div>
                       </div>
 
-                      {/* Inputs Form + Policy Flags */}
                       <div className="flex flex-col gap-3">
-                        {/* Policy QA Warnings Banner */}
                         {r.qaFlags.messages.length > 0 && (
-                          <div className={`p-2.5 border-2 border-black font-black text-xs uppercase flex flex-col gap-1 ${isRed ? "bg-[#E63946] text-white" : "bg-[#F4D35E] text-black"}`}>
+                          <div className={`p-2.5 border-2 border-black font-black text-xs uppercase flex flex-col gap-1 ${isRed ? "bg-[#E63946] text-white" : "bg-[#F4D35E] text-black"}`} role="alert">
                             <span className="underline">⚠️ POLICY QA WARNINGS:</span>
                             {r.qaFlags.messages.map((m, idx) => (
                               <div key={idx} className="flex items-center gap-1">
@@ -555,10 +556,11 @@ export default function FileBillsClient() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div>
-                            <label className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
+                            <label htmlFor={`bill-name-${r.id}`} className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
                               Bill / Merchant Name
                             </label>
                             <input
+                              id={`bill-name-${r.id}`}
                               type="text"
                               value={r.billName}
                               onChange={(e) => updateReceipt(r.id, "billName", e.target.value)}
@@ -567,10 +569,11 @@ export default function FileBillsClient() {
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
+                            <label htmlFor={`bill-date-${r.id}`} className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
                               Date of Bill (YYYY-MM-DD)
                             </label>
                             <input
+                              id={`bill-date-${r.id}`}
                               type="date"
                               value={r.date}
                               onChange={(e) => updateReceipt(r.id, "date", e.target.value)}
@@ -579,10 +582,11 @@ export default function FileBillsClient() {
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
+                            <label htmlFor={`bill-amount-${r.id}`} className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
                               Amount (Excl. Tip)
                             </label>
                             <input
+                              id={`bill-amount-${r.id}`}
                               type="number"
                               step="0.01"
                               value={r.amount}
@@ -592,10 +596,11 @@ export default function FileBillsClient() {
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
+                            <label htmlFor={`bill-curr-${r.id}`} className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-1">
                               Currency
                             </label>
                             <select
+                              id={`bill-curr-${r.id}`}
                               value={r.currency}
                               onChange={(e) => updateReceipt(r.id, "currency", e.target.value)}
                               className="w-full border-2 border-black p-2 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)]"
@@ -619,10 +624,10 @@ export default function FileBillsClient() {
                         </div>
                       </div>
 
-                      {/* Delete button */}
                       <div className="flex md:flex-col justify-end items-end gap-2">
                         <button
                           onClick={() => removeReceipt(r.id)}
+                          aria-label={`Remove receipt #${r.itemNo} ${r.billName}`}
                           className="text-xs font-black uppercase bg-[#E63946] text-white px-3 py-2 border-2 border-black hover:bg-black"
                         >
                           Remove
@@ -635,10 +640,12 @@ export default function FileBillsClient() {
             </div>
           )}
 
-          {/* Inline High-Res Image Preview Modal */}
           {previewItem && (
             <div
               onClick={() => setPreviewItem(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Inline scan view for Receipt #${previewItem.itemNo}`}
               className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 animate-fadeIn"
             >
               <div
@@ -656,23 +663,24 @@ export default function FileBillsClient() {
                   </div>
                   <button
                     onClick={() => setPreviewItem(null)}
+                    aria-label="Close image preview modal"
                     className="neo-button bg-[#E63946] text-white font-black text-sm px-4 py-2 uppercase"
                   >
-                    ✕ Close
+                    ✕ Close (Esc)
                   </button>
                 </div>
 
                 <div className="flex justify-center border-4 border-black bg-black p-4 max-h-[65vh] overflow-auto">
                   <img
                     src={previewItem.enhancedDataUrl}
-                    alt={previewItem.billName}
+                    alt={`High resolution scan of ${previewItem.billName}`}
                     className="max-w-full object-contain"
                   />
                 </div>
 
                 {previewItem.qaFlags.messages.length > 0 && (
-                  <div className="p-3 border-2 border-black bg-[#F4D35E] text-black font-bold text-xs uppercase">
-                    <strong>⚠️ QA Warning Flags:</strong> {previewItem.qaFlags.messages.join(" | ")}
+                  <div className="p-3 border-2 border-black bg-[#F4D35E] text-black font-bold text-xs uppercase" role="alert">
+                    <strong>⚠️ Policy QA Warning Flags:</strong> {previewItem.qaFlags.messages.join(" | ")}
                   </div>
                 )}
               </div>
@@ -680,7 +688,7 @@ export default function FileBillsClient() {
           )}
 
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel-muted)] p-6 text-center text-xs font-bold uppercase tracking-wider text-[var(--text-soft)] mb-12">
-            🔒 <strong>100% Private Processing:</strong> Receipts and compliance checks run locally in your browser memory. Zero server uploads.
+            🔒 <strong>Enterprise Security &amp; Privacy:</strong> Receipts and compliance checks run locally in browser memory. Zero server uploads.
           </div>
         </main>
 

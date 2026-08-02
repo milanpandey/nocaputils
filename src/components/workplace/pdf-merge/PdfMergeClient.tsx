@@ -19,11 +19,9 @@ export default function PdfMergeClient() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  // Track if user has modified ordering or compression options
   const [hasUserEdited, setHasUserEdited] = useState(false);
 
-  // Sub-action / Compression & Tradeoff Settings
+  // Sub-action / Compression Settings
   const [enableCompression, setEnableCompression] = useState(false);
   const [compressionPreset, setCompressionPreset] = useState<"original" | "balanced" | "max">("balanced");
 
@@ -43,7 +41,7 @@ export default function PdfMergeClient() {
     );
 
     if (fileArray.length === 0) {
-      setError("Please select valid PDF documents (.pdf)");
+      setError("Invalid file selection. Please select valid Microsoft PDF documents (.pdf).");
       return;
     }
 
@@ -66,7 +64,7 @@ export default function PdfMergeClient() {
 
       for (let i = 0; i < filesToProcess.length; i++) {
         const file = filesToProcess[i];
-        setStatusMsg(`Reading page count & generating preview for ${file.name}...`);
+        setStatusMsg(`Analyzing page structure & preview for ${file.name}...`);
 
         const arrayBuffer = await file.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -86,7 +84,7 @@ export default function PdfMergeClient() {
             previewUrl = canvas.toDataURL("image/jpeg", 0.8);
           }
         } catch (e) {
-          console.warn("Page 1 preview error:", e);
+          console.warn("Page preview generation skipped:", e);
         }
 
         newItems.push({
@@ -104,7 +102,7 @@ export default function PdfMergeClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("PDF upload error:", err);
-      setError("Failed to read PDF file. Please ensure files are unencrypted.");
+      setError("Failed to process PDF document. Please verify files are unencrypted.");
     } finally {
       setIsProcessing(false);
     }
@@ -142,18 +140,16 @@ export default function PdfMergeClient() {
   const totalPages = pdfItems.reduce((sum, item) => sum + item.pageCount, 0);
   const totalSizeBytes = pdfItems.reduce((sum, item) => sum + item.sizeBytes, 0);
 
-  // Dynamic Final Size Estimator calculation
   const estimatedFinalSizeBytes = enableCompression
     ? Math.round(totalSizeBytes * (compressionPreset === "max" ? 0.35 : compressionPreset === "balanced" ? 0.55 : 0.80))
     : totalSizeBytes;
 
-  // Merge PDFs using pdf-lib
   const mergePdfs = useCallback(async () => {
     if (pdfItems.length === 0) return;
 
     setIsProcessing(true);
     setError(null);
-    setStatusMsg("Initializing PDF Merger...");
+    setStatusMsg("Initializing PDF consolidation engine...");
 
     try {
       const { PDFDocument } = await import("pdf-lib");
@@ -211,7 +207,7 @@ export default function PdfMergeClient() {
         }
       }
 
-      setStatusMsg("Finalizing merged PDF document...");
+      setStatusMsg("Finalizing consolidated PDF document...");
       const mergedPdfBytes = await mergedPdf.save();
 
       const blob = new Blob([new Uint8Array(mergedPdfBytes)], { type: "application/pdf" });
@@ -225,7 +221,7 @@ export default function PdfMergeClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("PDF Merge error:", err);
-      setError("Failed to merge PDF files. Please ensure files are not password-protected.");
+      setError("Failed to merge PDF documents. Please verify files are unencrypted.");
     } finally {
       setIsProcessing(false);
     }
@@ -235,32 +231,35 @@ export default function PdfMergeClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link">
+          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
           </a>
           <ThemeToggle />
         </div>
 
-        <main className="flex flex-1 flex-col items-center">
+        <main className="flex flex-1 flex-col items-center" id="main-content">
           <div className="mb-10 text-center max-w-3xl">
             <div className="inline-block border-4 border-black bg-[#457B9D] px-4 py-1 text-white text-sm font-black uppercase shadow-[4px_4px_0_0_#000] mb-4">
-              PDF Consolidation Engine
+              Enterprise Document Consolidation
             </div>
             <h1 className="text-4xl sm:text-6xl font-black uppercase tracking-tight leading-none text-[var(--text-main)] mb-4">
               PDF Merge
             </h1>
             <p className="text-lg font-bold text-[var(--text-soft)]">
-              Combine up to 5 PDF files into one consolidated document. Reorder files in your exact sequence and toggle size compression tradeoffs.
+              Combine up to 5 PDF files into a single consolidated document. Reorder files in your exact sequence and toggle size compression options.
             </p>
           </div>
 
-          {/* Upload Drop Zone */}
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
               onClick={() => fileInputRef.current?.click()}
-              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+              tabIndex={0}
+              role="button"
+              aria-label="Upload PDF files to merge (Up to 5 files)"
+              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
             >
               <input
                 type="file"
@@ -269,8 +268,10 @@ export default function PdfMergeClient() {
                 accept="application/pdf,.pdf"
                 onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
                 className="hidden"
+                id="pdf-merge-file-input"
+                aria-label="Select PDF files to merge"
               />
-              <span className="text-5xl mb-3">📑</span>
+              <span className="text-5xl mb-3" aria-hidden="true">📑</span>
               <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
                 Upload PDFs to Merge (Up to 5 Files)
               </h2>
@@ -283,19 +284,18 @@ export default function PdfMergeClient() {
             </div>
 
             {isProcessing && (
-              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm">
+              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm" role="status">
                 ⏳ {statusMsg}
               </div>
             )}
 
             {error && (
-              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm">
+              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm" role="alert">
                 ⚠️ {error}
               </div>
             )}
           </div>
 
-          {/* Merge Workspace & Ordering Controls */}
           {pdfItems.length > 0 && (
             <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
               <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -305,8 +305,8 @@ export default function PdfMergeClient() {
                       Merge Queue ({pdfItems.length} Files)
                     </h3>
                     {hasUserEdited && (
-                      <div className="flex items-center gap-2 bg-black text-white px-3 py-1 border-2 border-black text-[11px] font-black uppercase tracking-wider">
-                        <span className="relative flex h-2.5 w-2.5">
+                      <div className="flex items-center gap-2 bg-black text-white px-3 py-1 border-2 border-black text-[11px] font-black uppercase tracking-wider" role="status">
+                        <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#10B981]"></span>
                         </span>
@@ -315,7 +315,7 @@ export default function PdfMergeClient() {
                     )}
                   </div>
                   <p className="text-xs font-bold uppercase text-[var(--text-soft)] tracking-wider mt-1">
-                    Total Pages: <strong>{totalPages}</strong> | Combined Input Size: <strong>{formatFileSize(totalSizeBytes)}</strong>
+                    Total Pages: <strong>{totalPages}</strong> | Input Size: <strong>{formatFileSize(totalSizeBytes)}</strong>
                   </p>
                 </div>
 
@@ -323,6 +323,7 @@ export default function PdfMergeClient() {
                   <button
                     onClick={mergePdfs}
                     disabled={isProcessing}
+                    aria-label="Download consolidated merged PDF document"
                     className="neo-button bg-[#E63946] text-white font-black uppercase px-8 py-3 text-base flex items-center gap-2"
                   >
                     <span>📥 Download Merged PDF</span>
@@ -333,21 +334,21 @@ export default function PdfMergeClient() {
                 </div>
               </div>
 
-              {/* Compression Sub-Action & Quality Tradeoffs */}
               <div className="border-3 border-black bg-[var(--bg-page)] p-5 mb-8">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
+                  <label htmlFor="enable-compression-check" className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
+                      id="enable-compression-check"
                       checked={enableCompression}
                       onChange={(e) => {
                         setEnableCompression(e.target.checked);
                         setHasUserEdited(true);
                       }}
-                      className="w-5 h-5 accent-[#457B9D] border-2 border-black"
+                      className="w-5 h-5 accent-[#457B9D] border-2 border-black focus:ring-2 focus:ring-black"
                     />
                     <span className="text-sm font-black uppercase text-[var(--text-main)]">
-                      Enable PDF File Compression (Sub-Action)
+                      Enable File Compression Sub-Action
                     </span>
                   </label>
 
@@ -360,14 +361,22 @@ export default function PdfMergeClient() {
                   <div className="mt-4 pt-4 border-t-2 border-black grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div
                       onClick={() => { setCompressionPreset("original"); setHasUserEdited(true); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setCompressionPreset("original"); setHasUserEdited(true); } }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Select High Quality compression preset"
                       className={`p-3 border-2 border-black cursor-pointer ${compressionPreset === "original" ? "bg-[#457B9D] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                     >
                       <h4 className="font-black text-xs uppercase">High Quality</h4>
-                      <p className="text-[11px] font-bold mt-1 opacity-90">1.8x Scale · 88% JPEG Quality · Best for Printing</p>
+                      <p className="text-[11px] font-bold mt-1 opacity-90">1.8x Scale · 88% Quality · Best for Printing</p>
                     </div>
 
                     <div
                       onClick={() => { setCompressionPreset("balanced"); setHasUserEdited(true); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setCompressionPreset("balanced"); setHasUserEdited(true); } }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Select Balanced compression preset"
                       className={`p-3 border-2 border-black cursor-pointer ${compressionPreset === "balanced" ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                     >
                       <h4 className="font-black text-xs uppercase">Balanced (Recommended)</h4>
@@ -376,6 +385,10 @@ export default function PdfMergeClient() {
 
                     <div
                       onClick={() => { setCompressionPreset("max"); setHasUserEdited(true); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setCompressionPreset("max"); setHasUserEdited(true); } }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Select Max Compression preset"
                       className={`p-3 border-2 border-black cursor-pointer ${compressionPreset === "max" ? "bg-[#E63946] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                     >
                       <h4 className="font-black text-xs uppercase">Max Compression</h4>
@@ -385,7 +398,6 @@ export default function PdfMergeClient() {
                 )}
               </div>
 
-              {/* PDF Item List with Up/Down Controls */}
               <div className="flex flex-col gap-4">
                 <h4 className="text-sm font-black uppercase text-[var(--text-main)] tracking-wider">
                   Set Merge Sequence (Order Top to Bottom):
@@ -401,7 +413,8 @@ export default function PdfMergeClient() {
                         <button
                           onClick={() => moveUp(idx)}
                           disabled={idx === 0}
-                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#457B9D]"
+                          aria-label={`Move ${item.name} up in merge queue`}
+                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#457B9D] focus:ring-2 focus:ring-white"
                           title="Move Up"
                         >
                           ▲
@@ -409,7 +422,8 @@ export default function PdfMergeClient() {
                         <button
                           onClick={() => moveDown(idx)}
                           disabled={idx === pdfItems.length - 1}
-                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#457B9D]"
+                          aria-label={`Move ${item.name} down in merge queue`}
+                          className="bg-black text-white px-2 py-0.5 text-xs font-black uppercase disabled:opacity-30 hover:bg-[#457B9D] focus:ring-2 focus:ring-white"
                           title="Move Down"
                         >
                           ▼
@@ -418,9 +432,9 @@ export default function PdfMergeClient() {
 
                       <div className="w-12 h-16 border-2 border-black bg-black overflow-hidden flex items-center justify-center shrink-0">
                         {item.previewUrl ? (
-                          <img src={item.previewUrl} alt={item.name} className="w-full h-full object-cover" />
+                          <img src={item.previewUrl} alt={`Thumbnail preview of ${item.name}`} className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-white text-xs">📄</span>
+                          <span className="text-white text-xs" aria-hidden="true">📄</span>
                         )}
                       </div>
 
@@ -439,6 +453,7 @@ export default function PdfMergeClient() {
 
                     <button
                       onClick={() => removeItem(item.id)}
+                      aria-label={`Remove ${item.name} from queue`}
                       className="text-xs font-black uppercase bg-[#E63946] text-white px-3 py-1.5 border-2 border-black hover:bg-black self-end sm:self-center"
                     >
                       Remove
@@ -450,7 +465,7 @@ export default function PdfMergeClient() {
           )}
 
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel-muted)] p-6 text-center text-xs font-bold uppercase tracking-wider text-[var(--text-soft)] mb-12">
-            🔒 <strong>100% Private Processing:</strong> PDF merging and page copy operations execute strictly inside your browser memory. Zero server uploads.
+            🔒 <strong>Enterprise Security &amp; Privacy:</strong> PDF merging and page copy operations execute strictly inside browser memory. Zero server uploads.
           </div>
         </main>
 

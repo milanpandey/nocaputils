@@ -20,11 +20,9 @@ export default function ArchiveFilesClient() {
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Archive & Compression Options
   const [compressionPreset, setCompressionPreset] = useState<"STORE" | "DEFLATE_STD" | "DEFLATE_MAX">("DEFLATE_STD");
   const [customArchiveName, setCustomArchiveName] = useState<string>("Workplace_Archive");
 
-  // Result Stats
   const [resultStats, setResultStats] = useState<{
     originalBytes: number;
     zippedBytes: number;
@@ -74,11 +72,9 @@ export default function ArchiveFilesClient() {
 
   const totalInputBytes = fileItems.reduce((sum, item) => sum + item.sizeBytes, 0);
 
-  // Dynamic Size Estimator Math
   const estimatedReductionPct = compressionPreset === "DEFLATE_MAX" ? 25 : compressionPreset === "DEFLATE_STD" ? 18 : 0;
   const estimatedArchiveBytes = Math.round(totalInputBytes * (1 - estimatedReductionPct / 100));
 
-  // Create ZIP Archive using JSZip
   const createZipArchive = useCallback(async () => {
     if (fileItems.length === 0) return;
 
@@ -134,7 +130,7 @@ export default function ArchiveFilesClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("ZIP Archive error:", err);
-      setError("Failed to create ZIP archive. Please check files.");
+      setError("Failed to create ZIP archive. Please check file integrity.");
     } finally {
       setIsProcessing(false);
     }
@@ -144,16 +140,16 @@ export default function ArchiveFilesClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link">
+          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
           </a>
           <ThemeToggle />
         </div>
 
-        <main className="flex flex-1 flex-col items-center">
+        <main className="flex flex-1 flex-col items-center" id="main-content">
           <div className="mb-10 text-center max-w-3xl">
             <div className="inline-block border-4 border-black bg-[#FFB703] px-4 py-1 text-black text-sm font-black uppercase shadow-[4px_4px_0_0_#000] mb-4">
-              Universal Portable Archiver
+              Enterprise Portable Archiver
             </div>
             <h1 className="text-4xl sm:text-6xl font-black uppercase tracking-tight leading-none text-[var(--text-main)] mb-4">
               Archive Files
@@ -163,13 +159,16 @@ export default function ArchiveFilesClient() {
             </p>
           </div>
 
-          {/* Upload Drop Zone */}
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
               onClick={() => fileInputRef.current?.click()}
-              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+              tabIndex={0}
+              role="button"
+              aria-label="Upload files to archive into ZIP (Up to 10 files)"
+              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
             >
               <input
                 type="file"
@@ -177,8 +176,10 @@ export default function ArchiveFilesClient() {
                 multiple
                 onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
                 className="hidden"
+                id="archive-files-input"
+                aria-label="Select Files to Archive"
               />
-              <span className="text-5xl mb-3">🗂️</span>
+              <span className="text-5xl mb-3" aria-hidden="true">🗂️</span>
               <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
                 Upload Files to Archive (Up to 10 Files)
               </h2>
@@ -191,19 +192,18 @@ export default function ArchiveFilesClient() {
             </div>
 
             {isProcessing && (
-              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm">
+              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm" role="status">
                 ⏳ {statusMsg}
               </div>
             )}
 
             {error && (
-              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm">
+              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm" role="alert">
                 ⚠️ {error}
               </div>
             )}
           </div>
 
-          {/* Archival Workspace & Options */}
           {fileItems.length > 0 && (
             <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
               <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -219,23 +219,24 @@ export default function ArchiveFilesClient() {
                 <button
                   onClick={createZipArchive}
                   disabled={isProcessing}
+                  aria-label="Download ZIP Archive File"
                   className="neo-button bg-[#FFB703] text-black font-black uppercase px-8 py-3 text-base flex items-center gap-2"
                 >
                   <span>🗂️ Download ZIP Archive</span>
                 </button>
               </div>
 
-              {/* Archive Name & Compression Preset Tradeoffs */}
               <div className="border-3 border-black bg-[var(--bg-page)] p-5 mb-8">
                 <div className="mb-4">
-                  <label className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
+                  <label htmlFor="custom-archive-name-input" className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
                     Archive File Name (.zip)
                   </label>
                   <input
+                    id="custom-archive-name-input"
                     type="text"
                     value={customArchiveName}
                     onChange={(e) => setCustomArchiveName(e.target.value)}
-                    className="w-full border-2 border-black p-2.5 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)]"
+                    className="w-full border-2 border-black p-2.5 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)] focus:ring-2 focus:ring-black"
                     placeholder="e.g. Workplace_Archive"
                   />
                 </div>
@@ -247,6 +248,10 @@ export default function ArchiveFilesClient() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div
                     onClick={() => setCompressionPreset("STORE")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("STORE"); }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select STORE compression option"
                     className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "STORE" ? "bg-[#FFB703] text-black" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                   >
                     <h4 className="font-black text-xs uppercase">STORE (No Compression)</h4>
@@ -255,6 +260,10 @@ export default function ArchiveFilesClient() {
 
                   <div
                     onClick={() => setCompressionPreset("DEFLATE_STD")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("DEFLATE_STD"); }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select DEFLATE Standard compression option"
                     className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "DEFLATE_STD" ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                   >
                     <h4 className="font-black text-xs uppercase">DEFLATE Standard (Recommended)</h4>
@@ -263,6 +272,10 @@ export default function ArchiveFilesClient() {
 
                   <div
                     onClick={() => setCompressionPreset("DEFLATE_MAX")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("DEFLATE_MAX"); }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select MAX Compression option"
                     className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "DEFLATE_MAX" ? "bg-[#E63946] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
                   >
                     <h4 className="font-black text-xs uppercase">MAX Compression</h4>
@@ -271,14 +284,13 @@ export default function ArchiveFilesClient() {
                 </div>
 
                 <div className="mt-4 pt-3 border-t-2 border-black text-[11px] font-bold text-[var(--text-soft)] uppercase flex items-center gap-2">
-                  <span>💡</span>
+                  <span aria-hidden="true">💡</span>
                   <span>
                     <strong>Portability Notice:</strong> Standard ZIP format is natively supported by Windows, macOS, iOS, Android, and all email clients without requiring third-party software.
                   </span>
                 </div>
               </div>
 
-              {/* Uploaded File List */}
               <div className="flex flex-col gap-3">
                 <h4 className="text-sm font-black uppercase text-[var(--text-main)] tracking-wider">
                   Files Included in Archive:
@@ -305,6 +317,7 @@ export default function ArchiveFilesClient() {
 
                     <button
                       onClick={() => removeItem(item.id)}
+                      aria-label={`Remove ${item.name} from archive queue`}
                       className="text-xs font-black uppercase bg-[#E63946] text-white px-3 py-1 border-2 border-black hover:bg-black"
                     >
                       Remove
@@ -313,10 +326,9 @@ export default function ArchiveFilesClient() {
                 ))}
               </div>
 
-              {/* Results Banner & Download */}
               {resultStats && (
-                <div className="mt-8 border-4 border-black bg-[#2A9D8F] text-white p-6 text-center animate-fadeIn">
-                  <span className="text-3xl mb-2 block">🎉</span>
+                <div className="mt-8 border-4 border-black bg-[#2A9D8F] text-white p-6 text-center animate-fadeIn" role="status">
+                  <span className="text-3xl mb-2 block" aria-hidden="true">🎉</span>
                   <h4 className="text-2xl font-black uppercase tracking-tight mb-1">
                     ZIP Archive Created Successfully!
                   </h4>
@@ -338,7 +350,7 @@ export default function ArchiveFilesClient() {
           )}
 
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel-muted)] p-6 text-center text-xs font-bold uppercase tracking-wider text-[var(--text-soft)] mb-12">
-            🔒 <strong>100% Private Processing:</strong> File packaging and ZIP archiving execute locally inside your browser memory. Zero server uploads.
+            🔒 <strong>Enterprise Security &amp; Privacy:</strong> File packaging and ZIP archiving execute locally inside browser memory. Zero server uploads.
           </div>
         </main>
 
