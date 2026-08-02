@@ -12,13 +12,31 @@ const tools = [
     badge: "100% Private",
   },
   {
+    id: "pdf-merge",
+    name: "PDF Merge",
+    description: "Combine up to 5 PDF files into a single document with drag-and-drop ordering & compression options.",
+    status: "Live" as const,
+    emoji: "📑",
+    color: "#457B9D",
+    badge: "Reorder & Merge",
+  },
+  {
     id: "file-bills",
     name: "File Bills",
-    description: "Organize receipt photos into a compiled printable PDF and Excel summary ledger.",
+    description: "Organize receipt photos & PDFs into a compiled printable PDF and Excel summary ledger.",
     status: "Live" as const,
     emoji: "🧾",
     color: "#2A9D8F",
     badge: "PDF + Excel",
+  },
+  {
+    id: "compress-pdf",
+    name: "Compress PDF",
+    description: "Shrink PDF file size in your browser with interactive quality presets and file size estimators.",
+    status: "Live" as const,
+    emoji: "📦",
+    color: "#F4D35E",
+    badge: "Size Savings",
   },
 ];
 
@@ -35,8 +53,7 @@ export default function WorkplaceUtilitiesHub() {
 
         <main className="flex flex-1 flex-col items-center">
           {/* ── Hero ── */}
-          <section className="bauhaus-hero mb-20 text-center">
-            {/* Decorative shapes */}
+          <section className="bauhaus-hero mb-16 text-center">
             <div className="bauhaus-hero-shapes" aria-hidden="true">
               <div className="bauhaus-shape bauhaus-shape--rect-blue" style={{ background: "#457B9D" }} />
               <div className="bauhaus-shape bauhaus-shape--circle-red" style={{ background: "#E63946" }} />
@@ -77,7 +94,7 @@ export default function WorkplaceUtilitiesHub() {
                       <span className="bauhaus-game-emoji">{tool.emoji}</span>
                       <div className="bauhaus-game-badges">
                         <span className="bauhaus-badge bauhaus-badge--live">{tool.status}</span>
-                        <span className="bauhaus-badge bauhaus-badge--age">{tool.badge}</span>
+                        <span className="bauhaus-badge bauhaus-badge--age" style={{ background: "#111827", color: "#FFF" }}>{tool.badge}</span>
                       </div>
                     </div>
                     <h3 className="bauhaus-game-name">{tool.name}</h3>

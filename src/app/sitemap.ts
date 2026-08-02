@@ -145,7 +145,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
             priority: 0.7,
         },
         {
+            url: `${baseUrl}/workplaceutilities/pdf-merge`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.7,
+        },
+        {
             url: `${baseUrl}/workplaceutilities/file-bills`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.7,
+        },
+        {
+            url: `${baseUrl}/workplaceutilities/compress-pdf`,
             lastModified: new Date(),
             changeFrequency: 'monthly',
             priority: 0.7,
