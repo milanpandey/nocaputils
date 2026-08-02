@@ -1,4 +1,5 @@
 import { detectCurrency, getBrowserLocaleCurrency, CURRENCY_MAP } from "./currencyMap";
+import * as XLSX from "xlsx";
 
 export interface QAFlags {
   isDuplicate: boolean;
@@ -60,7 +61,7 @@ const PROFANITY_WORDS = [
 ];
 
 /**
- * Evaluates all Policy QA rules dynamically for both OCR scanning & live user edits.
+ * Evaluates all Policy QA rules dynamically for OCR scanning, PDF intake, Excel stitching & live user edits.
  */
 export function evaluateQAFlags(
   item: { date: string; amount: number; billName: string; rawMessages?: string[] },
@@ -88,7 +89,6 @@ export function evaluateQAFlags(
     messages.push(`Merchant Category Warning: "${vendorMatch[0]}" (Non-reimbursable venue)`);
   }
 
-  // Include raw line messages if scanning
   if (item.rawMessages && item.rawMessages.length > 0) {
     item.rawMessages.forEach(m => {
       if (!messages.includes(m)) messages.push(m);
@@ -103,7 +103,7 @@ export function evaluateQAFlags(
     messages.push("$0 Bill Amount Detected");
   }
 
-  // 4. Date Policy Checks (Live evaluation on user edit)
+  // 4. Date Policy Checks
   if (item.date) {
     const billTime = new Date(item.date).getTime();
     const nowTime = new Date().getTime();
@@ -175,7 +175,7 @@ function sanitizeVendorName(rawText: string, fileName: string): string {
     }
   }
 
-  return "Vendor Name";
+  return fileName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9\s]/g, " ").trim() || "Vendor Name";
 }
 
 /**
@@ -249,7 +249,6 @@ function parseLocaleDate(rawText: string, currencyCode: string): string {
 
 /**
  * Largest Amount Total Due Selector.
- * Selects the largest valid number matching Total Due / Grand Total with VAT.
  */
 function parseLocaleAmount(text: string, currencyCode: string): { amount: number; isEuFormat: boolean } {
   const isEuCurrency = ["EUR", "SEK", "NOK", "DKK", "BRL"].includes(currencyCode);
@@ -257,7 +256,6 @@ function parseLocaleAmount(text: string, currencyCode: string): { amount: number
 
   const amounts: number[] = [];
 
-  // Match all numbers on lines containing total/due/grand/net/balance/amount
   const totalRegex = /(?:total|grand|due|net|sum|balance|amount)\D{0,15}(\d+[.,]\d{2})/gi;
   let totalMatch;
   while ((totalMatch = totalRegex.exec(text)) !== null) {
@@ -271,7 +269,6 @@ function parseLocaleAmount(text: string, currencyCode: string): { amount: number
     if (!isNaN(num) && num > 0) amounts.push(num);
   }
 
-  // Also collect all floating point numbers on receipt to find absolute max Total Due
   const anyNumber = isEuFormat ? /\b\d+,\d{2}\b/g : /\b\d+\.\d{2}\b/g;
   const allNums = text.match(anyNumber);
   if (allNums) {
@@ -289,7 +286,7 @@ function parseLocaleAmount(text: string, currencyCode: string): { amount: number
 }
 
 /**
- * Image enhancement with Automatic Receipt Background Bounding-Box Cropping.
+ * Canvas Image enhancement with 2-Pass Receipt Auto-Cropping.
  */
 export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: string; enhancedUrl: string }> {
   return new Promise((resolve, reject) => {
@@ -308,7 +305,6 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
         const imageData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
         const data = imageData.data;
 
-        // Pass 1: Adaptive paper brightness threshold
         let minBrightness = 255;
         let maxBrightness = 0;
 
@@ -321,7 +317,6 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
         const contrastRange = maxBrightness - minBrightness || 1;
         const paperThreshold = minBrightness + contrastRange * 0.45;
 
-        // Pass 2: Row & Column Density Analysis to isolate receipt paper
         const rowPaperCounts = new Int32Array(srcCanvas.height);
         const colPaperCounts = new Int32Array(srcCanvas.width);
 
@@ -336,7 +331,6 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
           }
         }
 
-        // Filter out sparse background noise (require >= 8% paper density)
         const minRowDensity = srcCanvas.width * 0.08;
         const minColDensity = srcCanvas.height * 0.08;
 
@@ -352,7 +346,6 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
         let maxX = srcCanvas.width - 1;
         while (maxX > minX && colPaperCounts[maxX] < minColDensity) maxX--;
 
-        // Apply contrast boost to pixels
         for (let i = 0; i < data.length; i += 4) {
           let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
           avg = ((avg - minBrightness) / contrastRange) * 255;
@@ -365,7 +358,6 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
         }
         ctx.putImageData(imageData, 0, 0);
 
-        // Safety padding (2%)
         const padX = Math.round(srcCanvas.width * 0.02);
         const padY = Math.round(srcCanvas.height * 0.02);
 
@@ -377,7 +369,6 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
         const cropW = maxX - minX + 1;
         const cropH = maxY - minY + 1;
 
-        // Perform crop if background padding was trimmed
         if (cropW < srcCanvas.width * 0.98 || cropH < srcCanvas.height * 0.98) {
           const cropCanvas = document.createElement("canvas");
           cropCanvas.width = cropW;
@@ -402,9 +393,212 @@ export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: st
 }
 
 /**
- * OCR & Policy QA Scanner for Receipt Images.
+ * Creates a clean SVG placeholder Data URL for stitched Excel ledger items.
  */
-export async function parseReceiptFile(file: File, itemNo: number): Promise<ReceiptItem> {
+function createStitchedCardGraphic(billName: string, amount: number, currency: string, date: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+    <rect width="600" height="800" fill="#111827"/>
+    <rect x="20" y="20" width="560" height="760" fill="#F9FAFB" stroke="#000000" stroke-width="8"/>
+    <rect x="40" y="40" width="520" height="120" fill="#2A9D8F"/>
+    <text x="60" y="90" font-family="sans-serif" font-weight="900" font-size="28" fill="#FFFFFF">STITCHED EXPENSE RECORD</text>
+    <text x="60" y="130" font-family="sans-serif" font-weight="700" font-size="16" fill="#E0F2FE">Imported via Expense Ledger Stitcher</text>
+    
+    <text x="60" y="240" font-family="sans-serif" font-weight="900" font-size="22" fill="#111827">MERCHANT / BILL:</text>
+    <text x="60" y="280" font-family="sans-serif" font-weight="900" font-size="36" fill="#E63946">${billName.toUpperCase()}</text>
+
+    <text x="60" y="380" font-family="sans-serif" font-weight="900" font-size="22" fill="#111827">DATE OF BILL:</text>
+    <text x="60" y="420" font-family="sans-serif" font-weight="800" font-size="32" fill="#1F2937">${date}</text>
+
+    <text x="60" y="520" font-family="sans-serif" font-weight="900" font-size="22" fill="#111827">AMOUNT CLAIMED:</text>
+    <text x="60" y="570" font-family="sans-serif" font-weight="900" font-size="44" fill="#2A9D8F">${currency} ${amount.toFixed(2)}</text>
+
+    <line x1="40" y1="650" x2="560" y2="650" stroke="#000000" stroke-width="4" stroke-dasharray="8 8"/>
+    <text x="60" y="710" font-family="sans-serif" font-weight="700" font-size="16" fill="#6B7280">Verified &amp; Merged into Final Master Ledger</text>
+  </svg>`;
+
+  return `data:image/svg+xml;base64,${typeof window !== "undefined" ? btoa(svg) : ""}`;
+}
+
+/**
+ * Parses PDF Receipt Documents page-by-page.
+ */
+export async function parsePdfReceiptFile(file: File, startItemNo: number): Promise<ReceiptItem[]> {
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const items: ReceiptItem[] = [];
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 2.0 });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+
+    if (ctx) {
+      // TypeScript compatibility for pdfjs-dist page.render
+      await (page as unknown as { render: (params: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> } })
+        .render({ canvasContext: ctx, viewport }).promise;
+    }
+
+    const pageImageDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+    // Extract text content from PDF page
+    const textContent = await page.getTextContent();
+    const textItems = textContent.items.map((item: unknown) => (item as { str: string }).str);
+    let rawText = textItems.join(" ");
+
+    // If PDF page text is sparse/scanned, fallback to Tesseract OCR on page canvas
+    if (rawText.trim().length < 15) {
+      try {
+        const { createWorker } = await import("tesseract.js");
+        const worker = await createWorker("eng");
+        const ret = await worker.recognize(pageImageDataUrl);
+        rawText = ret.data.text || "";
+        await worker.terminate();
+      } catch (err) {
+        console.warn("PDF Page OCR Fallback warning:", err);
+      }
+    }
+
+    const billName = sanitizeVendorName(rawText, `${file.name.replace(/\.pdf$/i, "")} Page ${p}`);
+    const detectedCurrency = detectCurrency(rawText);
+    const browserFallback = getBrowserLocaleCurrency();
+    const currency = detectedCurrency ? detectedCurrency.code : browserFallback.code;
+    const currencyDetected = detectedCurrency !== null;
+    const location = detectedCurrency ? detectedCurrency.name : browserFallback.name;
+
+    const date = parseLocaleDate(rawText, currency);
+    const { amount } = parseLocaleAmount(rawText, currency);
+
+    const rawMessages: string[] = [];
+    const alcoholRegex = new RegExp(`\\b(${ALCOHOL_SMOKING_KEYWORDS.join("|")})\\b`, "i");
+    if (alcoholRegex.test(rawText)) {
+      rawMessages.push(`Non-permitted items detected in PDF Page ${p}`);
+    }
+
+    const qaFlags = evaluateQAFlags({ date, amount, billName, rawMessages });
+
+    items.push({
+      id: `pdf_receipt_${Date.now()}_${p}_${Math.random().toString(36).substr(2, 4)}`,
+      file,
+      imageDataUrl: pageImageDataUrl,
+      enhancedDataUrl: pageImageDataUrl,
+      itemNo: startItemNo + p - 1,
+      billName,
+      date,
+      amount,
+      tipAmount: 0,
+      currency,
+      currencyDetected,
+      location,
+      status: "ready",
+      qaFlags,
+    });
+  }
+
+  return items;
+}
+
+/**
+ * Parses Existing Excel Expense Ledgers (.xlsx, .xls, .csv).
+ */
+export async function parseExcelLedgerFile(file: File, startItemNo: number): Promise<ReceiptItem[]> {
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+  const items: ReceiptItem[] = [];
+
+  let itemIdx = 0;
+  for (const row of rawRows) {
+    const keys = Object.keys(row);
+    const rowStr = JSON.stringify(row).toLowerCase();
+
+    // Skip total/header rows
+    if (rowStr.includes("total") || rowStr.includes("workplace expense")) continue;
+
+    let billName = "";
+    let date = new Date().toISOString().split("T")[0];
+    let amount = 0.0;
+    let currency = "AED";
+    let location = "United Arab Emirates";
+
+    for (const k of keys) {
+      const kLower = k.toLowerCase();
+      const val = String(row[k]).trim();
+      if (!val) continue;
+
+      if (kLower.includes("merchant") || kLower.includes("bill") || kLower.includes("name")) {
+        billName = val;
+      } else if (kLower.includes("date")) {
+        billName = billName || "Stitched Expense";
+        const parsedD = new Date(val);
+        if (!isNaN(parsedD.getTime())) {
+          date = parsedD.toISOString().split("T")[0];
+        } else {
+          date = val;
+        }
+      } else if (kLower.includes("amount") || kLower.includes("price") || kLower.includes("total")) {
+        const parsedA = parseFloat(val.replace(/[^0-9.]/g, ""));
+        if (!isNaN(parsedA) && parsedA > 0) amount = parsedA;
+      } else if (kLower.includes("currency")) {
+        if (CURRENCY_MAP[val.toUpperCase()]) currency = val.toUpperCase();
+      } else if (kLower.includes("location") || kLower.includes("country")) {
+        location = val;
+      }
+    }
+
+    if (amount > 0 || billName) {
+      itemIdx++;
+      billName = billName || `Stitched Bill ${itemIdx}`;
+      const graphicUrl = createStitchedCardGraphic(billName, amount, currency, date);
+      const qaFlags = evaluateQAFlags({ date, amount, billName });
+
+      items.push({
+        id: `excel_receipt_${Date.now()}_${itemIdx}`,
+        file,
+        imageDataUrl: graphicUrl,
+        enhancedDataUrl: graphicUrl,
+        itemNo: startItemNo + itemIdx - 1,
+        billName,
+        date,
+        amount,
+        tipAmount: 0,
+        currency,
+        currencyDetected: true,
+        location,
+        status: "ready",
+        qaFlags,
+      });
+    }
+  }
+
+  return items;
+}
+
+/**
+ * OCR & Policy QA Scanner for Receipt Files (Image, PDF, Excel).
+ */
+export async function parseReceiptFile(file: File, itemNo: number): Promise<ReceiptItem[]> {
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  const isExcel = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls") || file.name.toLowerCase().endsWith(".csv");
+
+  if (isPdf) {
+    return parsePdfReceiptFile(file, itemNo);
+  }
+
+  if (isExcel) {
+    return parseExcelLedgerFile(file, itemNo);
+  }
+
+  // Single Image Receipt Processing
   const id = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
   const { originalUrl, enhancedUrl } = await enhanceReceiptImage(file);
 
@@ -420,7 +614,6 @@ export async function parseReceiptFile(file: File, itemNo: number): Promise<Rece
   }
 
   const billName = sanitizeVendorName(rawText, file.name);
-
   const detectedCurrency = detectCurrency(rawText);
   const browserFallback = getBrowserLocaleCurrency();
   const currency = detectedCurrency ? detectedCurrency.code : browserFallback.code;
@@ -443,7 +636,6 @@ export async function parseReceiptFile(file: File, itemNo: number): Promise<Rece
     amount = Math.round((amount - tipAmount) * 100) / 100;
   }
 
-  // Scan alcohol keywords with line number callout
   const rawMessages: string[] = [];
   const alcoholRegex = new RegExp(`\\b(${ALCOHOL_SMOKING_KEYWORDS.join("|")})\\b`, "i");
 
@@ -467,7 +659,7 @@ export async function parseReceiptFile(file: File, itemNo: number): Promise<Rece
 
   const qaFlags = evaluateQAFlags({ date, amount, billName, rawMessages });
 
-  return {
+  return [{
     id,
     file,
     imageDataUrl: originalUrl,
@@ -482,5 +674,5 @@ export async function parseReceiptFile(file: File, itemNo: number): Promise<Rece
     location,
     status: "ready",
     qaFlags,
-  };
+  }];
 }

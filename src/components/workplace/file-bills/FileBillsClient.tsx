@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
-import { parseReceiptFile, evaluateQAFlags, type ReceiptItem } from "@/lib/workplace/receiptParser";
+import { parseReceiptFile, parseExcelLedgerFile, parsePdfReceiptFile, evaluateQAFlags, type ReceiptItem } from "@/lib/workplace/receiptParser";
 import { CURRENCY_MAP, TOP_CURRENCY_CODES } from "@/lib/workplace/currencyMap";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
@@ -21,36 +21,37 @@ export default function FileBillsClient() {
   // Track if user has modified any fields
   const [hasUserEdited, setHasUserEdited] = useState(false);
 
+  // Stitch Report Tracking (Max 1 report stitch)
+  const [stitchedReportCount, setStitchedReportCount] = useState(0);
+
   // Inline Image Preview Modal State
   const [previewItem, setPreviewItem] = useState<ReceiptItem | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stitchInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFilesUpload = useCallback(async (files: FileList | File[]) => {
-    const fileArray = Array.from(files).filter(f => f.type.startsWith("image/"));
-    if (fileArray.length === 0) {
-      setError("Please select valid image files (JPG, PNG, WEBP).");
-      return;
+  const processUploadedFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    if (receipts.length + fileArray.length > 20) {
+      setError("Maximum batch limit is 20 receipts/documents.");
     }
 
-    if (receipts.length + fileArray.length > 10) {
-      setError("Maximum limit is 10 receipt images per batch.");
-    }
-
-    const availableSlots = 10 - receipts.length;
+    const availableSlots = 20 - receipts.length;
     const filesToProcess = fileArray.slice(0, availableSlots);
 
     setIsProcessing(true);
     setError(null);
-    setStatusMsg(`Scanning & enhancing ${filesToProcess.length} receipt image(s)...`);
+    setStatusMsg(`Processing ${filesToProcess.length} document(s)...`);
 
     try {
       const newItems: ReceiptItem[] = [];
       for (let i = 0; i < filesToProcess.length; i++) {
-        const itemNo = receipts.length + i + 1;
-        setStatusMsg(`Analyzing receipt ${i + 1} of ${filesToProcess.length}...`);
-        const item = await parseReceiptFile(filesToProcess[i], itemNo);
-        newItems.push(item);
+        const itemNo = receipts.length + newItems.length + 1;
+        setStatusMsg(`Scanning receipt/document ${i + 1} of ${filesToProcess.length}...`);
+        const parsedResult = await parseReceiptFile(filesToProcess[i], itemNo);
+        newItems.push(...parsedResult);
       }
 
       setReceipts(prev => {
@@ -93,11 +94,70 @@ export default function FileBillsClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error("Receipt parsing error:", err);
-      setError("Failed to parse some receipt images. You can edit details manually below.");
+      setError("Failed to parse some documents. You can edit details manually below.");
     } finally {
       setIsProcessing(false);
     }
   }, [receipts]);
+
+  // Stitch Existing Report (PDF or Excel .xlsx)
+  const handleStitchReport = useCallback(async (files: FileList | File[]) => {
+    if (stitchedReportCount >= 1) {
+      setError("Maximum limit of 1 stitched report per batch reached.");
+      return;
+    }
+
+    const file = files[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setError(null);
+    setStatusMsg(`Stitching existing expense report: ${file.name}...`);
+
+    try {
+      const isExcel = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls") || file.name.toLowerCase().endsWith(".csv");
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+      let stitchedItems: ReceiptItem[] = [];
+      if (isExcel) {
+        stitchedItems = await parseExcelLedgerFile(file, receipts.length + 1);
+      } else if (isPdf) {
+        stitchedItems = await parsePdfReceiptFile(file, receipts.length + 1);
+      } else {
+        setError("Please upload a valid Excel ledger (.xlsx) or PDF report (.pdf).");
+        setIsProcessing(false);
+        return;
+      }
+
+      setStitchedReportCount(prev => prev + 1);
+      setHasUserEdited(true);
+
+      setReceipts(prev => {
+        let combined = [...prev, ...stitchedItems];
+
+        // Re-evaluate duplicates across stitched collection
+        const seenKeys = new Map<string, string>();
+        combined = combined.map(item => {
+          const key = `${item.date}_${item.amount}_${item.billName.toLowerCase()}`;
+          const isDuplicate = seenKeys.has(key) && item.amount > 0;
+          if (!isDuplicate) seenKeys.set(key, item.id);
+
+          const qaFlags = evaluateQAFlags(item, isDuplicate);
+          return { ...item, qaFlags };
+        });
+
+        return combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                       .map((item, idx) => ({ ...item, itemNo: idx + 1 }));
+      });
+
+      setStatusMsg("");
+    } catch (err) {
+      console.error("Report stitch error:", err);
+      setError("Failed to stitch existing report. Check file format.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [receipts, stitchedReportCount]);
 
   // Live Re-evaluation of Policy QA Flags on User Edits
   const updateReceipt = <K extends keyof ReceiptItem>(id: string, field: K, value: ReceiptItem[K]) => {
@@ -230,14 +290,17 @@ export default function FileBillsClient() {
         doc.setTextColor(0, 0, 0);
       }
 
-      const imgProps = doc.getImageProperties(r.enhancedDataUrl);
-      const pdfWidth = pageWidth - 28;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      const maxHeight = 235;
-      const finalHeight = Math.min(pdfHeight, maxHeight);
-      const finalWidth = (imgProps.width * finalHeight) / imgProps.height;
-
-      doc.addImage(r.enhancedDataUrl, "JPEG", (pageWidth - finalWidth) / 2, 34, finalWidth, finalHeight);
+      if (r.enhancedDataUrl.startsWith("data:image/svg+xml")) {
+        doc.text("STITCHED EXPENSE RECORD FROM EXCEL LEDGER", 14, 45);
+      } else {
+        const imgProps = doc.getImageProperties(r.enhancedDataUrl);
+        const pdfWidth = pageWidth - 28;
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const maxHeight = 235;
+        const finalHeight = Math.min(pdfHeight, maxHeight);
+        const finalWidth = (imgProps.width * finalHeight) / imgProps.height;
+        doc.addImage(r.enhancedDataUrl, "JPEG", (pageWidth - finalWidth) / 2, 34, finalWidth, finalHeight);
+      }
     });
 
     doc.save(`Expense_Bills_Ledger_${startDate}_to_${endDate}.pdf`);
@@ -304,12 +367,12 @@ export default function FileBillsClient() {
               File Bills
             </h1>
             <p className="text-lg font-bold text-[var(--text-soft)]">
-              Upload up to 10 receipts. Auto-scan, enhance, order by date, run corporate policy QA checks, and export printable PDF + Excel ledger.
+              Upload up to 20 receipts (Images &amp; PDFs). Auto-scan, enhance, order by date, run corporate policy QA checks, and export printable PDF + Excel ledger.
             </p>
           </div>
 
           {/* Upload Drop Zone & Corporate Header Inputs */}
-          <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-10">
+          <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
@@ -339,7 +402,7 @@ export default function FileBillsClient() {
 
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
+              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && processUploadedFiles(e.dataTransfer.files); }}
               onClick={() => fileInputRef.current?.click()}
               className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center"
             >
@@ -347,20 +410,48 @@ export default function FileBillsClient() {
                 type="file"
                 ref={fileInputRef}
                 multiple
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
+                accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
+                onChange={(e) => e.target.files && processUploadedFiles(e.target.files)}
                 className="hidden"
               />
               <span className="text-5xl mb-3">🧾</span>
               <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
-                Upload Receipts (Up to 10 Images)
+                Upload Receipts (Images &amp; PDFs - Up to 20)
               </h2>
               <p className="text-xs font-bold text-[var(--text-soft)] uppercase tracking-wider mb-4">
-                Drag &amp; drop receipt photos or click to browse
+                Drag &amp; drop receipt photos or PDF invoices or click to browse
               </p>
               <span className="neo-button bg-[var(--accent)] text-black font-black uppercase px-6 py-2.5 text-sm">
-                + Select Receipts ({receipts.length}/10 uploaded)
+                + Select Receipts ({receipts.length}/20 uploaded)
               </span>
+            </div>
+
+            {/* Stitching Option for Existing Ledger / PDF Report */}
+            <div className="mt-6 border-3 border-black bg-[var(--bg-page)] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-left">
+                <span className="text-xs font-black uppercase text-[#2A9D8F] block">
+                  🔗 Stitch / Append Existing Expense Report
+                </span>
+                <p className="text-xs font-bold text-[var(--text-soft)]">
+                  Upload 1 existing Excel ledger (.xlsx) or PDF report to parse &amp; merge into this master ledger. Auto-checks for duplicates across merged entries!
+                </p>
+              </div>
+
+              <input
+                type="file"
+                ref={stitchInputRef}
+                accept="application/pdf,.pdf,.xlsx,.xls,.csv"
+                onChange={(e) => e.target.files && handleStitchReport(e.target.files)}
+                className="hidden"
+              />
+
+              <button
+                onClick={() => stitchInputRef.current?.click()}
+                disabled={stitchedReportCount >= 1}
+                className="neo-button bg-[#2A9D8F] text-white font-black uppercase px-4 py-2 text-xs whitespace-nowrap disabled:opacity-50"
+              >
+                {stitchedReportCount >= 1 ? "✓ 1 Report Stitched" : "+ Stitch Existing Report"}
+              </button>
             </div>
 
             {isProcessing && (
