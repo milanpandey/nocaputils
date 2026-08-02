@@ -47,6 +47,15 @@ const tools = [
     color: "#9C27B0",
     badge: "Multi-Tab Merge",
   },
+  {
+    id: "archive-files",
+    name: "Archive Files",
+    description: "Package up to 10 files into a standard compressed ZIP archive with zero quality loss and size estimation.",
+    status: "Live" as const,
+    emoji: "🗂️",
+    color: "#FFB703",
+    badge: "ZIP Archiver",
+  },
 ];
 
 export default function WorkplaceUtilitiesHub() {
