@@ -3567,3 +3567,135 @@ button {
     print-color-adjust: exact;
   }
 }
+
+/* ─── Feedback Side Tabs ──────────────────────────────────────────────────── */
+
+/**
+ * Physical "file tab" style:
+ * - Each tab is rotated 90° counter-clockwise so the text reads bottom-to-top
+ * - They sit flush to the right viewport edge, vertically centred
+ * - No slide animation needed — they're always fully visible as vertical labels
+ *
+ * Technique:
+ *   The anchor element is rotated with writing-mode or transform.
+ *   We use `transform: rotate(-90deg)` + `transform-origin` to keep geometry
+ *   predictable, and position the group so tabs sit against the right wall.
+ */
+
+.feedback-tab-group {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.feedback-tab {
+  /* Written right-to-left visually by rotating the whole element */
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  /* Flip so text reads bottom → top (same direction as the reference) */
+  transform: rotate(180deg);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 14px 10px;
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: none;
+  user-select: none;
+
+  /* Neo-brutalist border */
+  border: 3px solid var(--border-main);
+  /* No bottom border — the viewport edge acts as the boundary */
+
+  /* Typography */
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+
+  /* Hover lift */
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+/* ── Feedback tab — yellow accent ─────────────────────────── */
+.feedback-tab--feedback {
+  background: var(--accent, #f2ef13);
+  color: #000;
+  box-shadow: -4px 4px 0 0 var(--border-main);
+}
+
+.feedback-tab--feedback:hover,
+.feedback-tab--feedback:focus-visible {
+  /* Nudge left on hover to give the pressed-button feel */
+  transform: rotate(180deg) translate(2px, -2px);
+  box-shadow: -6px 6px 0 0 var(--border-main);
+  outline: none;
+}
+
+/* ── Feature request tab — dark ───────────────────────────── */
+.feedback-tab--feature {
+  background: var(--border-main, #111111);
+  color: #fff;
+  box-shadow: -4px 4px 0 0 rgba(0, 0, 0, 0.45);
+}
+
+.feedback-tab--feature:hover,
+.feedback-tab--feature:focus-visible {
+  transform: rotate(180deg) translate(2px, -2px);
+  box-shadow: -6px 6px 0 0 rgba(0, 0, 0, 0.45);
+  outline: none;
+}
+
+/* ── Dark-mode overrides ──────────────────────────────────── */
+:root.dark .feedback-tab--feedback {
+  background: var(--accent, #f2ef13);
+  color: #000;
+}
+
+:root.dark .feedback-tab--feature {
+  background: #f8fafc;
+  color: #111827;
+}
+
+:root.dark .feedback-tab--feature:hover,
+:root.dark .feedback-tab--feature:focus-visible {
+  background: #e2e8f0;
+}
+
+/* ── Icon (now sits above the text in the rotated context) ── */
+.feedback-tab__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Mobile ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .feedback-tab {
+    font-size: 10px;
+    padding: 10px 8px;
+    gap: 6px;
+  }
+
+  .feedback-tab__icon {
+    width: 12px;
+    height: 12px;
+  }
+}
+

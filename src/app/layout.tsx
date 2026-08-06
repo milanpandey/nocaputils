@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import FeedbackButtons from "@/components/FeedbackButtons";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -24,6 +25,7 @@ export default function RootLayout({
         className={`${spaceGrotesk.variable} min-h-screen bg-[var(--bg-page)] font-[family-name:var(--font-space-grotesk)] text-[var(--text-main)] antialiased selection:bg-[var(--accent)] selection:text-black`}
       >
         {children}
+        <FeedbackButtons />
       </body>
     </html>
   );
