@@ -203,7 +203,7 @@ export default function PdfMergeClient() {
           const fileBuffer = await item.file.arrayBuffer();
           const pdf = await PDFDocument.load(fileBuffer);
           const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-          copiedPages.forEach(page => mergedPdf.addPage(page));
+          copiedPages.forEach((page: any) => mergedPdf.addPage(page));
         }
       }
 

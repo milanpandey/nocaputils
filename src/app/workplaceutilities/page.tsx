@@ -3,58 +3,24 @@ import Footer from "@/components/Footer";
 
 const tools = [
   {
-    id: "pdf-to-word",
-    name: "PDF to Word",
-    description: "Convert PDF documents to editable Microsoft Word (.docx) files offline.",
-    status: "Live" as const,
-    emoji: "📄",
-    color: "#E63946",
-    badge: "100% Private",
-  },
-  {
-    id: "pdf-merge",
-    name: "PDF Merge",
-    description: "Combine up to 5 PDF files into a single document with drag-and-drop ordering & compression options.",
-    status: "Live" as const,
-    emoji: "📑",
-    color: "#457B9D",
-    badge: "Reorder & Merge",
-  },
-  {
-    id: "compress-pdf",
-    name: "Compress PDF",
-    description: "Shrink PDF file size in your browser with interactive quality presets and file size estimators.",
-    status: "Live" as const,
-    emoji: "📦",
-    color: "#F4D35E",
-    badge: "Size Savings",
-  },
-  {
     id: "file-bills",
     name: "File Bills",
-    description: "Organize receipt photos & PDFs into a compiled printable PDF and Excel summary ledger.",
+    description: "Organize receipt photos into a compiled printable PDF and Excel summary ledger.",
     status: "Live" as const,
     emoji: "🧾",
     color: "#2A9D8F",
     badge: "PDF + Excel",
+    isAvailable: true,
   },
   {
-    id: "merge-excel",
-    name: "Merge Excel",
-    description: "Combine up to 5 Excel & CSV files into one multi-tab workbook with format conversion options.",
-    status: "Live" as const,
-    emoji: "📊",
-    color: "#9C27B0",
-    badge: "Multi-Tab Merge",
-  },
-  {
-    id: "archive-files",
-    name: "Archive Files",
-    description: "Package up to 10 files into a standard compressed ZIP archive with zero quality loss and size estimation.",
-    status: "Live" as const,
-    emoji: "🗂️",
-    color: "#FFB703",
-    badge: "ZIP Archiver",
+    id: "pdf-to-word",
+    name: "PDF to Word",
+    description: "Convert PDF documents to editable Microsoft Word (.docx) files offline.",
+    status: "Coming Soon" as const,
+    emoji: "📄",
+    color: "#E63946",
+    badge: "In Development",
+    isAvailable: false,
   },
 ];
 
@@ -71,7 +37,8 @@ export default function WorkplaceUtilitiesHub() {
 
         <main className="flex flex-1 flex-col items-center">
           {/* ── Hero ── */}
-          <section className="bauhaus-hero mb-16 text-center">
+          <section className="bauhaus-hero mb-20 text-center">
+            {/* Decorative shapes */}
             <div className="bauhaus-hero-shapes" aria-hidden="true">
               <div className="bauhaus-shape bauhaus-shape--rect-blue" style={{ background: "#457B9D" }} />
               <div className="bauhaus-shape bauhaus-shape--circle-red" style={{ background: "#E63946" }} />
@@ -98,31 +65,40 @@ export default function WorkplaceUtilitiesHub() {
               Workplace Tools
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tools.map((tool) => (
-                <a
-                  key={tool.id}
-                  href={`/workplaceutilities/${tool.id}`}
-                  className="bauhaus-game-card"
-                  id={`workplace-card-${tool.id}`}
-                >
-                  <div className="bauhaus-game-card-accent" style={{ background: tool.color }} />
-                  <div className="bauhaus-game-card-body">
-                    <div className="bauhaus-game-card-top">
-                      <span className="bauhaus-game-emoji">{tool.emoji}</span>
-                      <div className="bauhaus-game-badges">
-                        <span className="bauhaus-badge bauhaus-badge--live">{tool.status}</span>
-                        <span className="bauhaus-badge bauhaus-badge--age" style={{ background: "#111827", color: "#FFF" }}>{tool.badge}</span>
+            <div className="bauhaus-game-grid">
+              {tools.map((tool) => {
+                const CardTag = tool.isAvailable ? "a" : "div";
+                return (
+                  <CardTag
+                    key={tool.id}
+                    {...(tool.isAvailable ? { href: `/workplaceutilities/${tool.id}` } : {})}
+                    className={`bauhaus-game-card ${!tool.isAvailable ? "opacity-75 cursor-not-allowed" : ""}`}
+                    id={`workplace-card-${tool.id}`}
+                  >
+                    <div className="bauhaus-game-card-accent" style={{ background: tool.color }} />
+                    <div className="bauhaus-game-card-body">
+                      <div className="bauhaus-game-card-top">
+                        <span className="bauhaus-game-emoji">{tool.emoji}</span>
+                        <div className="bauhaus-game-badges">
+                          <span className={`bauhaus-badge ${tool.isAvailable ? "bauhaus-badge--live" : "bg-gray-400 text-black font-bold"}`}>
+                            {tool.status}
+                          </span>
+                          <span className="bauhaus-badge bauhaus-badge--age">{tool.badge}</span>
+                        </div>
+                      </div>
+                      <h3 className="bauhaus-game-name">{tool.name}</h3>
+                      <p className="bauhaus-game-desc">{tool.description}</p>
+                      <div className="bauhaus-game-play" style={{ color: tool.isAvailable ? tool.color : "#666" }}>
+                        {tool.isAvailable ? (
+                          <>Open Tool <span aria-hidden="true">→</span></>
+                        ) : (
+                          <>Coming Soon</>
+                        )}
                       </div>
                     </div>
-                    <h3 className="bauhaus-game-name">{tool.name}</h3>
-                    <p className="bauhaus-game-desc">{tool.description}</p>
-                    <div className="bauhaus-game-play" style={{ color: tool.color }}>
-                      Open Tool <span aria-hidden="true">→</span>
-                    </div>
-                  </div>
-                </a>
-              ))}
+                  </CardTag>
+                );
+              })}
             </div>
           </section>
         </main>
