@@ -159,7 +159,7 @@ export default function ArchiveFilesClient() {
             </p>
           </div>
 
-          <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
+          <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-4 sm:p-6 mb-6">
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
@@ -168,7 +168,7 @@ export default function ArchiveFilesClient() {
               tabIndex={0}
               role="button"
               aria-label="Upload files to archive into ZIP (Up to 10 files)"
-              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
+              className={`border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black ${fileItems.length > 0 ? "p-4 sm:p-5" : "p-8"}`}
             >
               <input
                 type="file"
@@ -179,173 +179,208 @@ export default function ArchiveFilesClient() {
                 id="archive-files-input"
                 aria-label="Select Files to Archive"
               />
-              <span className="text-5xl mb-3" aria-hidden="true">🗂️</span>
-              <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
-                Upload Files to Archive (Up to 10 Files)
+              <span className={fileItems.length > 0 ? "text-3xl mb-1" : "text-5xl mb-3"} aria-hidden="true">🗂️</span>
+              <h2 className={fileItems.length > 0 ? "text-base font-black uppercase text-[var(--text-main)] mb-0.5" : "text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1"}>
+                {fileItems.length > 0 ? `Archive Queue (${fileItems.length}/10 Files Uploaded)` : "Upload Files to Archive (Up to 10 Files)"}
               </h2>
-              <p className="text-xs font-bold text-[var(--text-soft)] uppercase tracking-wider mb-4">
-                Drag &amp; drop PDFs, documents, spreadsheets, images, or click to browse
+              <p className="text-xs font-bold text-[var(--text-soft)] uppercase tracking-wider mb-3">
+                {fileItems.length > 0 ? `Total Raw Size: ${formatFileSize(totalInputBytes)}` : "Drag & drop PDFs, documents, spreadsheets, images, or click to browse"}
               </p>
-              <span className="neo-button bg-[#FFB703] text-black font-black uppercase px-6 py-2.5 text-sm">
-                + Select Files ({fileItems.length}/10 uploaded)
+              <span className="neo-button bg-[#FFB703] text-black font-black uppercase px-5 py-2 text-xs">
+                + Add More Files ({fileItems.length}/10)
               </span>
             </div>
 
             {isProcessing && (
-              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm" role="status">
+              <div className="mt-3 border-3 border-black bg-[var(--bg-page)] p-3 text-center font-black uppercase text-xs" role="status">
                 ⏳ {statusMsg}
               </div>
             )}
 
             {error && (
-              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm" role="alert">
+              <div className="mt-3 border-3 border-black bg-[#E63946] text-white p-3 font-bold text-xs" role="alert">
                 ⚠️ {error}
               </div>
             )}
           </div>
 
           {fileItems.length > 0 && (
-            <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
-              <div className="border-4 border-black bg-[var(--bg-page)] p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="w-full max-w-4xl flex flex-col gap-6 mb-12">
+              {/* ── Top CTA Row: Create ZIP Archive ── */}
+              <div className="neo-panel bg-[var(--bg-panel)] p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
                 <div>
-                  <h3 className="text-xl font-black uppercase text-[var(--text-main)]">
-                    Archive Queue ({fileItems.length} Files)
-                  </h3>
-                  <p className="text-xs font-bold uppercase text-[var(--text-soft)] tracking-wider mt-1">
-                    Combined Input Size: <strong>{formatFileSize(totalInputBytes)}</strong> | Estimated ZIP Size: <strong className="text-[#FFB703]">~{formatFileSize(estimatedArchiveBytes)}</strong>
+                  <span className="text-xs font-black uppercase tracking-wider text-[var(--text-soft)] block">
+                    {fileItems.length} Files Selected · Raw: {formatFileSize(totalInputBytes)}
+                  </span>
+                  <p className="text-sm font-extrabold text-[var(--text-main)] uppercase mt-0.5">
+                    Est. ZIP Size: <strong className="text-[#FFB703]">~{formatFileSize(estimatedArchiveBytes)}</strong> ({compressionPreset === "STORE" ? "STORE / No Compression" : compressionPreset === "DEFLATE_MAX" ? "MAX Level 9" : "DEFLATE Level 6"})
                   </p>
                 </div>
-
                 <button
                   onClick={createZipArchive}
                   disabled={isProcessing}
                   aria-label="Download ZIP Archive File"
-                  className="neo-button bg-[#FFB703] text-black font-black uppercase px-8 py-3 text-base flex items-center gap-2"
+                  className="neo-button bg-[#FFB703] text-black font-black uppercase px-8 py-3.5 text-base sm:text-lg flex-shrink-0 w-full sm:w-auto"
                 >
-                  <span>🗂️ Download ZIP Archive</span>
+                  🗂️ Create &amp; Download ZIP
                 </button>
               </div>
 
-              <div className="border-3 border-black bg-[var(--bg-page)] p-5 mb-8">
-                <div className="mb-4">
-                  <label htmlFor="custom-archive-name-input" className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
-                    Archive File Name (.zip)
-                  </label>
-                  <input
-                    id="custom-archive-name-input"
-                    type="text"
-                    value={customArchiveName}
-                    onChange={(e) => setCustomArchiveName(e.target.value)}
-                    className="w-full border-2 border-black p-2.5 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)] focus:ring-2 focus:ring-black"
-                    placeholder="e.g. Workplace_Archive"
-                  />
-                </div>
-
-                <label className="text-xs font-black uppercase text-[var(--text-main)] block mb-2">
-                  Select Archival &amp; Compression Level Tradeoff:
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div
-                    onClick={() => setCompressionPreset("STORE")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("STORE"); }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label="Select STORE compression option"
-                    className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "STORE" ? "bg-[#FFB703] text-black" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
-                  >
-                    <h4 className="font-black text-xs uppercase">STORE (No Compression)</h4>
-                    <p className="text-[11px] font-bold mt-1 opacity-90">Instant Packaging · 0% CPU Overhead · 100% Binary Preservation</p>
+              {resultStats && (
+                <div className="neo-panel bg-[var(--bg-panel)] border-4 border-black p-6 animate-fadeIn" role="status">
+                  <div className="border-3 border-black bg-[#2A9D8F] text-white p-3 text-center mb-5 flex items-center justify-center gap-2">
+                    <span className="text-2xl" aria-hidden="true">🎉</span>
+                    <h4 className="text-lg font-black uppercase tracking-tight text-white">
+                      ZIP Archive Created Successfully!
+                    </h4>
                   </div>
 
-                  <div
-                    onClick={() => setCompressionPreset("DEFLATE_STD")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("DEFLATE_STD"); }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label="Select DEFLATE Standard compression option"
-                    className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "DEFLATE_STD" ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
-                  >
-                    <h4 className="font-black text-xs uppercase">DEFLATE Standard (Recommended)</h4>
-                    <p className="text-[11px] font-bold mt-1 opacity-90">Level 6 · ~15-25% Size Reduction · Universal OS Portability</p>
-                  </div>
-
-                  <div
-                    onClick={() => setCompressionPreset("DEFLATE_MAX")}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("DEFLATE_MAX"); }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label="Select MAX Compression option"
-                    className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "DEFLATE_MAX" ? "bg-[#E63946] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
-                  >
-                    <h4 className="font-black text-xs uppercase">MAX Compression</h4>
-                    <p className="text-[11px] font-bold mt-1 opacity-90">Level 9 · Highest Compression Ratio · Email Attachment Efficient</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t-2 border-black text-[11px] font-bold text-[var(--text-soft)] uppercase flex items-center gap-2">
-                  <span aria-hidden="true">💡</span>
-                  <span>
-                    <strong>Portability Notice:</strong> Standard ZIP format is natively supported by Windows, macOS, iOS, Android, and all email clients without requiring third-party software.
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <h4 className="text-sm font-black uppercase text-[var(--text-main)] tracking-wider">
-                  Files Included in Archive:
-                </h4>
-
-                {fileItems.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className="border-2 border-black bg-[var(--bg-page)] p-3 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="bg-black text-white px-2 py-0.5 text-[10px] font-black uppercase">
-                        #{idx + 1}
-                      </span>
-                      <div>
-                        <span className="font-black text-sm text-[var(--text-main)] break-all block">
-                          {item.name}
-                        </span>
-                        <span className="text-[10px] font-bold text-[var(--text-soft)] uppercase">
-                          {item.sizeFormatted} · {item.type}
-                        </span>
-                      </div>
+                  {/* ── Stats Cards ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5 text-center">
+                    <div className="border-2 border-black bg-[var(--bg-page)] p-3">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-0.5">Original Total Size</span>
+                      <span className="text-base font-black text-[var(--text-main)] block">{formatFileSize(resultStats.originalBytes)}</span>
                     </div>
 
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      aria-label={`Remove ${item.name} from archive queue`}
-                      className="text-xs font-black uppercase bg-[#E63946] text-white px-3 py-1 border-2 border-black hover:bg-black"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
+                    <div className="border-2 border-black bg-[var(--bg-page)] p-3">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-0.5">Compressed ZIP Size</span>
+                      <span className="text-base font-black text-[#2A9D8F] block">{formatFileSize(resultStats.zippedBytes)}</span>
+                    </div>
 
-              {resultStats && (
-                <div className="mt-8 border-4 border-black bg-[#2A9D8F] text-white p-6 text-center animate-fadeIn" role="status">
-                  <span className="text-3xl mb-2 block" aria-hidden="true">🎉</span>
-                  <h4 className="text-2xl font-black uppercase tracking-tight mb-1">
-                    ZIP Archive Created Successfully!
-                  </h4>
-                  <p className="text-sm font-bold uppercase tracking-wider mb-4">
-                    Original Files Total: {formatFileSize(resultStats.originalBytes)} ➔ Final ZIP Archive: <strong>{formatFileSize(resultStats.zippedBytes)}</strong>
-                    <br />
-                    Saved {Math.max(0, Math.round((1 - resultStats.zippedBytes / resultStats.originalBytes) * 100))}% ({formatFileSize(Math.max(0, resultStats.originalBytes - resultStats.zippedBytes))} saved)
-                  </p>
-                  <a
-                    href={resultStats.downloadUrl}
-                    download={resultStats.filename}
-                    className="neo-button bg-black text-white font-black uppercase px-8 py-3 text-base inline-block"
-                  >
-                    📥 Download {resultStats.filename}
-                  </a>
+                    <div className="border-2 border-black bg-[var(--bg-page)] p-3">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-0.5">Total Reduction</span>
+                      <span className="text-base font-black text-[#E63946] block">
+                        -{Math.max(0, Math.round((1 - resultStats.zippedBytes / resultStats.originalBytes) * 100))}% ({formatFileSize(Math.max(0, resultStats.originalBytes - resultStats.zippedBytes))})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* ── Editable Archive Filename ── */}
+                  <div className="mb-5">
+                    <label htmlFor="export-zip-filename" className="block text-xs font-black uppercase tracking-wider text-[var(--text-main)] mb-1.5">
+                      Export Archive Filename (.zip):
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl flex-shrink-0" aria-hidden="true">📦</span>
+                      <input
+                        type="text"
+                        id="export-zip-filename"
+                        value={customArchiveName}
+                        onChange={(e) => setCustomArchiveName(e.target.value)}
+                        placeholder="Workplace_Archive"
+                        aria-label="Editable Export Archive Filename"
+                        className="w-full border-3 border-black bg-[var(--bg-page)] text-[var(--text-main)] font-black text-sm px-3.5 py-2.5 focus:outline-none focus:ring-4 focus:ring-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <a
+                      href={resultStats.downloadUrl}
+                      download={`${customArchiveName.trim() || "Workplace_Archive"}.zip`}
+                      className="neo-button bg-[#FFB703] text-black font-black uppercase px-8 py-3 text-base inline-flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <span>📥</span> Download {customArchiveName.trim() || "Workplace_Archive"}.zip
+                    </a>
+                  </div>
                 </div>
               )}
+
+              {/* ── Archival Options & Files List ── */}
+              <div className="neo-panel bg-[var(--bg-panel)] p-5 sm:p-6">
+                <div className="border-3 border-black bg-[var(--bg-page)] p-4 sm:p-5 mb-6">
+                  <div className="mb-4">
+                    <label htmlFor="custom-archive-name-input" className="text-xs font-black uppercase text-[var(--text-main)] block mb-1">
+                      Archive File Name (.zip)
+                    </label>
+                    <input
+                      id="custom-archive-name-input"
+                      type="text"
+                      value={customArchiveName}
+                      onChange={(e) => setCustomArchiveName(e.target.value)}
+                      className="w-full border-2 border-black p-2.5 font-bold text-sm bg-[var(--bg-panel)] text-[var(--text-main)] focus:ring-2 focus:ring-black"
+                      placeholder="e.g. Workplace_Archive"
+                    />
+                  </div>
+
+                  <label className="text-xs font-black uppercase text-[var(--text-main)] block mb-2">
+                    Select Archival &amp; Compression Level Tradeoff:
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div
+                      onClick={() => setCompressionPreset("STORE")}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("STORE"); }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Select STORE compression option"
+                      className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "STORE" ? "bg-[#FFB703] text-black" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
+                    >
+                      <h4 className="font-black text-xs uppercase">STORE (No Compression)</h4>
+                      <p className="text-[10px] font-bold mt-1 opacity-90">Instant Packaging · 0% CPU · Binary Preservation</p>
+                    </div>
+
+                    <div
+                      onClick={() => setCompressionPreset("DEFLATE_STD")}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("DEFLATE_STD"); }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Select DEFLATE Standard compression option"
+                      className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "DEFLATE_STD" ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
+                    >
+                      <h4 className="font-black text-xs uppercase">DEFLATE Standard (Recommended)</h4>
+                      <p className="text-[10px] font-bold mt-1 opacity-90">Level 6 · ~15-25% Reduction · Universal Portability</p>
+                    </div>
+
+                    <div
+                      onClick={() => setCompressionPreset("DEFLATE_MAX")}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionPreset("DEFLATE_MAX"); }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Select MAX Compression option"
+                      className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionPreset === "DEFLATE_MAX" ? "bg-[#E63946] text-white" : "bg-[var(--bg-panel)] text-[var(--text-main)]"}`}
+                    >
+                      <h4 className="font-black text-xs uppercase">MAX Compression</h4>
+                      <p className="text-[10px] font-bold mt-1 opacity-90">Level 9 · Highest Compression Ratio · Smallest ZIP</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <h4 className="text-xs font-black uppercase text-[var(--text-main)] tracking-wider">
+                    Files Included in Archive ({fileItems.length}/10):
+                  </h4>
+
+                  {fileItems.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="border-2 border-black bg-[var(--bg-page)] p-3 flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="bg-black text-white px-2 py-0.5 text-[10px] font-black uppercase flex-shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <span className="font-black text-xs sm:text-sm text-[var(--text-main)] truncate block">
+                            {item.name}
+                          </span>
+                          <span className="text-[10px] font-bold text-[var(--text-soft)] uppercase">
+                            {item.sizeFormatted} · {item.type}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        aria-label={`Remove ${item.name} from archive queue`}
+                        className="text-xs font-black uppercase bg-[#E63946] text-white px-2.5 py-1 border-2 border-black hover:bg-black flex-shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

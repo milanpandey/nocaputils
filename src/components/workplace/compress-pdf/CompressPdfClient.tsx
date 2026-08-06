@@ -28,13 +28,16 @@ export default function CompressPdfClient() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const [exportFileName, setExportFileName] = useState<string>("");
+
   const handleFileSelect = async (selectedFile: File) => {
     if (selectedFile.type !== "application/pdf" && !selectedFile.name.toLowerCase().endsWith(".pdf")) {
-      setError("Invalid file format. Please upload a valid Microsoft PDF document (.pdf)");
+      setError("Invalid file format. Please upload a valid PDF document (.pdf)");
       return;
     }
 
     setFile(selectedFile);
+    setExportFileName(selectedFile.name.replace(/\.pdf$/i, "") + "_compressed.pdf");
     setError(null);
     setResultStats(null);
     setIsProcessing(true);
@@ -152,150 +155,234 @@ export default function CompressPdfClient() {
             </p>
           </div>
 
-          <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files?.[0] && handleFileSelect(e.dataTransfer.files[0]); }}
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
-              tabIndex={0}
-              role="button"
-              aria-label="Upload PDF file to compress"
-              className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="application/pdf,.pdf"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                className="hidden"
-                id="compress-pdf-file-input"
-                aria-label="Select PDF File to Compress"
-              />
-              <span className="text-5xl mb-3" aria-hidden="true">📦</span>
-              <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
-                {file ? file.name : "Upload PDF File to Compress"}
-              </h2>
-              <p className="text-xs font-bold text-[var(--text-soft)] uppercase tracking-wider mb-4">
-                {file ? `${formatFileSize(file.size)} · ${pageCount ?? "..."} Pages` : "Drag & drop PDF document or click to browse"}
-              </p>
-              <span className="neo-button bg-[#F4D35E] text-black font-black uppercase px-6 py-2.5 text-sm">
-                {file ? "Change Selected PDF" : "+ Select PDF File"}
-              </span>
-            </div>
+          <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-4 sm:p-6 mb-6">
+            {!file ? (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); e.dataTransfer.files?.[0] && handleFileSelect(e.dataTransfer.files[0]); }}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+                tabIndex={0}
+                role="button"
+                aria-label="Upload PDF file to compress"
+                className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center focus:outline-none focus:ring-4 focus:ring-black"
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="application/pdf,.pdf"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  className="hidden"
+                  id="compress-pdf-file-input"
+                  aria-label="Select PDF File to Compress"
+                />
+                <span className="text-5xl mb-3" aria-hidden="true">📦</span>
+                <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text-main)] mb-1">
+                  Upload PDF File to Compress
+                </h2>
+                <p className="text-xs font-bold text-[var(--text-soft)] uppercase tracking-wider mb-4">
+                  Drag &amp; drop PDF document or click to browse
+                </p>
+                <span className="neo-button bg-[#F4D35E] text-black font-black uppercase px-6 py-2.5 text-sm">
+                  + Select PDF File
+                </span>
+              </div>
+            ) : (
+              /* ── Compact Uploaded File Bar ── */
+              <div className="border-3 border-black bg-[var(--bg-page)] p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="application/pdf,.pdf"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  className="hidden"
+                  id="compress-pdf-file-input-compact"
+                />
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl flex-shrink-0" aria-hidden="true">📦</span>
+                  <div className="min-w-0">
+                    <h2 className="text-sm sm:text-base font-black uppercase tracking-tight text-[var(--text-main)] truncate">
+                      {file.name}
+                    </h2>
+                    <p className="text-[11px] font-bold text-[var(--text-soft)] uppercase tracking-wider">
+                      {formatFileSize(file.size)} · {pageCount !== null ? `${pageCount} Page${pageCount === 1 ? "" : "s"}` : "Loading..."}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="neo-button bg-[#F4D35E] text-black font-black uppercase px-3 py-1.5 text-xs flex-shrink-0"
+                >
+                  Change Selected PDF
+                </button>
+              </div>
+            )}
 
             {isProcessing && (
-              <div className="mt-4 border-4 border-black bg-[var(--bg-page)] p-4 text-center font-black uppercase text-sm" role="status">
+              <div className="mt-3 border-3 border-black bg-[var(--bg-page)] p-3 text-center font-black uppercase text-xs" role="status">
                 ⏳ {statusMsg}
               </div>
             )}
 
             {error && (
-              <div className="mt-4 border-4 border-black bg-[#E63946] text-white p-4 font-bold text-sm" role="alert">
+              <div className="mt-3 border-3 border-black bg-[#E63946] text-white p-3 font-bold text-xs" role="alert">
                 ⚠️ {error}
               </div>
             )}
           </div>
 
           {file && (
-            <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-6 sm:p-8 mb-12">
-              <h3 className="text-xl font-black uppercase text-[var(--text-main)] mb-6">
-                Compression Settings &amp; Range Estimator
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div
-                  onClick={() => setCompressionLevel(20)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionLevel(20); }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Select Low Compression preset"
-                  className={`p-4 border-3 border-black cursor-pointer transition-colors ${compressionLevel <= 30 ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-page)] text-[var(--text-main)]"}`}
-                >
-                  <span className="text-xs font-black uppercase block">Low Compression</span>
-                  <span className="text-lg font-black block mt-1">15% - 30% Saved</span>
-                  <p className="text-[11px] font-bold mt-1 opacity-90">150 DPI · 85% Quality · Crisp Print Quality</p>
-                </div>
-
-                <div
-                  onClick={() => setCompressionLevel(55)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionLevel(55); }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Select Medium Compression preset"
-                  className={`p-4 border-3 border-black cursor-pointer transition-colors ${compressionLevel > 30 && compressionLevel <= 70 ? "bg-[#457B9D] text-white" : "bg-[var(--bg-page)] text-[var(--text-main)]"}`}
-                >
-                  <span className="text-xs font-black uppercase block">Medium (Recommended)</span>
-                  <span className="text-lg font-black block mt-1">40% - 60% Saved</span>
-                  <p className="text-[11px] font-bold mt-1 opacity-90">110 DPI · 70% Quality · Email &amp; Web Standard</p>
-                </div>
-
-                <div
-                  onClick={() => setCompressionLevel(85)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionLevel(85); }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Select High Compression preset"
-                  className={`p-4 border-3 border-black cursor-pointer transition-colors ${compressionLevel > 70 ? "bg-[#E63946] text-white" : "bg-[var(--bg-page)] text-[var(--text-main)]"}`}
-                >
-                  <span className="text-xs font-black uppercase block">High Compression</span>
-                  <span className="text-lg font-black block mt-1">65% - 85% Saved</span>
-                  <p className="text-[11px] font-bold mt-1 opacity-90">85 DPI · 50% Quality · Max Size Reduction</p>
-                </div>
-              </div>
-
-              <div className="border-3 border-black bg-[var(--bg-page)] p-6 mb-8">
-                <div className="flex items-center justify-between mb-3">
-                  <label htmlFor="compress-power-slider" className="text-xs font-black uppercase text-[var(--text-main)]">
-                    Adjust Compression Power: {compressionLevel}%
-                  </label>
-                  <span className="text-xs font-black uppercase bg-black text-white px-2 py-0.5">
-                    Estimated Target: ~{formatFileSize(estimatedSizeBytes)} (-{estimateReductionPct}%)
+            <div className="w-full max-w-4xl flex flex-col gap-6 mb-12">
+              {/* ── Main CTA Row: Compress PDF Now ── */}
+              <div className="neo-panel bg-[var(--bg-panel)] p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                <div>
+                  <span className="text-xs font-black uppercase tracking-wider text-[var(--text-soft)] block">
+                    Target Estimate: ~{formatFileSize(estimatedSizeBytes)} (-{estimateReductionPct}%)
                   </span>
+                  <p className="text-sm font-extrabold text-[var(--text-main)] uppercase">
+                    Preset: {compressionLevel <= 30 ? "Low (15-30% Saved)" : compressionLevel > 70 ? "High (65-85% Saved)" : "Medium Recommended (40-60% Saved)"}
+                  </p>
                 </div>
-                <input
-                  type="range"
-                  id="compress-power-slider"
-                  min="0"
-                  max="100"
-                  value={compressionLevel}
-                  onChange={(e) => setCompressionLevel(parseInt(e.target.value))}
-                  aria-label="Compression Strength Slider"
-                  className="w-full h-3 bg-gray-300 accent-[#457B9D] cursor-pointer"
-                />
-              </div>
-
-              <div className="flex justify-center">
                 <button
                   onClick={compressPdf}
                   disabled={isProcessing}
                   aria-label="Execute PDF file compression"
-                  className="neo-button bg-[#F4D35E] text-black font-black uppercase px-10 py-4 text-lg"
+                  className="neo-button bg-[#F4D35E] text-black font-black uppercase px-8 py-3.5 text-base sm:text-lg flex-shrink-0 w-full sm:w-auto"
                 >
                   ⚡ Compress PDF Now
                 </button>
               </div>
 
               {resultStats && (
-                <div className="mt-8 border-4 border-black bg-[#2A9D8F] text-white p-6 text-center animate-fadeIn" role="status">
-                  <span className="text-3xl mb-2 block" aria-hidden="true">🎉</span>
-                  <h4 className="text-2xl font-black uppercase tracking-tight mb-1">
-                    Compression Complete!
-                  </h4>
-                  <p className="text-sm font-bold uppercase tracking-wider mb-4">
-                    Original: {formatFileSize(resultStats.originalBytes)} ➔ Compressed: <strong>{formatFileSize(resultStats.compressedBytes)}</strong>
-                    <br />
-                    Saved {Math.max(0, Math.round((1 - resultStats.compressedBytes / resultStats.originalBytes) * 100))}% ({formatFileSize(Math.max(0, resultStats.originalBytes - resultStats.compressedBytes))} smaller)
-                  </p>
-                  <a
-                    href={resultStats.downloadUrl}
-                    download={`Compressed_${file.name}`}
-                    className="neo-button bg-black text-white font-black uppercase px-8 py-3 text-base inline-block"
-                  >
-                    📥 Download Compressed PDF
-                  </a>
+                <div className="neo-panel bg-[var(--bg-panel)] border-4 border-black p-6 animate-fadeIn" role="status">
+                  <div className="border-3 border-black bg-[#2A9D8F] text-white p-3 text-center mb-5 flex items-center justify-center gap-2">
+                    <span className="text-2xl" aria-hidden="true">🎉</span>
+                    <h4 className="text-lg font-black uppercase tracking-tight text-white">
+                      Compression Complete!
+                    </h4>
+                  </div>
+
+                  {/* ── Compression Stats Cards ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5 text-center">
+                    <div className="border-2 border-black bg-[var(--bg-page)] p-3">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-0.5">Original File Size</span>
+                      <span className="text-base font-black text-[var(--text-main)] block">{formatFileSize(resultStats.originalBytes)}</span>
+                    </div>
+
+                    <div className="border-2 border-black bg-[var(--bg-page)] p-3">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-0.5">Compressed File Size</span>
+                      <span className="text-base font-black text-[#2A9D8F] block">{formatFileSize(resultStats.compressedBytes)}</span>
+                    </div>
+
+                    <div className="border-2 border-black bg-[var(--bg-page)] p-3">
+                      <span className="text-[10px] font-black uppercase text-[var(--text-soft)] block mb-0.5">Total Reduction</span>
+                      <span className="text-base font-black text-[#E63946] block">
+                        -{Math.max(0, Math.round((1 - resultStats.compressedBytes / resultStats.originalBytes) * 100))}% ({formatFileSize(Math.max(0, resultStats.originalBytes - resultStats.compressedBytes))})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* ── Editable Export Filename ── */}
+                  <div className="mb-5">
+                    <label htmlFor="export-pdf-filename" className="block text-xs font-black uppercase tracking-wider text-[var(--text-main)] mb-1.5">
+                      Export Filename &amp; Path:
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl flex-shrink-0" aria-hidden="true">📄</span>
+                      <input
+                        type="text"
+                        id="export-pdf-filename"
+                        value={exportFileName}
+                        onChange={(e) => setExportFileName(e.target.value)}
+                        placeholder="Compressed_document.pdf"
+                        aria-label="Editable Export PDF Filename"
+                        className="w-full border-3 border-black bg-[var(--bg-page)] text-[var(--text-main)] font-black text-sm px-3.5 py-2.5 focus:outline-none focus:ring-4 focus:ring-black"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ── Download Action Button ── */}
+                  <div className="text-center">
+                    <a
+                      href={resultStats.downloadUrl}
+                      download={exportFileName || `Compressed_${file.name}`}
+                      className="neo-button bg-[#F4D35E] text-black font-black uppercase px-8 py-3 text-base inline-flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <span>📥</span> Download Compressed PDF
+                    </a>
+                  </div>
                 </div>
               )}
+
+              {/* ── Compression Settings & Range Estimator (Positioned Below CTA) ── */}
+              <div className="neo-panel bg-[var(--bg-panel)] p-5 sm:p-6">
+                <h3 className="text-sm font-black uppercase tracking-wider text-[var(--text-main)] mb-4">
+                  Compression Settings &amp; Range Estimator
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <div
+                    onClick={() => setCompressionLevel(20)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionLevel(20); }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select Low Compression preset"
+                    className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionLevel <= 30 ? "bg-[#2A9D8F] text-white" : "bg-[var(--bg-page)] text-[var(--text-main)]"}`}
+                  >
+                    <span className="text-[11px] font-black uppercase block">Low Compression</span>
+                    <span className="text-sm font-black block mt-0.5">15% - 30% Saved</span>
+                    <p className="text-[10px] font-bold mt-0.5 opacity-90">150 DPI · 85% Quality · Print</p>
+                  </div>
+
+                  <div
+                    onClick={() => setCompressionLevel(50)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionLevel(50); }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select Medium Compression preset"
+                    className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionLevel > 30 && compressionLevel <= 70 ? "bg-[#457B9D] text-white" : "bg-[var(--bg-page)] text-[var(--text-main)]"}`}
+                  >
+                    <span className="text-[11px] font-black uppercase block">Medium (Recommended)</span>
+                    <span className="text-sm font-black block mt-0.5">40% - 60% Saved</span>
+                    <p className="text-[10px] font-bold mt-0.5 opacity-90">110 DPI · 70% Quality · Web</p>
+                  </div>
+
+                  <div
+                    onClick={() => setCompressionLevel(85)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCompressionLevel(85); }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Select High Compression preset"
+                    className={`p-3 border-2 border-black cursor-pointer transition-colors ${compressionLevel > 70 ? "bg-[#E63946] text-white" : "bg-[var(--bg-page)] text-[var(--text-main)]"}`}
+                  >
+                    <span className="text-[11px] font-black uppercase block">High Compression</span>
+                    <span className="text-sm font-black block mt-0.5">65% - 85% Saved</span>
+                    <p className="text-[10px] font-bold mt-0.5 opacity-90">85 DPI · 50% Quality · Small</p>
+                  </div>
+                </div>
+
+                <div className="border-2 border-black bg-[var(--bg-page)] p-3 sm:p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="compress-power-slider" className="text-[11px] font-black uppercase text-[var(--text-main)]">
+                      Compression Power: {compressionLevel}%
+                    </label>
+                    <span className="text-[10px] font-black uppercase bg-black text-white px-2 py-0.5">
+                      Est: ~{formatFileSize(estimatedSizeBytes)} (-{estimateReductionPct}%)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    id="compress-power-slider"
+                    min="0"
+                    max="100"
+                    value={compressionLevel}
+                    onChange={(e) => setCompressionLevel(parseInt(e.target.value))}
+                    aria-label="Compression Strength Slider"
+                    className="w-full h-2.5 bg-gray-300 accent-[#457B9D] cursor-pointer"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
