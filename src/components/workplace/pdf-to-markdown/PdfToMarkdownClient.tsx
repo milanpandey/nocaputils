@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 type ViewMode = "preview" | "source" | "split";
+type ExtractionMethod = "native" | "ocr" | null;
 
 /* ------------------------------------------------------------------ */
 /*  Text extraction + Markdown conversion using pdfjs-dist             */
@@ -71,7 +72,7 @@ function convertToMarkdown(
 
     // Calculate median font size for "body text" detection
     const fontSizes = blocks.map((b) => b.fontSize).sort((a, b) => a - b);
-    const medianFontSize = fontSizes[Math.floor(fontSizes.length / 2)];
+    const medianFontSize = fontSizes[Math.floor(fontSizes.length / 2)] || 12;
 
     // Group blocks into lines (items with similar Y coordinate)
     type Line = { blocks: PageBlock[]; y: number; maxFontSize: number; avgFontSize: number };
@@ -121,7 +122,7 @@ function convertToMarkdown(
         if (i > 0) {
           const prevBlock = line.blocks[i - 1];
           const gap = b.x - (prevBlock.x + prevBlock.width);
-          // If gap is large enough, insert a space (or tab for table-like spacing)
+          // If gap is large enough, insert a table column separator or space
           if (gap > b.fontSize * 2) {
             lineText += " | ";
           } else if (gap > 1) {
@@ -163,7 +164,7 @@ function convertToMarkdown(
         if (listMatch) {
           allLines.push(`- ${listMatch[2]}`);
         } else if (numberedMatch) {
-          allLines.push(lineText); // Keep numbered lists as-is
+          allLines.push(lineText);
         } else {
           allLines.push(lineText);
         }
@@ -178,8 +179,6 @@ function convertToMarkdown(
     }
   }
 
-  // Post-process: merge lines that are part of the same paragraph
-  // and add blank lines between distinct blocks
   return postProcessMarkdown(allLines);
 }
 
@@ -209,7 +208,6 @@ function postProcessMarkdown(lines: string[]): string {
     }
   }
 
-  // Clean up excessive blank lines
   return result
     .join("\n")
     .replace(/\n{4,}/g, "\n\n\n")
@@ -226,11 +224,9 @@ function detectAndFormatTables(md: string): string {
 
   while (i < lines.length) {
     const line = lines[i];
-    // Check if this line has pipe separators (potential table row)
     const pipeCount = (line.match(/ \| /g) || []).length;
 
     if (pipeCount >= 1) {
-      // Collect consecutive pipe-separated lines
       const tableLines: string[] = [];
       while (i < lines.length) {
         const tl = lines[i];
@@ -244,23 +240,18 @@ function detectAndFormatTables(md: string): string {
       }
 
       if (tableLines.length >= 2) {
-        // Format as markdown table
-        // Determine column count from the line with most pipes
         const maxCols = Math.max(...tableLines.map((l) => l.split(" | ").length));
 
         for (let j = 0; j < tableLines.length; j++) {
           const cells = tableLines[j].split(" | ").map((c) => c.trim());
-          // Pad to maxCols
           while (cells.length < maxCols) cells.push("");
           result.push("| " + cells.join(" | ") + " |");
 
-          // Add separator after first row (header)
           if (j === 0) {
             result.push("| " + cells.map(() => "---").join(" | ") + " |");
           }
         }
       } else {
-        // Single pipe line — not a table, keep as-is
         result.push(...tableLines);
       }
     } else {
@@ -284,11 +275,76 @@ export default function PdfToMarkdownClient() {
   const [error, setError] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState(0);
+  const [extractionMethod, setExtractionMethod] = useState<ExtractionMethod>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [copied, setCopied] = useState(false);
   const [renderedHtml, setRenderedHtml] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Optical Character Recognition (OCR) fallback using Tesseract.js
+  const runOcrExtraction = useCallback(async (targetFile?: File) => {
+    const activeFile = targetFile || file;
+    if (!activeFile) return;
+
+    setIsProcessing(true);
+    setError(null);
+    setStatusMsg("Initializing local OCR engine (Tesseract)…");
+
+    try {
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+
+      const arrayBuffer = await activeFile.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const numPages = pdf.numPages;
+      setPageCount(numPages);
+
+      const ocrPages: string[] = [];
+
+      for (let p = 1; p <= numPages; p++) {
+        setStatusMsg(`Scanning page ${p} of ${numPages} with OCR…`);
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale: 2 }); // High-DPI for crisp character recognition
+
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await (page as any).render({ canvasContext: ctx, viewport, canvas }).promise;
+
+        const ret = await worker.recognize(canvas);
+        const text = ret.data.text || "";
+        ocrPages.push(text.trim());
+      }
+
+      await worker.terminate();
+
+      setStatusMsg("Formatting Markdown…");
+      let md = ocrPages.join("\n\n---\n\n");
+      md = detectAndFormatTables(md);
+
+      setMarkdown(md);
+      setExtractionMethod("ocr");
+
+      if (md) {
+        setStatusMsg("Rendering preview…");
+        const { marked } = await import("marked");
+        const html = await marked(md);
+        setRenderedHtml(html);
+      }
+
+      setStatusMsg("");
+    } catch (err: unknown) {
+      console.error("OCR Extraction failed:", err);
+      setError("OCR scanning failed. Please make sure the PDF is not corrupted.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [file]);
 
   const processFile = useCallback(async (selectedFile: File) => {
     if (
@@ -302,6 +358,7 @@ export default function PdfToMarkdownClient() {
     setFile(selectedFile);
     setError(null);
     setMarkdown(null);
+    setExtractionMethod(null);
     setPageCount(0);
     setRenderedHtml("");
     setIsProcessing(true);
@@ -344,24 +401,26 @@ export default function PdfToMarkdownClient() {
         });
       }
 
-      setStatusMsg("Converting to Markdown…");
-
       // Check if we got any text at all
       const totalChars = pageItems.reduce(
         (sum, p) => sum + p.items.reduce((s, it) => s + it.str.trim().length, 0),
         0,
       );
 
+      // If no native text found (scanned or image-based PDF), mark as empty so user can run OCR
       if (totalChars === 0) {
         setMarkdown("");
+        setExtractionMethod(null);
         setStatusMsg("");
         return;
       }
 
+      setStatusMsg("Converting to Markdown…");
       let md = convertToMarkdown(pageItems);
       md = detectAndFormatTables(md);
 
       setMarkdown(md);
+      setExtractionMethod("native");
 
       if (md) {
         setStatusMsg("Rendering preview…");
@@ -433,7 +492,7 @@ export default function PdfToMarkdownClient() {
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Local", "No Uploads", "Tables & Headings", "Works Offline"].map((label) => (
+              {["100% Local", "No Uploads", "Tables & Headings", "Built-in OCR", "Works Offline"].map((label) => (
                 <div
                   key={label}
                   className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-[0.18em]"
@@ -444,8 +503,8 @@ export default function PdfToMarkdownClient() {
             </div>
 
             <p className="mt-8 max-w-3xl text-xl font-medium leading-9 text-[var(--text-soft)]">
-              Extract clean Markdown from text-based PDFs — headings, paragraphs, tables, bold &amp; italic.
-              Powered by PDF.js. Rendered entirely in your browser.
+              Extract clean Markdown from text-based and scanned PDFs — headings, paragraphs, tables, bold &amp; italic.
+              Powered by PDF.js &amp; local Tesseract OCR. Rendered entirely in your browser.
             </p>
           </section>
 
@@ -471,7 +530,7 @@ export default function PdfToMarkdownClient() {
               <div className="text-6xl mb-4">{isProcessing ? "⏳" : "📄"}</div>
               {isProcessing ? (
                 <>
-                  <span className="text-2xl font-black uppercase tracking-tighter text-[var(--text-main)]">{statusMsg}</span>
+                  <span className="text-2xl font-black uppercase tracking-tighter text-[var(--text-main)] text-center">{statusMsg}</span>
                   <div className="mt-4 h-2 w-64 bg-[var(--bg-panel-muted)] border-2 border-[var(--border-main)]">
                     <div className="h-full bg-[var(--accent)] animate-pulse" style={{ width: "60%" }} />
                   </div>
@@ -485,7 +544,7 @@ export default function PdfToMarkdownClient() {
                 <>
                   <span className="text-3xl font-black uppercase tracking-tighter text-[var(--text-main)]">Drop a PDF here</span>
                   <span className="text-sm font-bold mt-2 uppercase tracking-widest text-[var(--text-soft)]">or click to browse</span>
-                  <span className="text-xs font-bold mt-1 uppercase tracking-widest text-[var(--text-soft)]">Works best with text-based PDFs (reports, papers, docs)</span>
+                  <span className="text-xs font-bold mt-1 uppercase tracking-widest text-[var(--text-soft)]">Supports both digital text and scanned/image PDFs</span>
                 </>
               )}
             </div>
@@ -502,8 +561,11 @@ export default function PdfToMarkdownClient() {
             <section className="w-full max-w-7xl">
               {/* Stats bar */}
               <div className="mb-4 flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center border-4 border-[var(--border-main)] px-4 py-1.5 text-sm font-black uppercase tracking-widest text-black shadow-[4px_4px_0_0_var(--border-main)] bg-[#54d88d]">
-                  ✅ Extracted from {pageCount} page{pageCount !== 1 ? "s" : ""}
+                <span
+                  className="inline-flex items-center border-4 border-[var(--border-main)] px-4 py-1.5 text-sm font-black uppercase tracking-widest text-black shadow-[4px_4px_0_0_var(--border-main)]"
+                  style={{ background: extractionMethod === "ocr" ? "#F4A261" : "#54d88d" }}
+                >
+                  {extractionMethod === "ocr" ? "🔍 Scanned PDF (Extracted with OCR)" : `✅ Text PDF (${pageCount} page${pageCount !== 1 ? "s" : ""})`}
                 </span>
                 {markdown && (
                   <>
@@ -513,6 +575,16 @@ export default function PdfToMarkdownClient() {
                     <span className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-widest">
                       📄 {markdown.length.toLocaleString()} chars
                     </span>
+                    {extractionMethod === "native" && (
+                      <button
+                        onClick={() => runOcrExtraction()}
+                        disabled={isProcessing}
+                        className="ml-auto neo-button neo-button-theme px-3 py-1.5 text-xs font-black uppercase tracking-widest"
+                        title="Force OCR scanning across pages"
+                      >
+                        🔍 Run OCR Scan Instead
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -555,10 +627,21 @@ export default function PdfToMarkdownClient() {
               </div>
 
               {markdown === "" ? (
-                <div className="neo-panel bg-[var(--bg-panel)] p-8 text-center">
-                  <p className="text-5xl mb-3">🖼️</p>
-                  <p className="font-black text-xl uppercase tracking-widest">No extractable text found.</p>
-                  <p className="text-sm font-bold mt-2 uppercase tracking-widest text-[var(--text-soft)]">This PDF appears to be scanned or image-based. OCR would be required.</p>
+                <div className="neo-panel bg-[var(--bg-panel)] p-8 text-center flex flex-col items-center gap-4">
+                  <p className="text-5xl">🖼️</p>
+                  <div>
+                    <p className="font-black text-xl uppercase tracking-widest">Image-Based / Scanned PDF</p>
+                    <p className="text-sm font-bold mt-2 uppercase tracking-widest text-[var(--text-soft)] max-w-lg mx-auto leading-relaxed">
+                      No embedded text stream was found. This PDF consists of raster images or scans. Run local in-browser OCR to extract text from the images.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => runOcrExtraction()}
+                    disabled={isProcessing}
+                    className="neo-button bg-[var(--accent)] text-black px-6 py-3 text-sm font-black uppercase tracking-widest shadow-[4px_4px_0_0_var(--border-main)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
+                  >
+                    🔍 Run Local OCR Extraction
+                  </button>
                 </div>
               ) : (
                 <div

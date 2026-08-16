@@ -464,6 +464,50 @@ export default function MarkdownToPdfClient() {
           contentW,                           // width: fits within margins
           Math.min(imgDisplayH, usableH),     // height: clamp to usable area
         );
+
+        // Embed invisible text layer for searchability, text selection & PDF extraction
+        try {
+          const win = iframeDoc.defaultView!;
+          const walker = iframeDoc.createTreeWalker(iframeBody, NodeFilter.SHOW_TEXT);
+          let textNode = walker.nextNode();
+          while (textNode) {
+            const rawVal = textNode.nodeValue || "";
+            if (rawVal.trim().length > 0 && textNode.parentElement) {
+              const parent = textNode.parentElement;
+              const range = iframeDoc.createRange();
+              range.selectNodeContents(textNode);
+              const rect = range.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                const top = rect.top + win.scrollY;
+                const left = rect.left + win.scrollX;
+                if (top >= slice.startY - 2 && top < slice.endY + 2) {
+                  const computed = win.getComputedStyle(parent);
+                  const fontSize = parseFloat(computed.fontSize) || 12;
+                  const fontWeight = computed.fontWeight;
+                  const fontStyle = computed.fontStyle;
+                  const isBold = parseInt(fontWeight, 10) >= 600 || /bold/i.test(fontWeight);
+                  const isItalic = /italic|oblique/i.test(fontStyle);
+
+                  pdf.setFontSize(fontSize);
+                  pdf.setFont(
+                    "helvetica",
+                    isBold && isItalic ? "bolditalic" : isBold ? "bold" : isItalic ? "italic" : "normal"
+                  );
+
+                  const pdfX = left + margin;
+                  const pdfY = (top - slice.startY) + margin + (fontSize * 0.82);
+
+                  pdf.text(rawVal, pdfX, pdfY, {
+                    renderingMode: "invisible",
+                  });
+                }
+              }
+            }
+            textNode = walker.nextNode();
+          }
+        } catch (textErr) {
+          console.warn("Text layer embedding fallback:", textErr);
+        }
       }
 
       document.body.removeChild(iframe);
