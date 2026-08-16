@@ -63,6 +63,14 @@ export const TOOL_FEEDBACK_URLS: Record<string, string> = {
     "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Merge+Excel+Files",
   "/workplaceutilities/archive-files":
     "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Archive+Files+%28ZIP%2FTAR%29",
+  "/workplaceutilities/markdown-editor":
+    "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Markdown+Editor",
+  "/workplaceutilities/markdown-table":
+    "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Markdown+Table+Generator",
+  "/workplaceutilities/markdown-to-pdf":
+    "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Markdown+to+PDF",
+  "/workplaceutilities/pdf-to-markdown":
+    "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=PDF+to+Markdown",
   "/personality/rorschach-test":
     "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Rorschach+Inkblot+Explorer",
   "/personality/color-quest":
