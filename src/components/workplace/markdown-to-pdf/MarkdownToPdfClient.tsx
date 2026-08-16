@@ -6,9 +6,10 @@ import Footer from "@/components/Footer";
 
 type PaperSize = "a4" | "letter";
 type Theme = "minimal" | "academic" | "report" | "nature" | "dark";
+type ExportMode = "vector" | "direct";
 
 /* ------------------------------------------------------------------ */
-/*  THEME STYLES — embedded into both the preview iframe & export PDF  */
+/*  THEME STYLES — embedded into preview iframe, print, & direct PDF   */
 /* ------------------------------------------------------------------ */
 
 const SHARED_PRINT_RESET = `
@@ -146,6 +147,7 @@ export default function MarkdownToPdfClient() {
   const [source, setSource] = useState(SAMPLE_MD);
   const [paperSize, setPaperSize] = useState<PaperSize>("a4");
   const [theme, setTheme] = useState<Theme>("minimal");
+  const [exportMode, setExportMode] = useState<ExportMode>("vector");
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -221,7 +223,83 @@ export default function MarkdownToPdfClient() {
     return () => { cancelled = true; };
   }, [theme, paperSize, showPreview, source, buildHtmlDocument]);
 
-  /* ---- Generate & download PDF ---- */
+  /* ---- Native Vector PDF Export (Browser Print Engine) ---- */
+  const handleNativePrint = async () => {
+    if (!source.trim()) {
+      setError("Please enter some Markdown content.");
+      return;
+    }
+    setIsGenerating(true);
+    setError(null);
+    setStatusMsg("Preparing vector PDF document…");
+
+    try {
+      const { marked } = await import("marked");
+      const body = await marked(source);
+      const css = THEME_STYLES[theme];
+      const pageSize = PAPER_SIZES[paperSize];
+
+      const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Document</title>
+  <style>
+    ${SHARED_PRINT_RESET}
+    ${css}
+    @page {
+      size: ${pageSize.width} ${pageSize.height};
+      margin: 18mm 16mm;
+    }
+    @media print {
+      html, body {
+        background: ${theme === "dark" ? "#1e1e2e" : "#ffffff"} !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body {
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+      p, li, blockquote, pre, table, tr, figure { break-inside: avoid; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>${body}</body>
+</html>`;
+
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:0;";
+      document.body.appendChild(iframe);
+      iframe.srcdoc = printHtml;
+
+      await new Promise<void>((resolve) => {
+        iframe.onload = () => resolve();
+      });
+      await new Promise((r) => setTimeout(r, 350));
+
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {}
+      }, 2000);
+
+      setStatusMsg("");
+    } catch (err) {
+      console.error(err);
+      setError("Failed to open print dialog. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  /* ---- Direct Download PDF (Canvas + Searchable Text Layer) ---- */
   const handleGeneratePdf = async () => {
     if (!source.trim()) {
       setError("Please enter some Markdown content.");
@@ -246,7 +324,7 @@ export default function MarkdownToPdfClient() {
       const contentW = pageW - 2 * margin;
       const usableH  = pageH - 2 * margin;
 
-      // Build a special "print" HTML with NO body padding —
+      // Build special "print" HTML with NO body padding —
       // all margins are applied at the PDF level instead.
       const printHtml = `<!DOCTYPE html>
 <html>
@@ -286,8 +364,6 @@ export default function MarkdownToPdfClient() {
 
       /* -------------------------------------------------------- */
       /*  COLLECT FINE-GRAINED BREAK POINTS                        */
-      /*  Tables → individual rows, lists → individual items,      */
-      /*  everything else → top-level element.                     */
       /* -------------------------------------------------------- */
       const HEADING_TAGS = new Set(["H1","H2","H3","H4","H5","H6"]);
 
@@ -301,7 +377,6 @@ export default function MarkdownToPdfClient() {
           const tag = child.tagName.toUpperCase();
 
           if (tag === "TABLE") {
-            // Use individual rows as break points
             const rows = child.querySelectorAll("tr");
             if (rows.length > 0) {
               rows.forEach((r) => {
@@ -323,7 +398,6 @@ export default function MarkdownToPdfClient() {
               });
             }
           } else if (tag === "UL" || tag === "OL") {
-            // Use individual list items as break points
             const items = child.querySelectorAll(":scope > li");
             if (items.length > 0) {
               items.forEach((li) => {
@@ -379,7 +453,6 @@ export default function MarkdownToPdfClient() {
           const span = bp.bottom - pageStartY;
 
           if (span > usableH) {
-            // This break point would overflow — finalize current page
             if (pageEndY > pageStartY) {
               pages.push({ startY: pageStartY, endY: pageEndY });
             }
@@ -390,28 +463,22 @@ export default function MarkdownToPdfClient() {
           }
         }
 
-        // Push the final page
         if (pageEndY > pageStartY) {
           pages.push({ startY: pageStartY, endY: pageEndY });
         }
 
-        /* ---- Anti-orphan: headings at end of a page ---- */
-        // If the last break point(s) on a page are headings with
-        // no body content, move them to the start of the next page.
+        /* ---- Anti-orphan headings ---- */
         for (let p = 0; p < pages.length - 1; p++) {
           const pageSlice = pages[p];
-          // Find break points on this page
           const onPage = breakPoints.filter(
             (bp) => bp.top >= pageSlice.startY && bp.bottom <= pageSlice.endY + 1
           );
-          // Count trailing headings
           let trailingHeadingCount = 0;
           for (let j = onPage.length - 1; j >= 0; j--) {
             if (onPage[j].isHeading) trailingHeadingCount++;
             else break;
           }
           if (trailingHeadingCount > 0 && trailingHeadingCount < onPage.length) {
-            // Move trailing headings to the next page
             const firstOrphan = onPage[onPage.length - trailingHeadingCount];
             pageSlice.endY = firstOrphan.top;
             pages[p + 1].startY = firstOrphan.top;
@@ -456,13 +523,12 @@ export default function MarkdownToPdfClient() {
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
         const imgDisplayH = (canvas.height / canvas.width) * contentW;
 
-        // Place the image with consistent margins on every page
         pdf.addImage(
           imgData, "JPEG",
-          margin,                             // x: left margin
-          margin,                             // y: top margin (same on every page)
-          contentW,                           // width: fits within margins
-          Math.min(imgDisplayH, usableH),     // height: clamp to usable area
+          margin,
+          margin,
+          contentW,
+          Math.min(imgDisplayH, usableH),
         );
 
         // Embed invisible text layer for searchability, text selection & PDF extraction
@@ -521,6 +587,14 @@ export default function MarkdownToPdfClient() {
     }
   };
 
+  const handleExport = () => {
+    if (exportMode === "vector") {
+      handleNativePrint();
+    } else {
+      handleGeneratePdf();
+    }
+  };
+
   const words = source.trim() === "" ? 0 : source.trim().split(/\s+/).length;
 
   return (
@@ -539,7 +613,7 @@ export default function MarkdownToPdfClient() {
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Local", "No Uploads", "5 Themes", "Preview PDF", "Works Offline"].map((label) => (
+              {["100% Local", "Vector Text PDF", "5 Themes", "Selectable Text", "Works Offline"].map((label) => (
                 <div
                   key={label}
                   className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-[0.18em]"
@@ -550,11 +624,12 @@ export default function MarkdownToPdfClient() {
             </div>
 
             <p className="mt-8 max-w-3xl text-xl font-medium leading-9 text-[var(--text-soft)]">
-              Convert Markdown to a styled, print-ready PDF — choose your paper size and document theme. Preview before downloading. Rendered entirely in your browser.
+              Convert Markdown to a styled, vector text-ready PDF — choose your document theme and export mode.
+              Rendered 100% in your browser.
             </p>
           </section>
 
-          <div className="w-full max-w-6xl grid gap-6 md:grid-cols-[1fr_300px]">
+          <div className="w-full max-w-6xl grid gap-6 md:grid-cols-[1fr_310px]">
             {/* Editor */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
@@ -604,6 +679,56 @@ export default function MarkdownToPdfClient() {
                 <h2 className="text-xl font-black uppercase tracking-widest border-b-4 border-[var(--border-main)] pb-3">
                   PDF Settings
                 </h2>
+
+                {/* Export Mode */}
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest mb-3 text-[var(--text-soft)]">Output Format</p>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      className={`flex items-start gap-3 cursor-pointer border-4 border-[var(--border-main)] px-3 py-2.5 transition-all ${
+                        exportMode === "vector"
+                          ? "bg-[var(--accent)] text-black shadow-[3px_3px_0_0_var(--border-main)]"
+                          : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="export-mode"
+                        value="vector"
+                        checked={exportMode === "vector"}
+                        onChange={() => setExportMode("vector")}
+                        className="hidden"
+                      />
+                      <span className="text-lg mt-0.5">🖨️</span>
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-wide">Vector PDF (Default)</p>
+                        <p className="text-[10px] font-bold opacity-75 leading-snug">Crisp vector text · Native Print</p>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`flex items-start gap-3 cursor-pointer border-4 border-[var(--border-main)] px-3 py-2.5 transition-all ${
+                        exportMode === "direct"
+                          ? "bg-[var(--accent)] text-black shadow-[3px_3px_0_0_var(--border-main)]"
+                          : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="export-mode"
+                        value="direct"
+                        checked={exportMode === "direct"}
+                        onChange={() => setExportMode("direct")}
+                        className="hidden"
+                      />
+                      <span className="text-lg mt-0.5">⬇️</span>
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-wide">Direct Download</p>
+                        <p className="text-[10px] font-bold opacity-75 leading-snug">1-Click File · Embedded Text</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
 
                 {/* Paper size */}
                 <div>
@@ -683,11 +808,11 @@ export default function MarkdownToPdfClient() {
                   👁 Preview PDF
                 </button>
 
-                {/* Download PDF button */}
+                {/* Primary Export button */}
                 <button
-                  onClick={handleGeneratePdf}
+                  onClick={handleExport}
                   disabled={isGenerating || !source.trim()}
-                  className={`w-full border-4 border-[var(--border-main)] py-4 text-xl font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
+                  className={`w-full border-4 border-[var(--border-main)] py-4 text-lg font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
                     isGenerating || !source.trim()
                       ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0_0_var(--border-main)]"
                       : "bg-[var(--accent)] text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_var(--border-main)]"
@@ -697,15 +822,17 @@ export default function MarkdownToPdfClient() {
                   {isGenerating ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="inline-block h-5 w-5 animate-spin border-4 border-black border-t-transparent" />
-                      {statusMsg || "Generating…"}
+                      {statusMsg || "Processing…"}
                     </span>
+                  ) : exportMode === "vector" ? (
+                    "🖨️ Save as Vector PDF"
                   ) : (
-                    "⬇ Download PDF"
+                    "⬇ Direct Download PDF"
                   )}
                 </button>
 
                 <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-soft)] text-center leading-relaxed">
-                  Your document is rendered entirely in this browser. Nothing is sent to any server.
+                  Rendered 100% locally in your browser. Nothing is sent to any server.
                 </p>
               </div>
             </div>
@@ -732,18 +859,28 @@ export default function MarkdownToPdfClient() {
                   {THEME_META[theme].emoji} {theme} · {PAPER_SIZES[paperSize].label}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleNativePrint}
+                  disabled={isGenerating}
+                  className="neo-button px-3 py-1.5 text-xs font-black uppercase tracking-widest bg-[var(--accent)] text-black border-4 border-[var(--border-main)] shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
+                  id="preview-print-btn"
+                  title="Print to Vector PDF"
+                >
+                  🖨️ Vector PDF
+                </button>
                 <button
                   onClick={handleGeneratePdf}
                   disabled={isGenerating}
-                  className="neo-button px-4 py-1.5 text-xs font-black uppercase tracking-widest bg-[var(--accent)] text-black border-4 border-[var(--border-main)] shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
+                  className="neo-button neo-button-theme px-3 py-1.5 text-xs font-black uppercase tracking-widest"
                   id="preview-download-btn"
+                  title="Direct Download with Text Layer"
                 >
-                  {isGenerating ? "Generating…" : "⬇ Download"}
+                  ⬇ Download
                 </button>
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="neo-button neo-button-theme px-3 py-1.5 text-xs font-black uppercase tracking-widest"
+                  className="neo-button neo-button-theme px-3 py-1.5 text-xs font-black uppercase tracking-widest ml-2"
                   id="preview-close-btn"
                 >
                   ✕ Close
