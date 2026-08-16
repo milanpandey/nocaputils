@@ -232,105 +232,196 @@ export default function MarkdownToPdfClient() {
     setStatusMsg("Rendering Markdown to HTML…");
 
     try {
-      const htmlDoc = await buildHtmlDocument(source, true);
-
-      setStatusMsg("Building PDF…");
+      const { marked } = await import("marked");
       const { default: html2canvas } = await import("html2canvas");
       const { jsPDF } = await import("jspdf");
 
-      // Create an off-screen iframe to render the HTML
+      const htmlBody = await marked(source);
+      const css = THEME_STYLES[theme];
+
+      // ---- Page & margin dimensions (pixels at 96 dpi) ----
+      const pageW  = paperSize === "a4" ? 794 : 816;
+      const pageH  = paperSize === "a4" ? 1123 : 1056;
+      const margin = 72; // ~0.75 in / ~19 mm on each side
+      const contentW = pageW - 2 * margin;
+      const usableH  = pageH - 2 * margin;
+
+      // Build a special "print" HTML with NO body padding —
+      // all margins are applied at the PDF level instead.
+      const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    ${SHARED_PRINT_RESET}
+    ${css}
+    /* Override body padding — PDF margins handle spacing */
+    body {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: ${contentW}px !important;
+      max-width: ${contentW}px !important;
+    }
+  </style>
+</head>
+<body>${htmlBody}</body>
+</html>`;
+
+      // ---- Render in off-screen iframe ----
       const iframe = document.createElement("iframe");
-      const pageW = paperSize === "a4" ? 794 : 816;  // ~210mm / 8.5in at 96dpi
-      const pageH = paperSize === "a4" ? 1123 : 1056; // ~297mm / 11in at 96dpi
-      iframe.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${pageW}px;border:0;`;
+      iframe.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${contentW}px;border:0;`;
       document.body.appendChild(iframe);
 
       await new Promise<void>((resolve) => {
         iframe.onload = () => resolve();
-        iframe.srcdoc = htmlDoc;
+        iframe.srcdoc = printHtml;
       });
       await new Promise((r) => setTimeout(r, 400));
 
-      const iframeDoc = iframe.contentDocument!;
+      const iframeDoc  = iframe.contentDocument!;
       const iframeBody = iframeDoc.body;
-
-      // Let content flow naturally — don't constrain height
-      const contentHeight = iframeBody.scrollHeight;
-      iframe.style.height = `${contentHeight + 200}px`;
+      const fullHeight = iframeBody.scrollHeight;
+      iframe.style.height = `${fullHeight + 200}px`;
       await new Promise((r) => setTimeout(r, 200));
 
-      /* ---------------------------------------------------------- */
-      /*  ELEMENT-AWARE PAGE BREAKING                                */
-      /*  Walk top-level children, group them into pages so that no  */
-      /*  element is split across a page boundary.                   */
-      /* ---------------------------------------------------------- */
+      /* -------------------------------------------------------- */
+      /*  COLLECT FINE-GRAINED BREAK POINTS                        */
+      /*  Tables → individual rows, lists → individual items,      */
+      /*  everything else → top-level element.                     */
+      /* -------------------------------------------------------- */
+      const HEADING_TAGS = new Set(["H1","H2","H3","H4","H5","H6"]);
 
-      // Collect all top-level block elements and their positions
-      const children = Array.from(iframeBody.children) as HTMLElement[];
+      interface BreakPoint { el: HTMLElement; top: number; bottom: number; isHeading: boolean }
 
-      // If there are deeply nested structures, also collect all leaf
-      // block-level elements for finer-grained break detection.
-      // But for most markdown output, top-level children suffice.
+      function collectBreakPoints(parent: HTMLElement): BreakPoint[] {
+        const points: BreakPoint[] = [];
+        const win = iframeDoc.defaultView!;
 
+        for (const child of Array.from(parent.children) as HTMLElement[]) {
+          const tag = child.tagName.toUpperCase();
+
+          if (tag === "TABLE") {
+            // Use individual rows as break points
+            const rows = child.querySelectorAll("tr");
+            if (rows.length > 0) {
+              rows.forEach((r) => {
+                const rect = (r as HTMLElement).getBoundingClientRect();
+                points.push({
+                  el: r as HTMLElement,
+                  top: rect.top + win.scrollY,
+                  bottom: rect.top + win.scrollY + rect.height,
+                  isHeading: false,
+                });
+              });
+            } else {
+              const rect = child.getBoundingClientRect();
+              points.push({
+                el: child,
+                top: rect.top + win.scrollY,
+                bottom: rect.top + win.scrollY + rect.height,
+                isHeading: false,
+              });
+            }
+          } else if (tag === "UL" || tag === "OL") {
+            // Use individual list items as break points
+            const items = child.querySelectorAll(":scope > li");
+            if (items.length > 0) {
+              items.forEach((li) => {
+                const rect = (li as HTMLElement).getBoundingClientRect();
+                points.push({
+                  el: li as HTMLElement,
+                  top: rect.top + win.scrollY,
+                  bottom: rect.top + win.scrollY + rect.height,
+                  isHeading: false,
+                });
+              });
+            } else {
+              const rect = child.getBoundingClientRect();
+              points.push({ el: child, top: rect.top + win.scrollY, bottom: rect.top + win.scrollY + rect.height, isHeading: false });
+            }
+          } else {
+            const rect = child.getBoundingClientRect();
+            points.push({
+              el: child,
+              top: rect.top + win.scrollY,
+              bottom: rect.top + win.scrollY + rect.height,
+              isHeading: HEADING_TAGS.has(tag),
+            });
+          }
+        }
+
+        return points;
+      }
+
+      const breakPoints = collectBreakPoints(iframeBody);
+
+      /* -------------------------------------------------------- */
+      /*  GROUP BREAK POINTS INTO PAGES                            */
+      /* -------------------------------------------------------- */
       type PageSlice = { startY: number; endY: number };
       const pages: PageSlice[] = [];
 
-      // Body padding-top affects child positions
-      const bodyStyle = iframeDoc.defaultView!.getComputedStyle(iframeBody);
-      const bodyPadTop = parseFloat(bodyStyle.paddingTop) || 0;
-      const bodyPadBot = parseFloat(bodyStyle.paddingBottom) || 0;
-
-      if (children.length === 0) {
-        // Fallback: single page with all content
-        pages.push({ startY: 0, endY: contentHeight });
+      if (breakPoints.length === 0) {
+        pages.push({ startY: 0, endY: fullHeight });
       } else {
-        let currentPageStartY = 0;
-        let currentPageEndY = 0;
+        let pageStartY = 0;
+        let pageEndY   = 0;
 
-        for (let i = 0; i < children.length; i++) {
-          const child = children[i];
-          const rect = child.getBoundingClientRect();
-          // getBoundingClientRect is relative to viewport; in our iframe
-          // with no scroll, it's relative to the iframe's top.
-          const childTop = rect.top + iframeDoc.defaultView!.scrollY;
-          const childBottom = childTop + rect.height;
+        for (let i = 0; i < breakPoints.length; i++) {
+          const bp = breakPoints[i];
 
           if (i === 0) {
-            currentPageStartY = 0;
-            currentPageEndY = childBottom;
+            pageStartY = 0;
+            pageEndY   = bp.bottom;
             continue;
           }
 
-          const pageSpan = childBottom - currentPageStartY;
+          const span = bp.bottom - pageStartY;
 
-          if (pageSpan > pageH) {
-            // Adding this child would overflow the page.
-            // Finalize the current page at the previous child's bottom.
-            if (currentPageEndY > currentPageStartY) {
-              pages.push({ startY: currentPageStartY, endY: currentPageEndY });
+          if (span > usableH) {
+            // This break point would overflow — finalize current page
+            if (pageEndY > pageStartY) {
+              pages.push({ startY: pageStartY, endY: pageEndY });
             }
-            // Start new page from this child
-            currentPageStartY = childTop;
-            currentPageEndY = childBottom;
-
-            // Edge case: this single child is taller than a page.
-            // We'll still capture it as one chunk — it's better than mid-text clipping.
+            pageStartY = bp.top;
+            pageEndY   = bp.bottom;
           } else {
-            currentPageEndY = childBottom;
+            pageEndY = bp.bottom;
           }
         }
 
-        // Push the final page (include bottom padding)
-        const finalEnd = Math.max(currentPageEndY, currentPageEndY + bodyPadBot);
-        if (finalEnd > currentPageStartY) {
-          pages.push({ startY: currentPageStartY, endY: finalEnd });
+        // Push the final page
+        if (pageEndY > pageStartY) {
+          pages.push({ startY: pageStartY, endY: pageEndY });
+        }
+
+        /* ---- Anti-orphan: headings at end of a page ---- */
+        // If the last break point(s) on a page are headings with
+        // no body content, move them to the start of the next page.
+        for (let p = 0; p < pages.length - 1; p++) {
+          const pageSlice = pages[p];
+          // Find break points on this page
+          const onPage = breakPoints.filter(
+            (bp) => bp.top >= pageSlice.startY && bp.bottom <= pageSlice.endY + 1
+          );
+          // Count trailing headings
+          let trailingHeadingCount = 0;
+          for (let j = onPage.length - 1; j >= 0; j--) {
+            if (onPage[j].isHeading) trailingHeadingCount++;
+            else break;
+          }
+          if (trailingHeadingCount > 0 && trailingHeadingCount < onPage.length) {
+            // Move trailing headings to the next page
+            const firstOrphan = onPage[onPage.length - trailingHeadingCount];
+            pageSlice.endY = firstOrphan.top;
+            pages[p + 1].startY = firstOrphan.top;
+          }
         }
       }
 
-      /* ---------------------------------------------------------- */
-      /*  RENDER EACH PAGE SLICE TO CANVAS → PDF                     */
-      /* ---------------------------------------------------------- */
-
+      /* -------------------------------------------------------- */
+      /*  RENDER EACH PAGE TO CANVAS → PDF                         */
+      /* -------------------------------------------------------- */
       const scale = 2;
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -339,8 +430,6 @@ export default function MarkdownToPdfClient() {
         hotfixes: ["px_scaling"],
       });
 
-      const pdfPageW = pdf.internal.pageSize.getWidth();
-      const pdfPageH = pdf.internal.pageSize.getHeight();
       const bgColor = theme === "dark" ? "#1e1e2e" : "#ffffff";
 
       for (let i = 0; i < pages.length; i++) {
@@ -358,17 +447,23 @@ export default function MarkdownToPdfClient() {
           backgroundColor: bgColor,
           x: 0,
           y: Math.floor(slice.startY),
-          width: pageW,
+          width: contentW,
           height: captureH,
-          windowWidth: pageW,
+          windowWidth: contentW,
           windowHeight: captureH,
         });
 
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
-        // Scale the captured image to fit the PDF page width;
-        // height is proportional so shorter pages have whitespace at bottom
-        const imgDisplayH = (canvas.height / canvas.width) * pdfPageW;
-        pdf.addImage(imgData, "JPEG", 0, 0, pdfPageW, Math.min(imgDisplayH, pdfPageH));
+        const imgDisplayH = (canvas.height / canvas.width) * contentW;
+
+        // Place the image with consistent margins on every page
+        pdf.addImage(
+          imgData, "JPEG",
+          margin,                             // x: left margin
+          margin,                             // y: top margin (same on every page)
+          contentW,                           // width: fits within margins
+          Math.min(imgDisplayH, usableH),     // height: clamp to usable area
+        );
       }
 
       document.body.removeChild(iframe);
