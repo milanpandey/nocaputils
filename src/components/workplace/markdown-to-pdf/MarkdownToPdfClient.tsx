@@ -670,22 +670,72 @@ export default function MarkdownToPdfClient() {
                   PDF Settings
                 </h2>
 
-                {/* 1. Preview PDF button at top */}
-                <button
-                  onClick={handlePreview}
-                  disabled={!source.trim()}
-                  className={`w-full border-4 border-[var(--border-main)] py-3 px-4 text-base font-black uppercase shadow-[5px_5px_0_0_var(--border-main)] transition-all flex items-center justify-center gap-2 ${
-                    !source.trim()
-                      ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[3px_3px_0_0_var(--border-main)]"
-                      : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0_0_var(--border-main)]"
-                  }`}
-                  id="preview-pdf-btn"
-                >
-                  👁 Preview PDF
-                </button>
+                {/* Action Buttons: Preview, Print, Download */}
+                <div className="flex flex-col gap-3">
+                  {/* Preview PDF button */}
+                  <button
+                    onClick={handlePreview}
+                    disabled={!source.trim()}
+                    className={`w-full border-4 border-[var(--border-main)] py-3 px-4 text-base font-black uppercase shadow-[5px_5px_0_0_var(--border-main)] transition-all flex items-center justify-center gap-2 ${
+                      !source.trim()
+                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[3px_3px_0_0_var(--border-main)]"
+                        : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0_0_var(--border-main)]"
+                    }`}
+                    id="preview-pdf-btn"
+                  >
+                    👁 Preview PDF
+                  </button>
+
+                  {/* Action 1: Print PDF (Recommended) */}
+                  <button
+                    onClick={handleNativePrint}
+                    disabled={isGenerating || !source.trim()}
+                    className={`w-full border-4 border-[var(--border-main)] py-3.5 px-4 text-base font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
+                      isGenerating || !source.trim()
+                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0_0_var(--border-main)]"
+                        : "bg-[var(--accent)] text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_var(--border-main)]"
+                    }`}
+                    id="print-pdf-btn"
+                  >
+                    {isGenerating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="inline-block h-5 w-5 animate-spin border-4 border-black border-t-transparent" />
+                        {statusMsg || "Processing…"}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <span>🖨️ Print PDF (Recommended)</span>
+                        <span className="text-[10px] font-bold opacity-80 normal-case tracking-normal">Vector text · Native Save as PDF</span>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Action 2: 1-click Download */}
+                  <button
+                    onClick={handleGeneratePdf}
+                    disabled={isGenerating || !source.trim()}
+                    className={`w-full border-4 border-[var(--border-main)] py-3 px-4 text-sm font-black uppercase shadow-[4px_4px_0_0_var(--border-main)] transition-all ${
+                      isGenerating || !source.trim()
+                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[2px_2px_0_0_var(--border-main)]"
+                        : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_var(--border-main)]"
+                    }`}
+                    id="download-pdf-btn"
+                  >
+                    <div className="flex flex-col items-center">
+                      <span>⬇️ Download PDF</span>
+                      <span className="text-[10px] font-bold opacity-70 normal-case tracking-normal text-[var(--text-soft)]">1-Click File · Embedded Text</span>
+                    </div>
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="border-l-8 border-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-red-700 dark:text-red-400 text-xs font-black uppercase">
+                    ⚠️ {error}
+                  </div>
+                )}
 
                 {/* Paper size */}
-                <div>
+                <div className="pt-2 border-t-4 border-[var(--border-main)]">
                   <p className="text-xs font-black uppercase tracking-widest mb-3 text-[var(--text-soft)]">Paper Size</p>
                   <div className="flex flex-col gap-2">
                     {(Object.entries(PAPER_SIZES) as [PaperSize, typeof PAPER_SIZES[PaperSize]][]).map(([key, val]) => (
@@ -740,56 +790,6 @@ export default function MarkdownToPdfClient() {
                       </label>
                     ))}
                   </div>
-                </div>
-
-                {error && (
-                  <div className="border-l-8 border-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-red-700 dark:text-red-400 text-xs font-black uppercase">
-                    ⚠️ {error}
-                  </div>
-                )}
-
-                {/* Direct Action Buttons */}
-                <div className="flex flex-col gap-3 pt-2 border-t-4 border-[var(--border-main)]">
-                  {/* Action 1: Print PDF (Recommended) */}
-                  <button
-                    onClick={handleNativePrint}
-                    disabled={isGenerating || !source.trim()}
-                    className={`w-full border-4 border-[var(--border-main)] py-3.5 px-4 text-base font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
-                      isGenerating || !source.trim()
-                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0_0_var(--border-main)]"
-                        : "bg-[var(--accent)] text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_var(--border-main)]"
-                    }`}
-                    id="print-pdf-btn"
-                  >
-                    {isGenerating ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="inline-block h-5 w-5 animate-spin border-4 border-black border-t-transparent" />
-                        {statusMsg || "Processing…"}
-                      </span>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <span>🖨️ Print PDF (Recommended)</span>
-                        <span className="text-[10px] font-bold opacity-80 normal-case tracking-normal">Vector text · Native Save as PDF</span>
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Action 2: 1-click Download */}
-                  <button
-                    onClick={handleGeneratePdf}
-                    disabled={isGenerating || !source.trim()}
-                    className={`w-full border-4 border-[var(--border-main)] py-3 px-4 text-sm font-black uppercase shadow-[4px_4px_0_0_var(--border-main)] transition-all ${
-                      isGenerating || !source.trim()
-                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[2px_2px_0_0_var(--border-main)]"
-                        : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_var(--border-main)]"
-                    }`}
-                    id="download-pdf-btn"
-                  >
-                    <div className="flex flex-col items-center">
-                      <span>⬇️ Download PDF</span>
-                      <span className="text-[10px] font-bold opacity-70 normal-case tracking-normal text-[var(--text-soft)]">1-Click File · Embedded Text</span>
-                    </div>
-                  </button>
                 </div>
 
                 <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-soft)] text-center leading-relaxed">
