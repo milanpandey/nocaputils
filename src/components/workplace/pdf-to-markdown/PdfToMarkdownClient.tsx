@@ -4,22 +4,277 @@ import { useState, useCallback, useRef } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
-type PdfType = "TextBased" | "Scanned" | "ImageBased" | "Mixed" | null;
 type ViewMode = "preview" | "source" | "split";
 
-const PDF_TYPE_COLORS: Record<NonNullable<PdfType>, string> = {
-  TextBased: "#54d88d",
-  Scanned: "#E76F51",
-  ImageBased: "#F4A261",
-  Mixed: "#457B9D",
-};
+/* ------------------------------------------------------------------ */
+/*  Text extraction + Markdown conversion using pdfjs-dist             */
+/* ------------------------------------------------------------------ */
 
-const PDF_TYPE_LABELS: Record<NonNullable<PdfType>, string> = {
-  TextBased: "✅ Text-Based — Full Markdown extraction",
-  Scanned: "🖼️ Scanned — OCR needed for full text",
-  ImageBased: "🖼️ Image-Based — No extractable text",
-  Mixed: "⚡ Mixed — Partial extraction",
-};
+interface TextItem {
+  str: string;
+  transform: number[]; // [scaleX, skewX, skewY, scaleY, translateX, translateY]
+  width: number;
+  height: number;
+  fontName: string;
+}
+
+interface PageBlock {
+  text: string;
+  fontSize: number;
+  fontName: string;
+  x: number;
+  y: number;
+  width: number;
+  isBold: boolean;
+  isItalic: boolean;
+}
+
+/**
+ * Group text items into logical lines by Y-coordinate proximity,
+ * then convert to Markdown based on font-size heuristics, line-start
+ * patterns, and table-like spacing.
+ */
+function convertToMarkdown(
+  pageItems: { items: TextItem[]; pageWidth: number; pageHeight: number }[],
+): string {
+  const allLines: string[] = [];
+
+  for (let pi = 0; pi < pageItems.length; pi++) {
+    const { items } = pageItems[pi];
+    if (items.length === 0) continue;
+
+    // Build block list with position + style info
+    const blocks: PageBlock[] = items
+      .filter((it) => it.str.trim().length > 0)
+      .map((it) => ({
+        text: it.str,
+        fontSize: Math.abs(it.transform[3]) || Math.abs(it.transform[0]) || 12,
+        fontName: it.fontName || "",
+        x: it.transform[4],
+        y: it.transform[5],
+        width: it.width,
+        isBold:
+          /bold/i.test(it.fontName) ||
+          /Black/i.test(it.fontName) ||
+          /Heavy/i.test(it.fontName),
+        isItalic: /italic|oblique/i.test(it.fontName),
+      }));
+
+    if (blocks.length === 0) continue;
+
+    // Sort by Y descending (PDF origin is bottom-left), then X ascending
+    blocks.sort((a, b) => {
+      const yDiff = b.y - a.y;
+      if (Math.abs(yDiff) > 3) return yDiff;
+      return a.x - b.x;
+    });
+
+    // Calculate median font size for "body text" detection
+    const fontSizes = blocks.map((b) => b.fontSize).sort((a, b) => a - b);
+    const medianFontSize = fontSizes[Math.floor(fontSizes.length / 2)];
+
+    // Group blocks into lines (items with similar Y coordinate)
+    type Line = { blocks: PageBlock[]; y: number; maxFontSize: number; avgFontSize: number };
+    const lines: Line[] = [];
+    let currentLine: PageBlock[] = [blocks[0]];
+    let currentY = blocks[0].y;
+
+    for (let i = 1; i < blocks.length; i++) {
+      const b = blocks[i];
+      // If Y difference is small (within ~60% of font height), same line
+      const threshold = Math.max(b.fontSize, currentLine[0].fontSize) * 0.6;
+      if (Math.abs(b.y - currentY) <= threshold) {
+        currentLine.push(b);
+      } else {
+        // Finalize current line
+        const sizes = currentLine.map((bl) => bl.fontSize);
+        lines.push({
+          blocks: currentLine,
+          y: currentY,
+          maxFontSize: Math.max(...sizes),
+          avgFontSize: sizes.reduce((s, v) => s + v, 0) / sizes.length,
+        });
+        currentLine = [b];
+        currentY = b.y;
+      }
+    }
+    // Push last line
+    if (currentLine.length > 0) {
+      const sizes = currentLine.map((bl) => bl.fontSize);
+      lines.push({
+        blocks: currentLine,
+        y: currentY,
+        maxFontSize: Math.max(...sizes),
+        avgFontSize: sizes.reduce((s, v) => s + v, 0) / sizes.length,
+      });
+    }
+
+    // Convert each line to markdown
+    for (const line of lines) {
+      // Sort blocks in line by X position (left to right)
+      line.blocks.sort((a, b) => a.x - b.x);
+
+      // Join blocks into text, inserting spaces where there are gaps
+      let lineText = "";
+      for (let i = 0; i < line.blocks.length; i++) {
+        const b = line.blocks[i];
+        if (i > 0) {
+          const prevBlock = line.blocks[i - 1];
+          const gap = b.x - (prevBlock.x + prevBlock.width);
+          // If gap is large enough, insert a space (or tab for table-like spacing)
+          if (gap > b.fontSize * 2) {
+            lineText += " | ";
+          } else if (gap > 1) {
+            lineText += " ";
+          }
+        }
+        let text = b.text;
+        // Apply inline formatting
+        if (b.isBold && b.isItalic) {
+          text = `***${text}***`;
+        } else if (b.isBold) {
+          text = `**${text}**`;
+        } else if (b.isItalic) {
+          text = `*${text}*`;
+        }
+        lineText += text;
+      }
+
+      lineText = lineText.trim();
+      if (!lineText) continue;
+
+      // Determine heading level based on font size relative to body text
+      const ratio = line.avgFontSize / medianFontSize;
+      const allBold = line.blocks.every((b) => b.isBold);
+
+      if (ratio >= 1.8) {
+        allLines.push(`# ${cleanBoldMarkers(lineText)}`);
+      } else if (ratio >= 1.4) {
+        allLines.push(`## ${cleanBoldMarkers(lineText)}`);
+      } else if (ratio >= 1.15 && allBold) {
+        allLines.push(`### ${cleanBoldMarkers(lineText)}`);
+      } else if (allBold && lineText.length < 120) {
+        // Short bold lines are likely sub-headings
+        allLines.push(`#### ${cleanBoldMarkers(lineText)}`);
+      } else {
+        // Detect list-like patterns
+        const listMatch = lineText.match(/^(\s*)[•●○▪▸►◦–—-]\s+(.*)$/);
+        const numberedMatch = lineText.match(/^(\s*)\d+[.)]\s+(.*)$/);
+        if (listMatch) {
+          allLines.push(`- ${listMatch[2]}`);
+        } else if (numberedMatch) {
+          allLines.push(lineText); // Keep numbered lists as-is
+        } else {
+          allLines.push(lineText);
+        }
+      }
+    }
+
+    // Page separator (except after last page)
+    if (pi < pageItems.length - 1) {
+      allLines.push("");
+      allLines.push("---");
+      allLines.push("");
+    }
+  }
+
+  // Post-process: merge lines that are part of the same paragraph
+  // and add blank lines between distinct blocks
+  return postProcessMarkdown(allLines);
+}
+
+/** Remove redundant bold markers from text that will be a heading */
+function cleanBoldMarkers(text: string): string {
+  return text.replace(/\*\*\*/g, "").replace(/\*\*/g, "").replace(/\*/g, "").trim();
+}
+
+/** Post-process: add blank lines between different block types */
+function postProcessMarkdown(lines: string[]): string {
+  const result: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const prev = i > 0 ? lines[i - 1] : "";
+
+    // Add blank line before headings (if not already blank)
+    if (/^#{1,6}\s/.test(line) && prev !== "" && prev !== "---") {
+      result.push("");
+    }
+
+    result.push(line);
+
+    // Add blank line after headings
+    if (/^#{1,6}\s/.test(line)) {
+      result.push("");
+    }
+  }
+
+  // Clean up excessive blank lines
+  return result
+    .join("\n")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .trim();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Detect pipe-separated table patterns and format them               */
+/* ------------------------------------------------------------------ */
+function detectAndFormatTables(md: string): string {
+  const lines = md.split("\n");
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    // Check if this line has pipe separators (potential table row)
+    const pipeCount = (line.match(/ \| /g) || []).length;
+
+    if (pipeCount >= 1) {
+      // Collect consecutive pipe-separated lines
+      const tableLines: string[] = [];
+      while (i < lines.length) {
+        const tl = lines[i];
+        const tPipes = (tl.match(/ \| /g) || []).length;
+        if (tPipes >= 1) {
+          tableLines.push(tl);
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      if (tableLines.length >= 2) {
+        // Format as markdown table
+        // Determine column count from the line with most pipes
+        const maxCols = Math.max(...tableLines.map((l) => l.split(" | ").length));
+
+        for (let j = 0; j < tableLines.length; j++) {
+          const cells = tableLines[j].split(" | ").map((c) => c.trim());
+          // Pad to maxCols
+          while (cells.length < maxCols) cells.push("");
+          result.push("| " + cells.join(" | ") + " |");
+
+          // Add separator after first row (header)
+          if (j === 0) {
+            result.push("| " + cells.map(() => "---").join(" | ") + " |");
+          }
+        }
+      } else {
+        // Single pipe line — not a table, keep as-is
+        result.push(...tableLines);
+      }
+    } else {
+      result.push(line);
+      i++;
+    }
+  }
+
+  return result.join("\n");
+}
+
+/* ================================================================== */
+/*  Component                                                          */
+/* ================================================================== */
 
 export default function PdfToMarkdownClient() {
   const [file, setFile] = useState<File | null>(null);
@@ -28,8 +283,7 @@ export default function PdfToMarkdownClient() {
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
-  const [pdfType, setPdfType] = useState<PdfType>(null);
-  const [confidence, setConfidence] = useState<number | null>(null);
+  const [pageCount, setPageCount] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [copied, setCopied] = useState(false);
   const [renderedHtml, setRenderedHtml] = useState<string>("");
@@ -37,7 +291,10 @@ export default function PdfToMarkdownClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = useCallback(async (selectedFile: File) => {
-    if (!selectedFile.name.toLowerCase().endsWith(".pdf") && selectedFile.type !== "application/pdf") {
+    if (
+      !selectedFile.name.toLowerCase().endsWith(".pdf") &&
+      selectedFile.type !== "application/pdf"
+    ) {
       setError("Please upload a PDF file.");
       return;
     }
@@ -45,28 +302,65 @@ export default function PdfToMarkdownClient() {
     setFile(selectedFile);
     setError(null);
     setMarkdown(null);
-    setPdfType(null);
-    setConfidence(null);
+    setPageCount(0);
     setRenderedHtml("");
     setIsProcessing(true);
-    setStatusMsg("Loading PDF inspector (WASM)…");
+    setStatusMsg("Loading PDF engine…");
 
     try {
-      const wasmModule = await import("@firecrawl/pdf-inspector-wasm");
-      await wasmModule.default();
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
       setStatusMsg("Reading PDF bytes…");
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdfBytes = new Uint8Array(arrayBuffer);
 
-      setStatusMsg("Classifying & extracting Markdown…");
-      const result = wasmModule.processPdf(pdfBytes);
+      setStatusMsg("Opening PDF document…");
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const numPages = pdf.numPages;
+      setPageCount(numPages);
 
-      const detectedType = result.pdfType as PdfType;
-      setPdfType(detectedType);
-      setConfidence(result.confidence ?? null);
+      setStatusMsg(`Extracting text from ${numPages} page${numPages !== 1 ? "s" : ""}…`);
 
-      const md = result.markdown ?? "";
+      const pageItems: {
+        items: TextItem[];
+        pageWidth: number;
+        pageHeight: number;
+      }[] = [];
+
+      for (let p = 1; p <= numPages; p++) {
+        setStatusMsg(`Extracting page ${p} of ${numPages}…`);
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale: 1 });
+        const textContent = await page.getTextContent();
+
+        const items: TextItem[] = (textContent.items as TextItem[]).filter(
+          (it) => "str" in it && typeof it.str === "string",
+        );
+
+        pageItems.push({
+          items,
+          pageWidth: viewport.width,
+          pageHeight: viewport.height,
+        });
+      }
+
+      setStatusMsg("Converting to Markdown…");
+
+      // Check if we got any text at all
+      const totalChars = pageItems.reduce(
+        (sum, p) => sum + p.items.reduce((s, it) => s + it.str.trim().length, 0),
+        0,
+      );
+
+      if (totalChars === 0) {
+        setMarkdown("");
+        setStatusMsg("");
+        return;
+      }
+
+      let md = convertToMarkdown(pageItems);
+      md = detectAndFormatTables(md);
+
       setMarkdown(md);
 
       if (md) {
@@ -79,7 +373,9 @@ export default function PdfToMarkdownClient() {
       setStatusMsg("");
     } catch (err: unknown) {
       console.error(err);
-      setError("Failed to process PDF. The file may be encrypted, corrupted, or purely scanned.");
+      setError(
+        "Failed to process PDF. The file may be encrypted, corrupted, or use an unsupported format.",
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -116,7 +412,10 @@ export default function PdfToMarkdownClient() {
     URL.revokeObjectURL(url);
   };
 
-  const typeColor = pdfType ? PDF_TYPE_COLORS[pdfType] : "#666";
+  const words =
+    markdown && markdown.trim()
+      ? markdown.trim().split(/\s+/).length
+      : 0;
 
   return (
     <div className="subtle-pattern min-h-screen">
@@ -134,7 +433,7 @@ export default function PdfToMarkdownClient() {
             </h1>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {["100% Local", "No Uploads", "Tables & Headings", "Privacy First"].map((label) => (
+              {["100% Local", "No Uploads", "Tables & Headings", "Works Offline"].map((label) => (
                 <div
                   key={label}
                   className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-[0.18em]"
@@ -145,7 +444,8 @@ export default function PdfToMarkdownClient() {
             </div>
 
             <p className="mt-8 max-w-3xl text-xl font-medium leading-9 text-[var(--text-soft)]">
-              Extract clean Markdown from text-based PDFs — tables, headings, lists, bold & italic. Powered by Firecrawl pdf-inspector WASM.
+              Extract clean Markdown from text-based PDFs — headings, paragraphs, tables, bold &amp; italic.
+              Powered by PDF.js. Rendered entirely in your browser.
             </p>
           </section>
 
@@ -200,22 +500,22 @@ export default function PdfToMarkdownClient() {
           {/* Results */}
           {markdown !== null && (
             <section className="w-full max-w-7xl">
-              {/* PDF Type Badge */}
-              {pdfType && (
-                <div className="mb-4 flex flex-wrap items-center gap-3">
-                  <span
-                    className="inline-flex items-center border-4 border-[var(--border-main)] px-4 py-1.5 text-sm font-black uppercase tracking-widest text-black shadow-[4px_4px_0_0_var(--border-main)]"
-                    style={{ background: typeColor }}
-                  >
-                    {PDF_TYPE_LABELS[pdfType]}
-                  </span>
-                  {confidence !== null && (
-                    <span className="text-sm font-black uppercase tracking-widest text-[var(--text-soft)]">
-                      Confidence: <strong>{Math.round(confidence * 100)}%</strong>
+              {/* Stats bar */}
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center border-4 border-[var(--border-main)] px-4 py-1.5 text-sm font-black uppercase tracking-widest text-black shadow-[4px_4px_0_0_var(--border-main)] bg-[#54d88d]">
+                  ✅ Extracted from {pageCount} page{pageCount !== 1 ? "s" : ""}
+                </span>
+                {markdown && (
+                  <>
+                    <span className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-widest">
+                      📝 {words.toLocaleString()} words
                     </span>
-                  )}
-                </div>
-              )}
+                    <span className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-widest">
+                      📄 {markdown.length.toLocaleString()} chars
+                    </span>
+                  </>
+                )}
+              </div>
 
               {/* Toolbar */}
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
