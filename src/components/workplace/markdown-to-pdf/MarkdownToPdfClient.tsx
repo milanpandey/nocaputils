@@ -221,7 +221,7 @@ export default function MarkdownToPdfClient() {
     return () => { cancelled = true; };
   }, [theme, paperSize, showPreview, source, buildHtmlDocument]);
 
-  /* ---- Generate & download PDF via browser print ---- */
+  /* ---- Generate & download PDF ---- */
   const handleGeneratePdf = async () => {
     if (!source.trim()) {
       setError("Please enter some Markdown content.");
@@ -234,13 +234,13 @@ export default function MarkdownToPdfClient() {
     try {
       const htmlDoc = await buildHtmlDocument(source, true);
 
-      setStatusMsg("Building PDF with html2canvas + jsPDF…");
+      setStatusMsg("Building PDF…");
       const { default: html2canvas } = await import("html2canvas");
       const { jsPDF } = await import("jspdf");
 
       // Create an off-screen iframe to render the HTML
       const iframe = document.createElement("iframe");
-      const pageW = paperSize === "a4" ? 794 : 816; // ~210mm / 8.5in at 96dpi
+      const pageW = paperSize === "a4" ? 794 : 816;  // ~210mm / 8.5in at 96dpi
       const pageH = paperSize === "a4" ? 1123 : 1056; // ~297mm / 11in at 96dpi
       iframe.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${pageW}px;border:0;`;
       document.body.appendChild(iframe);
@@ -249,15 +249,87 @@ export default function MarkdownToPdfClient() {
         iframe.onload = () => resolve();
         iframe.srcdoc = htmlDoc;
       });
-
       await new Promise((r) => setTimeout(r, 400));
 
-      const iframeBody = iframe.contentDocument!.body;
+      const iframeDoc = iframe.contentDocument!;
+      const iframeBody = iframeDoc.body;
 
-      // Measure full content height
+      // Let content flow naturally — don't constrain height
       const contentHeight = iframeBody.scrollHeight;
-      iframe.style.height = `${contentHeight}px`;
+      iframe.style.height = `${contentHeight + 200}px`;
       await new Promise((r) => setTimeout(r, 200));
+
+      /* ---------------------------------------------------------- */
+      /*  ELEMENT-AWARE PAGE BREAKING                                */
+      /*  Walk top-level children, group them into pages so that no  */
+      /*  element is split across a page boundary.                   */
+      /* ---------------------------------------------------------- */
+
+      // Collect all top-level block elements and their positions
+      const children = Array.from(iframeBody.children) as HTMLElement[];
+
+      // If there are deeply nested structures, also collect all leaf
+      // block-level elements for finer-grained break detection.
+      // But for most markdown output, top-level children suffice.
+
+      type PageSlice = { startY: number; endY: number };
+      const pages: PageSlice[] = [];
+
+      // Body padding-top affects child positions
+      const bodyStyle = iframeDoc.defaultView!.getComputedStyle(iframeBody);
+      const bodyPadTop = parseFloat(bodyStyle.paddingTop) || 0;
+      const bodyPadBot = parseFloat(bodyStyle.paddingBottom) || 0;
+
+      if (children.length === 0) {
+        // Fallback: single page with all content
+        pages.push({ startY: 0, endY: contentHeight });
+      } else {
+        let currentPageStartY = 0;
+        let currentPageEndY = 0;
+
+        for (let i = 0; i < children.length; i++) {
+          const child = children[i];
+          const rect = child.getBoundingClientRect();
+          // getBoundingClientRect is relative to viewport; in our iframe
+          // with no scroll, it's relative to the iframe's top.
+          const childTop = rect.top + iframeDoc.defaultView!.scrollY;
+          const childBottom = childTop + rect.height;
+
+          if (i === 0) {
+            currentPageStartY = 0;
+            currentPageEndY = childBottom;
+            continue;
+          }
+
+          const pageSpan = childBottom - currentPageStartY;
+
+          if (pageSpan > pageH) {
+            // Adding this child would overflow the page.
+            // Finalize the current page at the previous child's bottom.
+            if (currentPageEndY > currentPageStartY) {
+              pages.push({ startY: currentPageStartY, endY: currentPageEndY });
+            }
+            // Start new page from this child
+            currentPageStartY = childTop;
+            currentPageEndY = childBottom;
+
+            // Edge case: this single child is taller than a page.
+            // We'll still capture it as one chunk — it's better than mid-text clipping.
+          } else {
+            currentPageEndY = childBottom;
+          }
+        }
+
+        // Push the final page (include bottom padding)
+        const finalEnd = Math.max(currentPageEndY, currentPageEndY + bodyPadBot);
+        if (finalEnd > currentPageStartY) {
+          pages.push({ startY: currentPageStartY, endY: finalEnd });
+        }
+      }
+
+      /* ---------------------------------------------------------- */
+      /*  RENDER EACH PAGE SLICE TO CANVAS → PDF                     */
+      /* ---------------------------------------------------------- */
 
       const scale = 2;
       const pdf = new jsPDF({
@@ -269,36 +341,34 @@ export default function MarkdownToPdfClient() {
 
       const pdfPageW = pdf.internal.pageSize.getWidth();
       const pdfPageH = pdf.internal.pageSize.getHeight();
+      const bgColor = theme === "dark" ? "#1e1e2e" : "#ffffff";
 
-      // Usable area with margins
-      const marginTop = 0;
-      const marginBottom = 0;
-      const usableH = pdfPageH - marginTop - marginBottom;
+      for (let i = 0; i < pages.length; i++) {
+        if (i > 0) pdf.addPage();
 
-      // Calculate how many pages we need
-      const totalPages = Math.ceil(contentHeight / pageH);
+        const slice = pages[i];
+        const captureH = Math.ceil(slice.endY - slice.startY);
 
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) pdf.addPage();
-
-        const yOffset = page * pageH;
-        const remainingH = Math.min(pageH, contentHeight - yOffset);
+        setStatusMsg(`Rendering page ${i + 1} of ${pages.length}…`);
 
         const canvas = await html2canvas(iframeBody, {
           scale,
           useCORS: false,
           allowTaint: true,
-          backgroundColor: theme === "dark" ? "#1e1e2e" : "#ffffff",
-          y: yOffset,
-          height: remainingH,
+          backgroundColor: bgColor,
+          x: 0,
+          y: Math.floor(slice.startY),
           width: pageW,
+          height: captureH,
           windowWidth: pageW,
-          windowHeight: remainingH,
+          windowHeight: captureH,
         });
 
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        // Scale the captured image to fit the PDF page width;
+        // height is proportional so shorter pages have whitespace at bottom
         const imgDisplayH = (canvas.height / canvas.width) * pdfPageW;
-        pdf.addImage(imgData, "JPEG", 0, marginTop, pdfPageW, imgDisplayH);
+        pdf.addImage(imgData, "JPEG", 0, 0, pdfPageW, Math.min(imgDisplayH, pdfPageH));
       }
 
       document.body.removeChild(iframe);
