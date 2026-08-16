@@ -6,7 +6,6 @@ import Footer from "@/components/Footer";
 
 type PaperSize = "a4" | "letter";
 type Theme = "minimal" | "academic" | "report" | "nature" | "dark";
-type ExportMode = "vector" | "direct";
 
 /* ------------------------------------------------------------------ */
 /*  THEME STYLES — embedded into preview iframe, print, & direct PDF   */
@@ -147,7 +146,6 @@ export default function MarkdownToPdfClient() {
   const [source, setSource] = useState(SAMPLE_MD);
   const [paperSize, setPaperSize] = useState<PaperSize>("a4");
   const [theme, setTheme] = useState<Theme>("minimal");
-  const [exportMode, setExportMode] = useState<ExportMode>("vector");
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -231,7 +229,7 @@ export default function MarkdownToPdfClient() {
     }
     setIsGenerating(true);
     setError(null);
-    setStatusMsg("Preparing vector PDF document…");
+    setStatusMsg("Preparing vector print document…");
 
     try {
       const { marked } = await import("marked");
@@ -587,14 +585,6 @@ export default function MarkdownToPdfClient() {
     }
   };
 
-  const handleExport = () => {
-    if (exportMode === "vector") {
-      handleNativePrint();
-    } else {
-      handleGeneratePdf();
-    }
-  };
-
   const words = source.trim() === "" ? 0 : source.trim().split(/\s+/).length;
 
   return (
@@ -675,60 +665,24 @@ export default function MarkdownToPdfClient() {
 
             {/* Settings sidebar */}
             <div className="flex flex-col gap-4">
-              <div className="neo-panel bg-[var(--bg-panel)] p-6 flex flex-col gap-6">
+              <div className="neo-panel bg-[var(--bg-panel)] p-6 flex flex-col gap-5">
                 <h2 className="text-xl font-black uppercase tracking-widest border-b-4 border-[var(--border-main)] pb-3">
                   PDF Settings
                 </h2>
 
-                {/* Export Mode */}
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest mb-3 text-[var(--text-soft)]">Output Format</p>
-                  <div className="flex flex-col gap-2">
-                    <label
-                      className={`flex items-start gap-3 cursor-pointer border-4 border-[var(--border-main)] px-3 py-2.5 transition-all ${
-                        exportMode === "vector"
-                          ? "bg-[var(--accent)] text-black shadow-[3px_3px_0_0_var(--border-main)]"
-                          : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)]"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="export-mode"
-                        value="vector"
-                        checked={exportMode === "vector"}
-                        onChange={() => setExportMode("vector")}
-                        className="hidden"
-                      />
-                      <span className="text-lg mt-0.5">🖨️</span>
-                      <div>
-                        <p className="text-sm font-black uppercase tracking-wide">Vector PDF (Default)</p>
-                        <p className="text-[10px] font-bold opacity-75 leading-snug">Crisp vector text · Native Print</p>
-                      </div>
-                    </label>
-
-                    <label
-                      className={`flex items-start gap-3 cursor-pointer border-4 border-[var(--border-main)] px-3 py-2.5 transition-all ${
-                        exportMode === "direct"
-                          ? "bg-[var(--accent)] text-black shadow-[3px_3px_0_0_var(--border-main)]"
-                          : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)]"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="export-mode"
-                        value="direct"
-                        checked={exportMode === "direct"}
-                        onChange={() => setExportMode("direct")}
-                        className="hidden"
-                      />
-                      <span className="text-lg mt-0.5">⬇️</span>
-                      <div>
-                        <p className="text-sm font-black uppercase tracking-wide">Direct Download</p>
-                        <p className="text-[10px] font-bold opacity-75 leading-snug">1-Click File · Embedded Text</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
+                {/* 1. Preview PDF button at top */}
+                <button
+                  onClick={handlePreview}
+                  disabled={!source.trim()}
+                  className={`w-full border-4 border-[var(--border-main)] py-3 px-4 text-base font-black uppercase shadow-[5px_5px_0_0_var(--border-main)] transition-all flex items-center justify-center gap-2 ${
+                    !source.trim()
+                      ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[3px_3px_0_0_var(--border-main)]"
+                      : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0_0_var(--border-main)]"
+                  }`}
+                  id="preview-pdf-btn"
+                >
+                  👁 Preview PDF
+                </button>
 
                 {/* Paper size */}
                 <div>
@@ -794,42 +748,49 @@ export default function MarkdownToPdfClient() {
                   </div>
                 )}
 
-                {/* Preview PDF button */}
-                <button
-                  onClick={handlePreview}
-                  disabled={!source.trim()}
-                  className={`w-full border-4 border-[var(--border-main)] py-3 text-base font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
-                    !source.trim()
-                      ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0_0_var(--border-main)]"
-                      : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_var(--border-main)]"
-                  }`}
-                  id="preview-pdf-btn"
-                >
-                  👁 Preview PDF
-                </button>
+                {/* Direct Action Buttons */}
+                <div className="flex flex-col gap-3 pt-2 border-t-4 border-[var(--border-main)]">
+                  {/* Action 1: Print PDF (Recommended) */}
+                  <button
+                    onClick={handleNativePrint}
+                    disabled={isGenerating || !source.trim()}
+                    className={`w-full border-4 border-[var(--border-main)] py-3.5 px-4 text-base font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
+                      isGenerating || !source.trim()
+                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0_0_var(--border-main)]"
+                        : "bg-[var(--accent)] text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_var(--border-main)]"
+                    }`}
+                    id="print-pdf-btn"
+                  >
+                    {isGenerating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="inline-block h-5 w-5 animate-spin border-4 border-black border-t-transparent" />
+                        {statusMsg || "Processing…"}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <span>🖨️ Print PDF (Recommended)</span>
+                        <span className="text-[10px] font-bold opacity-80 normal-case tracking-normal">Vector text · Native Save as PDF</span>
+                      </div>
+                    )}
+                  </button>
 
-                {/* Primary Export button */}
-                <button
-                  onClick={handleExport}
-                  disabled={isGenerating || !source.trim()}
-                  className={`w-full border-4 border-[var(--border-main)] py-4 text-lg font-black uppercase shadow-[6px_6px_0_0_var(--border-main)] transition-all ${
-                    isGenerating || !source.trim()
-                      ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[4px_4px_0_0_var(--border-main)]"
-                      : "bg-[var(--accent)] text-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_var(--border-main)]"
-                  }`}
-                  id="generate-pdf-btn"
-                >
-                  {isGenerating ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="inline-block h-5 w-5 animate-spin border-4 border-black border-t-transparent" />
-                      {statusMsg || "Processing…"}
-                    </span>
-                  ) : exportMode === "vector" ? (
-                    "🖨️ Save as Vector PDF"
-                  ) : (
-                    "⬇ Direct Download PDF"
-                  )}
-                </button>
+                  {/* Action 2: 1-click Download */}
+                  <button
+                    onClick={handleGeneratePdf}
+                    disabled={isGenerating || !source.trim()}
+                    className={`w-full border-4 border-[var(--border-main)] py-3 px-4 text-sm font-black uppercase shadow-[4px_4px_0_0_var(--border-main)] transition-all ${
+                      isGenerating || !source.trim()
+                        ? "bg-gray-400 text-gray-700 cursor-not-allowed translate-x-[2px] translate-y-[2px] shadow-[2px_2px_0_0_var(--border-main)]"
+                        : "bg-[var(--bg-panel)] hover:bg-[var(--bg-panel-muted)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_var(--border-main)]"
+                    }`}
+                    id="download-pdf-btn"
+                  >
+                    <div className="flex flex-col items-center">
+                      <span>⬇️ Download PDF</span>
+                      <span className="text-[10px] font-bold opacity-70 normal-case tracking-normal text-[var(--text-soft)]">1-Click File · Embedded Text</span>
+                    </div>
+                  </button>
+                </div>
 
                 <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-soft)] text-center leading-relaxed">
                   Rendered 100% locally in your browser. Nothing is sent to any server.
@@ -863,20 +824,20 @@ export default function MarkdownToPdfClient() {
                 <button
                   onClick={handleNativePrint}
                   disabled={isGenerating}
-                  className="neo-button px-3 py-1.5 text-xs font-black uppercase tracking-widest bg-[var(--accent)] text-black border-4 border-[var(--border-main)] shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
+                  className="neo-button px-3.5 py-1.5 text-xs font-black uppercase tracking-widest bg-[var(--accent)] text-black border-4 border-[var(--border-main)] shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
                   id="preview-print-btn"
                   title="Print to Vector PDF"
                 >
-                  🖨️ Vector PDF
+                  🖨️ Print PDF (Recommended)
                 </button>
                 <button
                   onClick={handleGeneratePdf}
                   disabled={isGenerating}
-                  className="neo-button neo-button-theme px-3 py-1.5 text-xs font-black uppercase tracking-widest"
+                  className="neo-button neo-button-theme px-3.5 py-1.5 text-xs font-black uppercase tracking-widest"
                   id="preview-download-btn"
                   title="Direct Download with Text Layer"
                 >
-                  ⬇ Download
+                  ⬇️ Download PDF
                 </button>
                 <button
                   onClick={() => setShowPreview(false)}
