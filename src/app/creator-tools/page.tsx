@@ -2,9 +2,9 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import { getToolsByCategory } from "@/lib/toolRegistry";
 
-const tests = getToolsByCategory("personality");
+const tools = getToolsByCategory("creator");
 
-export default function PersonalityHub() {
+export default function CreatorToolsHub() {
   return (
     <div className="bauhaus-page min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
@@ -20,56 +20,51 @@ export default function PersonalityHub() {
           <section className="bauhaus-hero mb-20">
             {/* Decorative shapes */}
             <div className="bauhaus-hero-shapes" aria-hidden="true">
-              <div className="bauhaus-shape bauhaus-shape--circle-red" style={{ background: "#9C27B0" }} />
-              <div className="bauhaus-shape bauhaus-shape--rect-blue" style={{ background: "#2A9D8F" }} />
-              <div className="bauhaus-shape bauhaus-shape--tri-yellow" style={{ borderBottomColor: "#F77F00" }} />
+              <div className="bauhaus-shape bauhaus-shape--circle-red" style={{ background: "#F2EF13" }} />
+              <div className="bauhaus-shape bauhaus-shape--rect-blue" style={{ background: "#457B9D" }} />
+              <div className="bauhaus-shape bauhaus-shape--tri-yellow" />
               <div className="bauhaus-shape bauhaus-shape--line-1" />
               <div className="bauhaus-shape bauhaus-shape--line-2" />
             </div>
 
             <h1 className="bauhaus-title">
-              <span className="bauhaus-title-top" style={{ fontSize: "clamp(3rem, 9vw, 6.5rem)" }}>
-                PERSONALITY TESTS
-              </span>
+              <span className="bauhaus-title-top">CREATOR TOOLS</span>
               <span className="bauhaus-title-sub">by nocaputils</span>
             </h1>
 
             <p className="bauhaus-tagline">
-              Free. Private. Insightful.<br />
+              Professional. Private. Powerful.<br />
               <span className="bauhaus-tagline-small">No downloads · No ads · 100% browser-based</span>
             </p>
           </section>
 
-          {/* ── Tests Grid ── */}
+          {/* ── Tools Grid ── */}
           <section className="mb-16 w-full max-w-5xl">
             <h2 className="bauhaus-section-title">
-              <span className="bauhaus-section-dot" style={{ background: "#9C27B0" }} aria-hidden="true" />
-              Take Test
+              <span className="bauhaus-section-dot" style={{ background: "#F2EF13" }} aria-hidden="true" />
+              Audio &amp; Video Tools
             </h2>
 
             <div className="bauhaus-game-grid">
-              {tests.map((test) => (
+              {tools.map((tool) => (
                 <a
-                  key={test.id}
-                  href={test.href}
+                  key={tool.id}
+                  href={tool.href}
                   className="bauhaus-game-card"
-                  id={`test-card-${test.id}`}
+                  id={`creator-card-${tool.id}`}
                 >
-                  <div className="bauhaus-game-card-accent" style={{ background: test.color }} />
+                  <div className="bauhaus-game-card-accent" style={{ background: tool.color }} />
                   <div className="bauhaus-game-card-body">
                     <div className="bauhaus-game-card-top">
-                      <span className="bauhaus-game-emoji">{test.emoji}</span>
+                      <span className="bauhaus-game-emoji">{tool.emoji}</span>
                       <div className="bauhaus-game-badges">
-                        <span className="bauhaus-badge bauhaus-badge--live">{test.status}</span>
-                        {test.badge && (
-                          <span className="bauhaus-badge bauhaus-badge--age">{test.badge}</span>
-                        )}
+                        <span className="bauhaus-badge bauhaus-badge--live">{tool.status}</span>
                       </div>
                     </div>
-                    <h3 className="bauhaus-game-name">{test.name}</h3>
-                    <p className="bauhaus-game-desc">{test.description}</p>
-                    <div className="bauhaus-game-play" style={{ color: test.color }}>
-                      Take Test <span aria-hidden="true">→</span>
+                    <h3 className="bauhaus-game-name">{tool.name}</h3>
+                    <p className="bauhaus-game-desc">{tool.description}</p>
+                    <div className="bauhaus-game-play">
+                      Open Tool <span aria-hidden="true">→</span>
                     </div>
                   </div>
                 </a>

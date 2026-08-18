@@ -1,108 +1,8 @@
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
+import { getToolsByCategory } from "@/lib/toolRegistry";
 
-const tools = [
-  {
-    id: "file-bills",
-    name: "File Bills & Expense Ledger",
-    description: "Organize receipt photos into a compiled printable PDF and Excel summary ledger.",
-    status: "Live" as const,
-    emoji: "🧾",
-    color: "#2A9D8F",
-    badge: "PDF + Excel",
-    isAvailable: true,
-  },
-  {
-    id: "pdf-merge",
-    name: "PDF Merger",
-    description: "Combine multiple PDF documents into a single consolidated file offline.",
-    status: "Live" as const,
-    emoji: "📚",
-    color: "#457B9D",
-    badge: "Fast & Private",
-    isAvailable: true,
-  },
-  {
-    id: "compress-pdf",
-    name: "PDF Compressor",
-    description: "Compress and reduce PDF file size directly in your browser.",
-    status: "Live" as const,
-    emoji: "🗜️",
-    color: "#E76F51",
-    badge: "100% Private",
-    isAvailable: true,
-  },
-  {
-    id: "merge-excel",
-    name: "Merge Excel Files",
-    description: "Combine multiple Excel spreadsheets (.xlsx, .xls, .csv) into one workbook.",
-    status: "Live" as const,
-    emoji: "📊",
-    color: "#107C41",
-    badge: "XLSX + CSV",
-    isAvailable: true,
-  },
-  {
-    id: "archive-files",
-    name: "Archive Files (ZIP/TAR)",
-    description: "Compress multiple files into ZIP or extract archives offline without server uploads.",
-    status: "Live" as const,
-    emoji: "📦",
-    color: "#F4A261",
-    badge: "ZIP / Extract",
-    isAvailable: true,
-  },
-  {
-    id: "pdf-to-word",
-    name: "PDF to Word Converter",
-    description: "Convert PDF documents to editable Microsoft Word (.docx) files offline.",
-    status: "Coming Soon" as const,
-    emoji: "📄",
-    color: "#E63946",
-    badge: "In Development",
-    isAvailable: false,
-  },
-  {
-    id: "pdf-to-markdown",
-    name: "PDF → Markdown",
-    description: "Extract clean Markdown from text-based PDFs — headings, tables, lists, bold & italic. Powered by Firecrawl WASM.",
-    status: "Live" as const,
-    emoji: "📄→✍️",
-    color: "#2A9D8F",
-    badge: "WASM · Private",
-    isAvailable: true,
-  },
-  {
-    id: "markdown-editor",
-    name: "Markdown Editor",
-    description: "Write and preview Markdown live in a split-pane editor. Toolbar shortcuts, import/export, word count.",
-    status: "Live" as const,
-    emoji: "✍️",
-    color: "#6A4C93",
-    badge: "Live Preview",
-    isAvailable: true,
-  },
-  {
-    id: "markdown-to-pdf",
-    name: "Markdown → PDF",
-    description: "Convert Markdown to a styled, print-ready PDF. Choose paper size (A4/Letter) and document theme.",
-    status: "Live" as const,
-    emoji: "✍️→📄",
-    color: "#E76F51",
-    badge: "A4 · Letter",
-    isAvailable: true,
-  },
-  {
-    id: "markdown-table",
-    name: "Markdown Table Generator",
-    description: "Build GitHub-Flavored Markdown tables visually. Import CSV, set alignment per column, copy in one click.",
-    status: "Live" as const,
-    emoji: "📊",
-    color: "#457B9D",
-    badge: "CSV Import",
-    isAvailable: true,
-  },
-];
+const tools = getToolsByCategory("workplace");
 
 export default function WorkplaceUtilitiesHub() {
   return (
@@ -147,12 +47,13 @@ export default function WorkplaceUtilitiesHub() {
 
             <div className="bauhaus-game-grid">
               {tools.map((tool) => {
-                const CardTag = tool.isAvailable ? "a" : "div";
+                const isAvailable = tool.status === "Live";
+                const CardTag = isAvailable ? "a" : "div";
                 return (
                   <CardTag
                     key={tool.id}
-                    {...(tool.isAvailable ? { href: `/workplaceutilities/${tool.id}` } : {})}
-                    className={`bauhaus-game-card ${!tool.isAvailable ? "opacity-75 cursor-not-allowed" : ""}`}
+                    {...(isAvailable ? { href: tool.href } : {})}
+                    className={`bauhaus-game-card ${!isAvailable ? "opacity-75 cursor-not-allowed" : ""}`}
                     id={`workplace-card-${tool.id}`}
                   >
                     <div className="bauhaus-game-card-accent" style={{ background: tool.color }} />
@@ -160,16 +61,18 @@ export default function WorkplaceUtilitiesHub() {
                       <div className="bauhaus-game-card-top">
                         <span className="bauhaus-game-emoji">{tool.emoji}</span>
                         <div className="bauhaus-game-badges">
-                          <span className={`bauhaus-badge ${tool.isAvailable ? "bauhaus-badge--live" : "bg-gray-400 text-black font-bold"}`}>
+                          <span className={`bauhaus-badge ${isAvailable ? "bauhaus-badge--live" : "bg-gray-400 text-black font-bold"}`}>
                             {tool.status}
                           </span>
-                          <span className="bauhaus-badge bauhaus-badge--age">{tool.badge}</span>
+                          {tool.badge && (
+                            <span className="bauhaus-badge bauhaus-badge--age">{tool.badge}</span>
+                          )}
                         </div>
                       </div>
                       <h3 className="bauhaus-game-name">{tool.name}</h3>
                       <p className="bauhaus-game-desc">{tool.description}</p>
-                      <div className="bauhaus-game-play" style={{ color: tool.isAvailable ? tool.color : "#666" }}>
-                        {tool.isAvailable ? (
+                      <div className="bauhaus-game-play" style={{ color: isAvailable ? tool.color : "#666" }}>
+                        {isAvailable ? (
                           <>Open Tool <span aria-hidden="true">→</span></>
                         ) : (
                           <>Coming Soon</>

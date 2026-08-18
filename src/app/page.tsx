@@ -1,79 +1,8 @@
 import ThemeToggle from "@/components/ThemeToggle";
 import { getTripTeaLink, SHOW_TRIPTEA } from "@/lib/constants";
 import Footer from "@/components/Footer";
-
-const tools = [
-  {
-    id: "online-video-editor",
-    name: "Video Editor",
-    description: "Trim, crop, and filter in-browser.",
-    status: "Live",
-    artClass: "tool-art-edit",
-  },
-  {
-    id: "video-frame-extractor",
-    name: "Frame Grab",
-    description: "Extract high-res cinematic stills.",
-    status: "Live",
-    artClass: "tool-art-grab",
-  },
-  {
-    id: "video-to-gif",
-    name: "Video to GIF",
-    description: "Convert clips to looping GIFs.",
-    status: "Live",
-    artClass: "tool-art-gif",
-  },
-  {
-    id: "compress-video",
-    name: "Video Compressor",
-    description: "Shrink files, keep quality.",
-    status: "Live",
-    artClass: "tool-art-shrink",
-  },
-  {
-    id: "video-to-mp3",
-    name: "Video to MP3",
-    description: "Extract pure audio from any video.",
-    status: "Live",
-    artClass: "tool-art-mp3",
-  },
-  {
-    id: "audio-to-mp4",
-    name: "Audio to MP4",
-    description: "Convert audio to video in seconds.",
-    status: "Live",
-    artClass: "tool-art-mp4",
-  },
-  {
-    id: "change-video-speed",
-    name: "Video Speed Control",
-    description: "Speed up or slow down videos.",
-    status: "Live",
-    artClass: "tool-art-speed",
-  },
-  {
-    id: "music-visualizer",
-    name: "Music Visualizer",
-    description: "Audio-reactive videos for YouTube.",
-    status: "Live",
-    artClass: "tool-art-visualizer",
-  },
-  {
-    id: "audio-effects",
-    name: "Audio Effects",
-    description: "Apply filters, delays, and EQs to audio.",
-    status: "Live",
-    artClass: "tool-art-audio",
-  },
-  {
-    id: "blog",
-    name: "The Blog",
-    description: "Creator tips & tool updates.",
-    status: "Live",
-    artClass: "tool-art-pencil",
-  },
-];
+import { POPULAR_TOOLS, CATEGORIES } from "@/lib/toolRegistry";
+import HomepageSearch from "@/components/HomepageSearch";
 
 export default function Home() {
   return (
@@ -84,13 +13,13 @@ export default function Home() {
         </div>
 
         <main className="flex flex-1 flex-col items-center">
-          <section className="mb-20 max-w-4xl text-center">
-            <h1 className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.06em] text-[var(--text-main)] sm:text-7xl lg:text-[6.5rem]">
+          {/* ── Hero ── */}
+          <section className="mb-8 max-w-4xl text-center">
+            <h1 className="text-4xl font-black uppercase leading-[0.9] tracking-[-0.06em] text-[var(--text-main)] sm:text-6xl lg:text-[5.5rem]">
               <span className="block">Level Up Your</span>
               <span className="my-2 inline-block rotate-[-2deg] border-4 border-[var(--border-main)] bg-[var(--accent)] px-4 py-1 text-black shadow-[6px_6px_0_0_var(--border-main)]">
-                Content
+                Toolkit
               </span>
-              <span className="block">Creation</span>
             </h1>
 
             <div className="mt-10 flex flex-col items-center gap-5">
@@ -105,11 +34,19 @@ export default function Home() {
                     Powered by <span className="font-black text-[var(--text-main)]">TripTea</span>.{" "}
                   </>
                 )}
-                Get professional-grade assets with{" "}
+                Get professional-grade tools with{" "}
                 <span className="font-black text-[var(--text-main)]">
                   100% private in-browser processing
                 </span>
-                . No uploads, zero servers, total control.
+                . No uploads, zero servers, total control.{" "}
+                Check out the{" "}
+                <a
+                  href="/blog"
+                  className="inline-block border-2 border-[var(--border-main)] bg-[var(--accent)] px-1.5 py-0.5 font-black text-black shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
+                >
+                  Blog
+                </a>{" "}
+                for creator tips &amp; tool updates.
               </p>
             </div>
 
@@ -123,6 +60,11 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* ── Search Bar ── */}
+          <section className="mb-12 flex w-full max-w-6xl justify-center">
+            <HomepageSearch />
           </section>
 
           {SHOW_TRIPTEA && (
@@ -171,194 +113,91 @@ export default function Home() {
             </section>
           )}
 
-          <section id="tools" className="mb-20 w-full max-w-6xl">
+          {/* ── Popular Tools ── */}
+          <section id="popular" className="mb-20 w-full max-w-6xl">
             <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
               <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-[-0.06em] sm:text-6xl">
-                Free Utility
+                Popular
                 <br />
                 Tools
               </h2>
               <p className="max-w-sm text-sm font-bold uppercase leading-7 tracking-[0.18em] text-[var(--text-soft)] md:text-right">
-                Industry standard tools running entirely in your browser.
+                The most-used tools across all categories.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
-              {tools.map((tool) => {
-                const statusClass =
-                  tool.status === "Live"
-                    ? "bg-[var(--success)] text-black"
-                    : "bg-[var(--accent)] text-black";
-
+            <div className="compact-grid">
+              {POPULAR_TOOLS.map((tool) => {
+                const catMeta = CATEGORIES.find((c) => c.key === tool.category);
                 return (
                   <a
                     key={tool.id}
-                    href={`/${tool.id}`}
-                    className="neo-button block bg-[var(--bg-panel-muted)] p-2"
+                    href={tool.href}
+                    className="compact-card"
+                    id={`popular-${tool.id}`}
                   >
-                    <div className="mb-3 border-[3px] border-[var(--border-main)] bg-[#111827] p-2">
-                      <div
-                        className={`relative aspect-square border-2 border-[var(--border-main)] ${tool.artClass}`}
-                      >
-                        <div
-                          className={`absolute right-1.5 top-1.5 border-2 border-[var(--border-main)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] ${statusClass}`}
+                    <div className="compact-card-emoji">{tool.emoji}</div>
+                    <div className="compact-card-body">
+                      <div className="compact-card-header">
+                        <span className="compact-card-name">{tool.name}</span>
+                        <span
+                          className="compact-card-badge"
+                          style={{ background: catMeta?.color ?? "#ccc", color: "#000" }}
                         >
-                          {tool.status}
-                        </div>
+                          {catMeta?.label}
+                        </span>
                       </div>
+                      <p className="compact-card-desc">{tool.description}</p>
                     </div>
-                    <h3 className="px-1 text-lg font-black uppercase italic tracking-[-0.05em]">
-                      {tool.name}
-                    </h3>
-                    <p className="mt-1 px-1 text-[10px] font-bold uppercase leading-5 tracking-[0.1em] text-[var(--text-soft)]">
-                      {tool.description}
-                    </p>
                   </a>
                 );
               })}
             </div>
           </section>
 
-          {/* ── Games Section Card ── */}
-          <section id="games" className="mb-12 w-full max-w-6xl">
-            <a
-              href="/games"
-              className="neo-button group relative block overflow-hidden bg-[var(--bg-panel)] p-0"
-            >
-              {/* Bauhaus accent bar */}
-              <div className="flex h-2">
-                <div className="flex-1 bg-[#E63946]" />
-                <div className="flex-1 bg-[#457B9D]" />
-                <div className="flex-1 bg-[#F4D35E]" />
-              </div>
+          {/* ── Browse by Category ── */}
+          <section id="categories" className="mb-20 w-full max-w-6xl">
+            <div className="mb-10">
+              <h2 className="text-4xl font-black uppercase leading-[0.92] tracking-[-0.06em] sm:text-5xl">
+                Browse by Category
+              </h2>
+            </div>
 
-              <div className="flex flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:px-10 sm:py-10">
-                {/* Geometric decorations */}
-                <div className="flex shrink-0 items-center gap-3">
-                  <div className="h-14 w-14 rounded-full border-4 border-[var(--border-main)] bg-[#E63946]" />
-                  <div className="h-14 w-14 border-4 border-[var(--border-main)] bg-[#457B9D]" />
+            <div className="category-grid">
+              {CATEGORIES.map((cat) => (
+                <a
+                  key={cat.key}
+                  href={cat.href}
+                  className="category-card"
+                  style={{ borderLeftColor: cat.color }}
+                  id={`category-${cat.key}`}
+                >
                   <div
-                    className="border-[var(--border-main)]"
-                    style={{
-                      width: 0,
-                      height: 0,
-                      borderLeft: "28px solid transparent",
-                      borderRight: "28px solid transparent",
-                      borderBottom: "56px solid #F4D35E",
-                    }}
+                    className="absolute left-0 top-0 bottom-0 w-[6px]"
+                    style={{ background: cat.color }}
                   />
-                </div>
-
-                {/* Text */}
-                <div className="flex-1">
-                  <h2 className="mb-2 text-3xl font-black uppercase leading-none tracking-[-0.04em] sm:text-4xl">
-                    <span className="inline-block border-4 border-[var(--border-main)] bg-[#E63946] px-3 py-1 text-white shadow-[4px_4px_0_0_var(--border-main)]">
-                      Games
-                    </span>
-                  </h2>
-                  <p className="text-sm font-bold uppercase leading-6 tracking-[0.1em] text-[var(--text-soft)]">
-                    6 free learning games for kids — play now!
-                  </p>
-                </div>
-
-                {/* Arrow */}
-                <div className="text-3xl font-black text-[var(--text-soft)] transition-all group-hover:translate-x-2 group-hover:text-[#E63946]">
-                  →
-                </div>
-              </div>
-            </a>
+                  <span className="category-card-emoji">{cat.emoji}</span>
+                  <div className="category-card-body">
+                    <h3 className="category-card-title">{cat.label}</h3>
+                    <p className="category-card-desc">{cat.tagline}</p>
+                  </div>
+                  <span className="category-card-arrow">→</span>
+                </a>
+              ))}
+            </div>
           </section>
 
-          {/* ── Personality Tests Section Card ── */}
-          <section id="personality" className="mb-12 w-full max-w-6xl">
-            <a
-              href="/personality"
-              className="neo-button group relative block overflow-hidden bg-[var(--bg-panel)] p-0"
-            >
-              {/* Accent bar */}
-              <div className="flex h-2">
-                <div className="flex-1 bg-[#9C27B0]" />
-                <div className="flex-1 bg-[#2A9D8F]" />
-                <div className="flex-1 bg-[#F77F00]" />
-              </div>
-
-              <div className="flex flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:px-10 sm:py-10">
-                {/* Symbolism */}
-                <div className="flex shrink-0 items-center justify-center text-4xl">
-                  🦋 🔮 ✨
-                </div>
-
-                {/* Text */}
-                <div className="flex-1">
-                  <h2 className="mb-2 text-3xl font-black uppercase leading-none tracking-[-0.04em] sm:text-4xl">
-                    <span className="inline-block border-4 border-[var(--border-main)] bg-[#9C27B0] px-3 py-1 text-white shadow-[4px_4px_0_0_var(--border-main)]">
-                      Personality Tests
-                    </span>
-                  </h2>
-                  <p className="text-sm font-bold uppercase leading-6 tracking-[0.1em] text-[var(--text-soft)]">
-                    Free. Private. Insightful. Try Rorschach Inkblot Explorer &amp; more!
-                  </p>
-                </div>
-
-                {/* Arrow */}
-                <div className="text-3xl font-black text-[var(--text-soft)] transition-all group-hover:translate-x-2 group-hover:text-[#9C27B0]">
-                  →
-                </div>
-              </div>
-            </a>
-          </section>
-
-          {/* ── Workplace Utilities Section Card ── */}
-          <section id="workplaceutilities" className="mb-20 w-full max-w-6xl">
-            <a
-              href="/workplaceutilities"
-              className="neo-button group relative block overflow-hidden bg-[var(--bg-panel)] p-0"
-            >
-              {/* Accent bar */}
-              <div className="flex h-2">
-                <div className="flex-1 bg-[#E63946]" />
-                <div className="flex-1 bg-[#457B9D]" />
-                <div className="flex-1 bg-[#2A9D8F]" />
-              </div>
-
-              <div className="flex flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:px-10 sm:py-10">
-                {/* Symbolism */}
-                <div className="flex shrink-0 items-center justify-center text-4xl">
-                  📊 💼 📁
-                </div>
-
-                {/* Text */}
-                <div className="flex-1">
-                  <h2 className="mb-2 text-3xl font-black uppercase leading-none tracking-[-0.04em] sm:text-4xl">
-                    <span className="inline-block border-4 border-[var(--border-main)] bg-[#2A9D8F] px-3 py-1 text-white shadow-[4px_4px_0_0_var(--border-main)]">
-                      Workplace Utilities
-                    </span>
-                  </h2>
-                  <p className="text-sm font-bold uppercase leading-6 tracking-[0.1em] text-[var(--text-soft)]">
-                    Free. Private. Productive. PDF to Word, File Bills &amp; expense ledgers!
-                  </p>
-                </div>
-
-                {/* Arrow */}
-                <div className="text-3xl font-black text-[var(--text-soft)] transition-all group-hover:translate-x-2 group-hover:text-[#2A9D8F]">
-                  →
-                </div>
-              </div>
-            </a>
-          </section>
-
-
-
+          {/* ── Explore All CTA ── */}
           <section className="neo-panel mb-24 w-full max-w-6xl !bg-[var(--bg-panel)] px-6 py-16 text-center text-[var(--text-main)] sm:px-10 sm:py-20">
             <h2 className="text-5xl font-black uppercase italic leading-none tracking-[-0.06em] sm:text-7xl">
-              Ready to Create?
+              Want More?
             </h2>
             <p className="mx-auto mt-8 max-w-2xl text-lg font-extrabold uppercase leading-8 tracking-[0.12em]">
-              Join the creators on the home page.
+              Discover all {POPULAR_TOOLS.length > 0 ? "28+" : ""} tools in one place.
             </p>
             <div className="mt-12">
               <a
-                href="#tools"
+                href="/tools"
                 className="neo-button neo-button-theme inline-flex px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] transition-all"
               >
                 Explore All Tools
