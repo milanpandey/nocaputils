@@ -51,7 +51,13 @@ export default function Home() {
             </div>
 
             <div className="mt-10 flex flex-wrap justify-center gap-4">
-              {["100% Private", "No Uploads", "Zero Servers"].map((label) => (
+              {[
+                "100% Private",
+                "100% Free",
+                "No Sign-In Required",
+                "No Watermark",
+                "Zero Servers",
+              ].map((label) => (
                 <div
                   key={label}
                   className="neo-panel bg-[var(--bg-panel)] px-4 py-2 text-xs font-black uppercase tracking-[0.18em]"
