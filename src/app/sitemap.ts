@@ -146,6 +146,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
             priority: 0.7,
         },
         {
+            url: `${baseUrl}/games/reaction-timer`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.7,
+        },
+        {
             url: `${baseUrl}/personality`,
             lastModified: new Date(),
             changeFrequency: 'weekly',
@@ -156,6 +162,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
             lastModified: new Date(),
             changeFrequency: 'monthly',
             priority: 0.7,
+        },
+        {
+            url: `${baseUrl}/personality/archetype-quiz`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.8,
+        },
+        {
+            url: `${baseUrl}/personality/reaction-timer`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.8,
         },
         {
             url: `${baseUrl}/personality/color-quest`,
