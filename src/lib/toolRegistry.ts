@@ -2,7 +2,7 @@
 // Single source of truth for every tool on nocaputils.
 // Import from here instead of maintaining per-page arrays.
 
-export type ToolCategory = "creator" | "workplace" | "games" | "personality";
+export type ToolCategory = "creator" | "workplace" | "developer" | "games" | "personality";
 
 export interface ToolEntry {
   id: string;
@@ -56,6 +56,14 @@ export const CATEGORIES: CategoryMeta[] = [
     color: "#E63946",
     emoji: "🎮",
     href: "/games",
+  },
+  {
+    key: "developer",
+    label: "Developer Tools",
+    tagline: "Private dev & sysadmin utilities — zero server overhead.",
+    color: "#3B82F6",
+    emoji: "🛠️",
+    href: "/developer-tools",
   },
   {
     key: "personality",
@@ -407,6 +415,70 @@ export const ALL_TOOLS: ToolEntry[] = [
     status: "Live",
     color: "#F4D35E",
     badge: "Ages 2–5",
+  },
+
+  // ── Developer Tools ──
+  {
+    id: "jwt-decoder",
+    name: "JWT Decoder",
+    description: "Decode JWT tokens client-side — inspect header, payload & expiration privately.",
+    category: "developer",
+    href: "/developer-tools/jwt-decoder",
+    emoji: "🔐",
+    keywords: ["jwt", "token", "decode", "inspect", "auth", "bearer", "json", "web", "token"],
+    status: "Live",
+    color: "#3B82F6",
+    badge: "Privacy-First",
+    isPopular: true,
+  },
+  {
+    id: "cron-visualizer",
+    name: "Cron Visualizer",
+    description: "Build, visualize & validate cron expressions with plain-English translations.",
+    category: "developer",
+    href: "/developer-tools/cron-visualizer",
+    emoji: "⏰",
+    keywords: ["cron", "schedule", "crontab", "visualizer", "generator", "timer", "job"],
+    status: "Live",
+    color: "#3B82F6",
+    badge: "Interactive",
+  },
+  {
+    id: "regex-tester",
+    name: "Regex Tester",
+    description: "Test regular expressions in real-time with match highlighting & capture groups.",
+    category: "developer",
+    href: "/developer-tools/regex-tester",
+    emoji: "🔍",
+    keywords: ["regex", "regular", "expression", "test", "pattern", "match", "capture", "group"],
+    status: "Live",
+    color: "#3B82F6",
+    badge: "Cheat Sheet",
+    isPopular: true,
+  },
+  {
+    id: "diff-comparator",
+    name: "Diff Comparator",
+    description: "Compare two texts side-by-side with line-level and character-level diff highlights.",
+    category: "developer",
+    href: "/developer-tools/diff-comparator",
+    emoji: "📝",
+    keywords: ["diff", "compare", "text", "difference", "merge", "side", "unified"],
+    status: "Live",
+    color: "#3B82F6",
+    badge: "Split + Unified",
+  },
+  {
+    id: "hash-base64",
+    name: "Hash & Base64 Studio",
+    description: "Generate SHA-256/512 hashes, Base64 encode/decode, URL encode & UUID v4 — all private.",
+    category: "developer",
+    href: "/developer-tools/hash-base64",
+    emoji: "🔒",
+    keywords: ["hash", "sha", "md5", "base64", "encode", "decode", "uuid", "hex", "url", "crypto"],
+    status: "Live",
+    color: "#3B82F6",
+    badge: "Web Crypto",
   },
 
   // ── Personality Tests ──

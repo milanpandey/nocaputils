@@ -4134,3 +4134,245 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.18em;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DEVELOPER TOOL STYLES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared Inputs ── */
+.dev-tool-textarea {
+  width: 100%;
+  border: 3px solid var(--border-main);
+  background: var(--bg-page);
+  color: var(--text-main);
+  padding: 0.75rem 1rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: box-shadow 150ms ease;
+}
+
+.dev-tool-textarea:focus {
+  box-shadow: 4px 4px 0 0 var(--border-main);
+}
+
+.dev-tool-input {
+  width: 100%;
+  border: 3px solid var(--border-main);
+  background: var(--bg-page);
+  color: var(--text-main);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: box-shadow 150ms ease;
+}
+
+.dev-tool-input:focus {
+  box-shadow: 3px 3px 0 0 var(--border-main);
+}
+
+/* ── JSON Display (JWT) ── */
+.dev-tool-json {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+
+.dev-tool-json-row {
+  padding-left: 1.5rem;
+}
+
+.dev-tool-key {
+  color: #E63946;
+  font-weight: 700;
+}
+
+.dev-tool-string {
+  color: #2A9D8F;
+}
+
+.dev-tool-number {
+  color: #457B9D;
+  font-weight: 700;
+}
+
+.dev-tool-bool {
+  color: #9C27B0;
+  font-weight: 700;
+}
+
+.dev-tool-null {
+  color: #999;
+  font-style: italic;
+}
+
+.dev-tool-ts {
+  color: var(--text-soft);
+  font-size: 0.75rem;
+}
+
+.dev-tool-countdown {
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.dev-tool-signature {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--text-soft);
+}
+
+/* ── Regex Match Highlighting ── */
+.dev-tool-match-highlight {
+  background: rgba(59, 130, 246, 0.25);
+  border-bottom: 2px solid #3B82F6;
+  color: inherit;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.dev-tool-result-box {
+  border: 3px solid var(--border-main);
+  background: var(--bg-page);
+  padding: 1rem;
+}
+
+.dev-tool-cheatsheet-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  border: 2px solid var(--border-main);
+  background: var(--bg-panel-muted);
+  padding: 2px 6px;
+  font-weight: 700;
+  min-width: 6rem;
+  text-align: center;
+}
+
+/* ── Tables (Regex, Diff) ── */
+.dev-tool-table {
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.dev-tool-table th {
+  text-align: left;
+  font-size: 0.625rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 3px solid var(--border-main);
+  background: var(--bg-panel-muted);
+}
+
+.dev-tool-table td {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--bg-panel-muted);
+}
+
+.dev-tool-table tr:nth-child(even) {
+  background: rgba(59, 130, 246, 0.03);
+}
+
+/* ── Diff Styles ── */
+.dev-tool-diff-table {
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  table-layout: fixed;
+}
+
+.dev-tool-diff-linenum {
+  width: 2.5rem;
+  text-align: right;
+  padding: 2px 6px;
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--text-soft);
+  background: var(--bg-panel-muted);
+  user-select: none;
+  border-right: 2px solid var(--border-main);
+  vertical-align: top;
+}
+
+.dev-tool-diff-cell {
+  padding: 2px 8px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  vertical-align: top;
+}
+
+.dev-tool-diff-added {
+  background: rgba(84, 216, 141, 0.15);
+}
+
+.dev-tool-diff-removed {
+  background: rgba(230, 57, 70, 0.12);
+}
+
+.dev-tool-diff-empty {
+  background: var(--bg-panel-muted);
+  opacity: 0.4;
+}
+
+.dev-tool-diff-char-add {
+  background: rgba(84, 216, 141, 0.4);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.dev-tool-diff-char-del {
+  background: rgba(230, 57, 70, 0.3);
+  border-radius: 2px;
+  padding: 0 1px;
+  text-decoration: line-through;
+  text-decoration-color: rgba(230, 57, 70, 0.6);
+}
+
+/* Unified diff */
+.dev-tool-diff-unified-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--bg-panel-muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+
+.dev-tool-diff-linenum-unified {
+  width: 2.5rem;
+  flex-shrink: 0;
+  text-align: right;
+  padding: 2px 6px;
+  font-size: 0.6875rem;
+  color: var(--text-soft);
+  background: var(--bg-panel-muted);
+  user-select: none;
+  border-right: 2px solid var(--border-main);
+}
+
+.dev-tool-diff-symbol {
+  width: 1.5rem;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 2px 0;
+  font-weight: 900;
+  user-select: none;
+}
+
+.dev-tool-diff-added .dev-tool-diff-symbol {
+  color: #54d88d;
+}
+
+.dev-tool-diff-removed .dev-tool-diff-symbol {
+  color: #E63946;
+}
+
+.dev-tool-diff-unified-text {
+  flex: 1;
+  padding: 2px 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
