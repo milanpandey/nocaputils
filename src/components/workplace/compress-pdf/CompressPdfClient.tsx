@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -131,6 +132,67 @@ export default function CompressPdfClient() {
       setIsProcessing(false);
     }
   }, [file, compressionLevel]);
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "load_pdf_by_base64",
+      description: "Load a PDF directly using a base64-encoded string, without needing the native file picker dialog.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          filename: { type: "string", description: "Name of the PDF file ending in .pdf" },
+          base64_data: { type: "string", description: "Base64-encoded PDF binary data" },
+        },
+        required: ["base64_data"],
+      },
+      execute: async (args: Record<string, unknown>) => {
+        try {
+          const filename = String(args.filename || "document.pdf");
+          const base64Data = String(args.base64_data || "");
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Uint8Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const blob = new Blob([byteNumbers], { type: "application/pdf" });
+          const pdfFile = new File([blob], filename.endsWith(".pdf") ? filename : `${filename}.pdf`, { type: "application/pdf" });
+          await handleFileSelect(pdfFile);
+          return `Loaded PDF "${pdfFile.name}" (${formatFileSize(pdfFile.size)}) directly into compressor.`;
+        } catch {
+          return "Error: Invalid base64 PDF data.";
+        }
+      },
+    },
+    {
+      name: "set_compression_level",
+      description: "Set the PDF compression level. Higher values produce smaller files but lower quality.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          level: { type: "string", description: "Compression level from 0 (minimal compression) to 100 (maximum compression). Default is 50." },
+        },
+        required: ["level"],
+      },
+      execute: (args: Record<string, unknown>) => {
+        const level = Number(args.level);
+        if (isNaN(level) || level < 0 || level > 100) return "Error: Level must be a number between 0 and 100.";
+        setCompressionLevel(level);
+        return `Compression level set to ${level}%.`;
+      },
+    },
+    {
+      name: "compress_pdf",
+      description: `Compress the currently loaded PDF file${file ? ` ("${file.name}", ${pageCount ?? "?"} pages)` : ""}. A PDF can be loaded via load_pdf_by_base64 or user upload.`,
+      inputSchema: { type: "object" as const },
+      execute: async () => {
+        if (!file) return "Error: No PDF file loaded. Load a PDF first via load_pdf_by_base64 or user upload.";
+        if (isProcessing) return "Error: Compression already in progress.";
+        await compressPdf();
+        return `PDF compressed successfully.`;
+      },
+    },
+  ], [file, pageCount, isProcessing, compressPdf]));
 
   return (
     <div className="subtle-pattern min-h-screen">

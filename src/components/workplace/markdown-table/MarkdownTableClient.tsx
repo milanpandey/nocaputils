@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -204,6 +205,101 @@ export default function MarkdownTableClient() {
     reader.readAsText(f);
     e.target.value = "";
   }, []);
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "populate_table",
+      description: "Populate the Markdown table with custom column headers and row data.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          headers: {
+            type: "string",
+            description: "JSON array of column header names (e.g. '[\"Product\", \"Price\", \"Stock\"]').",
+          },
+          rows: {
+            type: "string",
+            description: "JSON 2D array of rows (e.g. '[[\"Widget A\", \"$10\", \"In Stock\"], [\"Widget B\", \"$15\", \"Out of Stock\"]]').",
+          },
+          alignments: {
+            type: "string",
+            description: "Optional JSON array of alignments for each column: 'left', 'center', or 'right' (e.g. '[\"left\", \"right\", \"center\"]').",
+          },
+        },
+        required: ["headers", "rows"],
+      },
+      execute: (args: Record<string, unknown>) => {
+        try {
+          const rawHeaders = typeof args.headers === "string" ? JSON.parse(args.headers) : args.headers;
+          const rawRows = typeof args.rows === "string" ? JSON.parse(args.rows) : args.rows;
+          const rawAlign = args.alignments ? (typeof args.alignments === "string" ? JSON.parse(args.alignments) : args.alignments) : [];
+
+          if (!Array.isArray(rawHeaders) || !Array.isArray(rawRows)) {
+            return "Error: headers and rows must be arrays.";
+          }
+
+          const newCols: Column[] = rawHeaders.map((h: unknown, i: number) => {
+            const alignCandidate = rawAlign[i];
+            const align: Alignment = alignCandidate === "center" || alignCandidate === "right" ? alignCandidate : "left";
+            return { id: makeId(), header: String(h), align };
+          });
+
+          const newRows: Row[] = rawRows.map((r: unknown) => {
+            const rowArr = Array.isArray(r) ? r : [];
+            const cells: Record<string, string> = {};
+            newCols.forEach((col, i) => {
+              cells[col.id] = rowArr[i] !== undefined ? String(rowArr[i]) : "";
+            });
+            return { id: makeId(), cells };
+          });
+
+          setCols(newCols);
+          setRows(newRows.length > 0 ? newRows : [{ id: makeId(), cells: Object.fromEntries(newCols.map((c) => [c.id, ""])) }]);
+          return `Populated table with ${newCols.length} columns and ${newRows.length} rows.`;
+        } catch (err: unknown) {
+          return `Error parsing table data: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    },
+    {
+      name: "get_markdown_table",
+      description: "Retrieve the current GitHub-Flavored Markdown table text output.",
+      inputSchema: { type: "object" as const },
+      execute: () => {
+        return markdown || "No table content available.";
+      },
+    },
+    {
+      name: "add_table_row",
+      description: "Append a single data row to the existing table.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          cells: {
+            type: "string",
+            description: "JSON array of cell values in column order (e.g. '[\"New Item\", \"$25\", \"50\"]').",
+          },
+        },
+        required: ["cells"],
+      },
+      execute: (args: Record<string, unknown>) => {
+        try {
+          const rawCells = typeof args.cells === "string" ? JSON.parse(args.cells) : args.cells;
+          if (!Array.isArray(rawCells)) return "Error: cells must be a JSON array.";
+          const id = makeId();
+          const cellMap: Record<string, string> = {};
+          cols.forEach((c, idx) => {
+            cellMap[c.id] = rawCells[idx] !== undefined ? String(rawCells[idx]) : "";
+          });
+          setRows((prev) => [...prev, { id, cells: cellMap }]);
+          return `Added row to table (now ${rows.length + 1} rows).`;
+        } catch (err: unknown) {
+          return `Error adding row: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    },
+  ], [cols, rows, markdown]));
 
   return (
     <div className="subtle-pattern min-h-screen">

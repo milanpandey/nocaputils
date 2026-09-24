@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -226,6 +227,69 @@ export default function PdfMergeClient() {
       setIsProcessing(false);
     }
   }, [pdfItems, enableCompression, compressionPreset, totalPages]);
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "add_pdf_by_base64",
+      description: "Add a PDF directly to the merge queue using a base64-encoded string, without needing the native file picker dialog.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          filename: { type: "string", description: "Name of the PDF file ending in .pdf" },
+          base64_data: { type: "string", description: "Base64-encoded PDF binary data" },
+        },
+        required: ["base64_data"],
+      },
+      execute: async (args: Record<string, unknown>) => {
+        try {
+          const filename = String(args.filename || `document_${pdfItems.length + 1}.pdf`);
+          const base64Data = String(args.base64_data || "");
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Uint8Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const blob = new Blob([byteNumbers], { type: "application/pdf" });
+          const pdfFile = new File([blob], filename.endsWith(".pdf") ? filename : `${filename}.pdf`, { type: "application/pdf" });
+          await handleFilesUpload([pdfFile]);
+          return `Added PDF "${pdfFile.name}" (${formatFileSize(pdfFile.size)}) directly to merge queue.`;
+        } catch {
+          return "Error: Invalid base64 PDF data.";
+        }
+      },
+    },
+    {
+      name: "configure_pdf_merge",
+      description: "Enable or disable compression and set the compression preset for merging PDFs.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          compression: { type: "string", enum: ["true", "false"], description: "Enable compression (renders pages as JPEG images for smaller file size)" },
+          preset: { type: "string", enum: ["original", "balanced", "max"], description: "Compression quality: original (high quality), balanced, or max (smallest size)" },
+        },
+      },
+      execute: (args: Record<string, unknown>) => {
+        if (args.compression === "true") setEnableCompression(true);
+        else if (args.compression === "false") setEnableCompression(false);
+        if (args.preset === "original" || args.preset === "balanced" || args.preset === "max") {
+          setCompressionPreset(args.preset);
+        }
+        return `PDF merge configured: compression=${args.compression ?? enableCompression}, preset=${args.preset ?? compressionPreset}`;
+      },
+    },
+    {
+      name: "merge_pdfs",
+      description: `Merge the ${pdfItems.length} currently loaded PDF file(s) into a single document and download. PDFs can be added via add_pdf_by_base64 or user upload.`,
+      inputSchema: { type: "object" as const },
+      execute: async () => {
+        if (pdfItems.length === 0) return "Error: No PDF files loaded. Add PDF files first via add_pdf_by_base64 or user upload.";
+        if (isProcessing) return "Error: Merge already in progress.";
+        await mergePdfs();
+        return `Merged ${pdfItems.length} PDF(s) into a single document (${totalPages} total pages).`;
+      },
+    },
+  ], [pdfItems.length, totalPages, isProcessing, enableCompression, compressionPreset, mergePdfs, handleFilesUpload]));
 
   return (
     <div className="subtle-pattern min-h-screen">

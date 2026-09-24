@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import * as XLSX from "xlsx";
@@ -170,6 +171,71 @@ export default function MergeExcelClient() {
       setIsProcessing(false);
     }
   }, [excelItems, outputFormat]);
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "add_csv_content",
+      description: "Add a spreadsheet to the merge queue directly using CSV text or raw data, without needing the native file picker dialog.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          filename: {
+            type: "string",
+            description: "Name for the spreadsheet file ending in .csv (e.g. 'q1_sales.csv', 'inventory.csv')",
+          },
+          csv_text: {
+            type: "string",
+            description: "The complete comma-separated values (CSV) text with headers and rows",
+          },
+        },
+        required: ["filename", "csv_text"],
+      },
+      execute: async (args: Record<string, unknown>) => {
+        const filename = String(args.filename || "data.csv");
+        const csvText = String(args.csv_text || "");
+        const actualName = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+        const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
+        const file = new File([blob], actualName, { type: "text/csv" });
+        await handleFilesUpload([file]);
+        return `Added spreadsheet "${actualName}" (${formatFileSize(file.size)}) directly to merge queue.`;
+      },
+    },
+    {
+      name: "set_output_format",
+      description: "Set the output format for the merged Excel workbook.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          format: {
+            type: "string",
+            enum: ["xlsx", "xls", "csv"],
+            description: "Desired output format: xlsx (modern Excel), xls (legacy Excel 97-2004), or csv (first sheet only).",
+          },
+        },
+        required: ["format"],
+      },
+      execute: (args: Record<string, unknown>) => {
+        const format = args.format as "xlsx" | "xls" | "csv";
+        if (format === "xlsx" || format === "xls" || format === "csv") {
+          setOutputFormat(format);
+          return `Output format set to ${format.toUpperCase()}.`;
+        }
+        return "Error: Format must be 'xlsx', 'xls', or 'csv'.";
+      },
+    },
+    {
+      name: "merge_excel_files",
+      description: `Merge the ${excelItems.length} currently loaded Excel/CSV file(s) into a unified workbook and trigger download. Spreadsheets can be added via add_csv_content or user upload.`,
+      inputSchema: { type: "object" as const },
+      execute: async () => {
+        if (excelItems.length === 0) return "Error: No Excel/CSV files loaded. Add spreadsheets first via add_csv_content or upload.";
+        if (isProcessing) return "Error: Merge already in progress.";
+        await mergeWorkbooks();
+        return `Successfully merged ${excelItems.length} workbook(s) (${totalSheets} total sheets) into .${outputFormat} file.`;
+      },
+    },
+  ], [excelItems.length, totalSheets, outputFormat, isProcessing, mergeWorkbooks, handleFilesUpload]));
 
   return (
     <div className="subtle-pattern min-h-screen">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import JSZip from "jszip";
@@ -135,6 +136,77 @@ export default function ArchiveFilesClient() {
       setIsProcessing(false);
     }
   }, [fileItems, compressionPreset, customArchiveName, totalInputBytes]);
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "add_file_by_content",
+      description: "Add a file directly to the archive queue using raw text or base64-encoded content, without needing the native file picker dialog.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          filename: { type: "string", description: "Name of the file including extension (e.g. 'notes.txt', 'data.json', 'summary.csv')" },
+          content: { type: "string", description: "The raw text or base64-encoded string content of the file" },
+          is_base64: { type: "string", enum: ["true", "false"], description: "Set to 'true' if content is base64 encoded, 'false' if plain text. Default: 'false'." },
+        },
+        required: ["filename", "content"],
+      },
+      execute: (args: Record<string, unknown>) => {
+        const filename = String(args.filename || "file.txt");
+        const content = String(args.content || "");
+        const isBase64 = args.is_base64 === "true";
+
+        let blob: Blob;
+        if (isBase64) {
+          try {
+            const byteCharacters = atob(content);
+            const byteNumbers = new Uint8Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            blob = new Blob([byteNumbers]);
+          } catch {
+            return "Error: Invalid base64 content.";
+          }
+        } else {
+          blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        }
+
+        const file = new File([blob], filename, { type: blob.type });
+        handleFilesUpload([file]);
+        return `Added "${filename}" (${formatFileSize(file.size)}) directly to archive queue.`;
+      },
+    },
+    {
+      name: "configure_archive",
+      description: "Set the archive name and compression level for the ZIP file.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          archive_name: { type: "string", description: "Name for the output ZIP file (without .zip extension)" },
+          compression: { type: "string", enum: ["store", "standard", "maximum"], description: "Compression level: store (no compression), standard (balanced), or maximum (smallest size)" },
+        },
+      },
+      execute: (args: Record<string, unknown>) => {
+        if (typeof args.archive_name === "string") setCustomArchiveName(args.archive_name);
+        if (args.compression === "store") setCompressionPreset("STORE");
+        else if (args.compression === "standard") setCompressionPreset("DEFLATE_STD");
+        else if (args.compression === "maximum") setCompressionPreset("DEFLATE_MAX");
+        return `Archive configured: name="${args.archive_name ?? customArchiveName}", compression=${args.compression ?? compressionPreset}`;
+      },
+    },
+    {
+      name: "create_archive",
+      description: `Create and download a ZIP archive from the ${fileItems.length} currently loaded file(s). Files can be added via add_file_by_content or user upload.`,
+      inputSchema: { type: "object" as const },
+      execute: async () => {
+        if (fileItems.length === 0) return "Error: No files loaded. Add files first via add_file_by_content or user upload.";
+        if (isProcessing) return "Error: Archive creation already in progress.";
+        await createZipArchive();
+        return `ZIP archive created with ${fileItems.length} file(s).`;
+      },
+    },
+  ], [fileItems.length, isProcessing, customArchiveName, compressionPreset, createZipArchive, handleFilesUpload]));
 
   return (
     <div className="subtle-pattern min-h-screen">

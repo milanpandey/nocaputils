@@ -87,4 +87,49 @@ export const TOOL_FEEDBACK_URLS: Record<string, string> = {
     "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Shape+Builder",
   "/games/count-along":
     "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=Count+Along",
+  "/pii-shield":
+    "https://docs.google.com/forms/d/e/1FAIpQLScUlkb4NiuqIDUckpMENYNKCXGOGUSXMuH9S4G9ItvWC-3pMQ/viewform?usp=pp_url&entry.15159524=PII+Shield",
 };
+
+// ─── PII Shield Constants & Microsoft Store Campaign Tracking ────────────────
+
+export const PII_SHIELD_STORE_ID = "9NM785C34320";
+export const PII_SHIELD_CAMPAIGN_HOMEPAGE = "homepage";
+export const PII_SHIELD_CAMPAIGN_PAGE = "piishield_page";
+export const PII_SHIELD_DEFAULT_CAMPAIGN = "website";
+
+export const PII_SHIELD_STORE_WEB_BASE = `https://apps.microsoft.com/detail/${PII_SHIELD_STORE_ID}`;
+export const PII_SHIELD_STORE_PROTOCOL_BASE = `ms-windows-store://pdp/?productid=${PII_SHIELD_STORE_ID}`;
+
+/** Documentation & Legal links hosted on Firebase */
+export const PII_SHIELD_DOCS_URL = "https://okpi-5e20b.web.app/piishield/about.html";
+export const PII_SHIELD_PRIVACY_URL = "https://okpi-5e20b.web.app/piishield/privacy-policy.html";
+export const PII_SHIELD_TERMS_URL = "https://okpi-5e20b.web.app/piishield/terms-of-service.html";
+export const PII_SHIELD_EULA_URL = "https://okpi-5e20b.web.app/piishield/license.html";
+export const PII_SHIELD_THIRD_PARTY_LICENSES_URL = "https://okpi-5e20b.web.app/piishield/third-party-licenses.html";
+
+/**
+ * Generates a Microsoft Store link for PII Shield with campaign / referrer tracking.
+ *
+ * In Microsoft Partner Center (Analytics > Custom app promotion campaigns),
+ * you can register custom Campaign IDs (e.g. "homepage", "piishield_page", "website")
+ * to track downloads, impressions, and conversions.
+ *
+ * @param campaign - Custom campaign ID (default: "website")
+ * @param isProtocol - If true, returns `ms-windows-store://` protocol link for Windows PCs
+ */
+export const getPiiShieldStoreLink = (
+  campaign: string = PII_SHIELD_DEFAULT_CAMPAIGN,
+  isProtocol: boolean = false
+): string => {
+  const cleanCampaign = campaign ? encodeURIComponent(campaign) : "";
+  if (isProtocol) {
+    return cleanCampaign
+      ? `${PII_SHIELD_STORE_PROTOCOL_BASE}&cid=${cleanCampaign}`
+      : PII_SHIELD_STORE_PROTOCOL_BASE;
+  }
+  return cleanCampaign
+    ? `${PII_SHIELD_STORE_WEB_BASE}?cid=${cleanCampaign}`
+    : PII_SHIELD_STORE_WEB_BASE;
+};
+

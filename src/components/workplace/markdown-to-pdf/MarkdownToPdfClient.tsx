@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -586,6 +587,81 @@ export default function MarkdownToPdfClient() {
   };
 
   const words = source.trim() === "" ? 0 : source.trim().split(/\s+/).length;
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "set_markdown_content",
+      description: "Set or replace the Markdown source text in the editor.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          markdown: {
+            type: "string",
+            description: "The complete Markdown text content to load into the converter.",
+          },
+        },
+        required: ["markdown"],
+      },
+      execute: (args: Record<string, unknown>) => {
+        if (typeof args.markdown === "string") {
+          setSource(args.markdown);
+          const w = args.markdown.trim().split(/\s+/).length;
+          return `Loaded Markdown content (${w} words).`;
+        }
+        return "Error: markdown parameter must be a string.";
+      },
+    },
+    {
+      name: "configure_pdf_export",
+      description: "Configure paper size and document styling theme for the generated PDF.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          paper_size: {
+            type: "string",
+            enum: ["a4", "letter"],
+            description: "Paper standard: 'a4' (210x297mm) or 'letter' (8.5x11in). Default is 'a4'.",
+          },
+          theme: {
+            type: "string",
+            enum: ["minimal", "academic", "report", "nature", "dark"],
+            description: "Visual design theme: minimal (clean Georgia serif), academic (formal Times New Roman), report (Calibri + colors), nature (warm organic greens), or dark (high-contrast Catppuccin).",
+          },
+        },
+      },
+      execute: (args: Record<string, unknown>) => {
+        if (args.paper_size === "a4" || args.paper_size === "letter") {
+          setPaperSize(args.paper_size);
+        }
+        if (["minimal", "academic", "report", "nature", "dark"].includes(args.theme as string)) {
+          setTheme(args.theme as Theme);
+        }
+        return `PDF export configured: paperSize=${args.paper_size ?? paperSize}, theme=${args.theme ?? theme}`;
+      },
+    },
+    {
+      name: "export_pdf",
+      description: "Compile the current Markdown into a styled, printable PDF and trigger download.",
+      inputSchema: { type: "object" as const },
+      execute: async () => {
+        if (!source.trim()) return "Error: No Markdown content provided. Call set_markdown_content first.";
+        if (isGenerating) return "Error: PDF generation already in progress.";
+        await handleGeneratePdf();
+        return `Exported ${words} words as a styled PDF (${paperSize.toUpperCase()}, ${theme} theme).`;
+      },
+    },
+    {
+      name: "preview_pdf",
+      description: "Open or refresh the interactive in-page PDF layout preview.",
+      inputSchema: { type: "object" as const },
+      execute: async () => {
+        if (!source.trim()) return "Error: No Markdown content provided.";
+        await handlePreview();
+        return "PDF preview generated and displayed.";
+      },
+    },
+  ], [source, paperSize, theme, words, isGenerating, handlePreview, handleGeneratePdf]));
 
   return (
     <div className="subtle-pattern min-h-screen">

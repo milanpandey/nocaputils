@@ -289,6 +289,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
             changeFrequency: 'monthly',
             priority: 0.8,
         },
+        {
+            url: `${baseUrl}/pii-shield`,
+            lastModified: new Date(),
+            changeFrequency: 'weekly',
+            priority: 0.95,
+        },
     ];
 
     const blogRoutes: MetadataRoute.Sitemap = BLOG_POSTS.map(post => ({

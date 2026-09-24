@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useWebMCP } from "@/hooks/useWebMCP";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -475,6 +476,46 @@ export default function PdfToMarkdownClient() {
     markdown && markdown.trim()
       ? markdown.trim().split(/\s+/).length
       : 0;
+
+  // ── WebMCP Tool Registration ──────────────────────────────────────────────
+  useWebMCP(useMemo(() => [
+    {
+      name: "extract_markdown",
+      description: "Trigger text/OCR extraction on the currently loaded PDF file.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          method: {
+            type: "string",
+            enum: ["native", "ocr"],
+            description: "Extraction method: 'native' (fast vector/text parsing) or 'ocr' (Tesseract optical character recognition for scanned pages). Default is 'native'.",
+          },
+        },
+      },
+      execute: async (args: Record<string, unknown>) => {
+        if (!file) return "Error: No PDF file loaded. The user must upload a PDF first.";
+        if (isProcessing) return "Error: Extraction already in progress.";
+        if (args.method === "ocr") {
+          await runOcrExtraction();
+          return `Completed OCR extraction on ${pageCount || "document"} pages.`;
+        } else {
+          await processFile(file);
+          return `Completed native extraction on ${pageCount || "document"} pages.`;
+        }
+      },
+    },
+    {
+      name: "get_extracted_markdown",
+      description: "Retrieve the extracted Markdown text content from the loaded PDF.",
+      inputSchema: { type: "object" as const },
+      execute: () => {
+        if (!markdown) {
+          return "No Markdown has been extracted yet. Upload a PDF and trigger extract_markdown first.";
+        }
+        return markdown;
+      },
+    },
+  ], [file, isProcessing, pageCount, markdown, runOcrExtraction, processFile]));
 
   return (
     <div className="subtle-pattern min-h-screen">

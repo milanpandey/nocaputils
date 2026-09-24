@@ -1,5 +1,10 @@
 import ThemeToggle from "@/components/ThemeToggle";
-import { getTripTeaLink, SHOW_TRIPTEA } from "@/lib/constants";
+import {
+  getTripTeaLink,
+  SHOW_TRIPTEA,
+  getPiiShieldStoreLink,
+  PII_SHIELD_CAMPAIGN_HOMEPAGE,
+} from "@/lib/constants";
 import Footer from "@/components/Footer";
 import { POPULAR_TOOLS, CATEGORIES } from "@/lib/toolRegistry";
 import HomepageSearch from "@/components/HomepageSearch";
@@ -118,6 +123,74 @@ export default function Home() {
               </div>
             </section>
           )}
+
+          {/* ── Featured App: PII Shield ── */}
+          <section className="neo-panel mb-20 grid w-full max-w-6xl grid-cols-1 gap-8 bg-[var(--bg-panel)] p-8 lg:grid-cols-[1.15fr_0.85fr] lg:p-12">
+            <div className="flex flex-col justify-center">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="border-2 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_0_var(--border-main)]">
+                  Featured Windows App
+                </span>
+                <span className="border-2 border-[var(--border-main)] bg-[#2A9D8F] px-3 py-1 text-xs font-black uppercase tracking-wider text-white shadow-[2px_2px_0_0_var(--border-main)]">
+                  100% Offline &middot; Zero Cloud
+                </span>
+              </div>
+              <h2 className="mb-4 text-3xl font-black uppercase leading-none tracking-[-0.05em] sm:text-5xl">
+                Meet{" "}
+                <span className="inline-block border-4 border-[var(--border-main)] bg-[var(--accent)] px-3 py-1 text-black">
+                  PII Shield
+                </span>
+              </h2>
+              <p className="mb-4 max-w-xl text-xl font-extrabold uppercase leading-snug tracking-[-0.03em] text-[var(--text-main)]">
+                Permanent document redaction &amp; LLM privacy guard for your PC.
+              </p>
+              <p className="mb-8 max-w-xl text-sm leading-relaxed text-[var(--text-soft)] sm:text-base">
+                Sanitize PDFs, Word documents, Excel spreadsheets, and scanned paperwork before uploading to ChatGPT, Claude, Copilot, Gemini, or other LLMs.
+                Runs 100% locally with GLiNER Named Entity Recognition and OCR.
+              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <a
+                  href="/pii-shield?cid=homepage"
+                  className="neo-button neo-button-theme inline-flex items-center gap-2 px-6 py-3.5 text-sm font-black uppercase tracking-[0.15em] transition-colors"
+                >
+                  Explore PII Shield &rarr;
+                </a>
+                <a
+                  href={getPiiShieldStoreLink(PII_SHIELD_CAMPAIGN_HOMEPAGE, false)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="neo-button inline-flex items-center gap-2 !bg-[var(--accent)] px-5 py-3.5 text-sm font-black uppercase tracking-[0.12em] !text-black border-2 border-[var(--border-main)] shadow-[3px_3px_0_0_var(--border-main)] hover:brightness-105 transition-transform hover:-translate-y-0.5"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.902-1.799" />
+                  </svg>
+                  Get on Store
+                </a>
+                <span className="text-xs font-bold uppercase text-[var(--text-soft)]">
+                  Free Trial in Microsoft Store
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <a
+                href="/pii-shield?cid=homepage"
+                className="group relative block w-full max-w-md rotate-[2deg] border-4 border-[var(--border-main)] bg-white p-3 shadow-[8px_8px_0_0_var(--border-main)] dark:bg-gray-900 transition-transform hover:rotate-0"
+              >
+                <div className="overflow-hidden border-2 border-[var(--border-main)]">
+                  <img
+                    src="/images/pii-shield/screenshot1.png"
+                    alt="PII Shield interface"
+                    className="w-full h-auto object-cover transition-transform group-hover:scale-105 duration-300"
+                  />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-[11px] font-black uppercase text-[var(--text-main)]">
+                  <span>Native Windows Redaction</span>
+                  <span className="text-[#2A9D8F]">Tauri v2 + Local AI</span>
+                </div>
+              </a>
+            </div>
+          </section>
 
           {/* ── Popular Tools ── */}
           <section id="popular" className="mb-20 w-full max-w-6xl">

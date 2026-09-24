@@ -206,6 +206,19 @@ export const ALL_TOOLS: ToolEntry[] = [
 
   // ── Workplace Utilities ──
   {
+    id: "pii-shield",
+    name: "PII Shield",
+    description: "100% offline document redaction & LLM privacy guard for Windows.",
+    category: "workplace",
+    href: "/pii-shield",
+    emoji: "🛡️",
+    keywords: ["pii", "shield", "redact", "redaction", "anonymizer", "llm", "chatgpt", "claude", "copilot", "gemini", "offline", "privacy", "pdf", "word", "excel", "ocr", "gdpr", "hipaa", "windows"],
+    status: "Live",
+    color: "#2A9D8F",
+    badge: "Windows App",
+    isPopular: true,
+  },
+  {
     id: "pdf-page-manager",
     name: "PDF Page Manager",
     description: "Reorder, rotate, delete & split PDF pages.",
