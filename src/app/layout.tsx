@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import FeedbackButtons from "@/components/FeedbackButtons";
 
@@ -8,10 +9,51 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
 });
 
+const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
 export const metadata: Metadata = {
-  title: "nocaputils | Free Privacy-First Utility Tools",
+  metadataBase: new URL("https://nocaputils.com"),
+  title: {
+    default: "nocaputils | Free Privacy-First Utility Tools",
+    template: "%s | nocaputils",
+  },
   description:
-    "Free creator utility tools that run entirely in your browser. No uploads, zero servers, total control.",
+    "Privacy-first tools for everyone. 100% in-browser • no servers • no tracking.",
+  keywords: [
+    "privacy-first tools",
+    "free online tools",
+    "browser-based utilities",
+    "client-side video editor",
+    "pdf tools",
+    "screen recorder",
+    "developer tools",
+    "no tracking",
+    "nocaputils",
+  ],
+  openGraph: {
+    title: "nocaputils | Free Privacy-First Utility Tools",
+    description:
+      "Privacy-first tools for everyone. 100% in-browser • no servers • no tracking.",
+    url: "https://nocaputils.com",
+    siteName: "nocaputils",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1024,
+        height: 689,
+        alt: "nocaputils - Privacy-first tools for everyone. 100% in-browser • no servers • no tracking",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "nocaputils | Free Privacy-First Utility Tools",
+    description:
+      "Privacy-first tools for everyone. 100% in-browser • no servers • no tracking.",
+    images: ["/og-image.jpg"],
+  },
 };
 
 export default function RootLayout({
@@ -24,6 +66,28 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} min-h-screen bg-[var(--bg-page)] font-[family-name:var(--font-space-grotesk)] text-[var(--text-main)] antialiased selection:bg-[var(--accent)] selection:text-black`}
       >
+        {gaId && (
+          <>
+            <Script
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+            />
+            <Script
+              id="google-analytics-init"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${gaId}', {
+                    page_path: window.location.pathname,
+                  });
+                `,
+              }}
+            />
+          </>
+        )}
         {children}
         <FeedbackButtons />
       </body>
