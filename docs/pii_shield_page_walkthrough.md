@@ -30,7 +30,7 @@ Following the visual inspection in both Light and Dark modes:
 ### 3. High-Impact Sections
 - **Hero & Call to Action**:
   - High-impact headline: *"Sanitize Before You Prompt: 100% Offline PII Redaction & LLM Privacy Guard"*.
-  - App icon badge, Windows 10/11 compatibility tag, ₹224 price indicator, and Free Trial notice.
+  - App icon badge, Windows 10/11 compatibility tag, $2.49 price indicator, and Free Trial notice.
   - Direct Microsoft Store web CTA + Windows protocol link (`ms-windows-store://`).
 - **Interactive AI & LLM Safety Demo**:
   - Interactive toggle comparing **Raw Confidential Data (Unsafe)** vs. **Sanitized Prompt (Pseudonymized)**.

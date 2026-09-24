@@ -40,7 +40,7 @@ None. All assets (3 app screenshots, official icon, generated social preview pho
 ### Tool Registry & Sitemap
 
 #### [MODIFY] [toolRegistry.ts](file:///Users/milan/workspace/nocaputils/src/lib/toolRegistry.ts)
-- Register `pii-shield` under Workplace Utilities / Featured Desktop App with category badge `"Windows App"`, pricing `"₹224 (Trial Available)"`, description, keywords, and link to `/pii-shield`.
+- Register `pii-shield` under Workplace Utilities / Featured Desktop App with category badge `"Windows App"`, pricing `"$2.49 (Trial Available)"`, description, keywords, and link to `/pii-shield`.
 
 #### [MODIFY] [sitemap.ts](file:///Users/milan/workspace/nocaputils/src/app/sitemap.ts)
 - Add `${baseUrl}/pii-shield` with `priority: 0.9` and `changeFrequency: 'weekly'`.
@@ -58,7 +58,7 @@ Interactive Neo-Brutalist product page matching the NoCapUtils design system:
 1. **Hero Section**:
    - High-impact headline: *"Sanitize Before You Prompt: 100% Offline PII Redaction & LLM Privacy Guard"*.
    - App badge, Windows 10/11 compatibility tag, version 1.0.0, zero-cloud badge.
-   - Primary Call-to-Action: Neo-brutalist "Get on Microsoft Store" button with official Windows Store badge icon, price tag (`₹224 / One-time`), and free trial mention.
+   - Primary Call-to-Action: Neo-brutalist "Get on Microsoft Store" button with official Windows Store badge icon, price tag (`$2.49 / One-time`), and free trial mention.
    - Secondary button: View Live Demo / Explore Features.
 2. **Social Proof & Compliance Persona**:
    - Featuring the professional compliance officer image in a dedicated showcase card: *"Built for Enterprise Privacy, Legal Counsel & AI Engineers"*.

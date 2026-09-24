@@ -49,8 +49,10 @@ export const metadata: Metadata = {
     images: [
       {
         url: "https://nocaputils.com/images/pii-shield/social-preview.jpg",
-        width: 1200,
-        height: 675,
+        secureUrl: "https://nocaputils.com/images/pii-shield/social-preview.jpg",
+        width: 1024,
+        height: 571,
+        type: "image/jpeg",
         alt: "PII Shield — 100% Offline Document Redaction & LLM Privacy Guard",
       },
     ],
@@ -62,7 +64,12 @@ export const metadata: Metadata = {
     title: "PII Shield — 100% Offline Document Redaction & Safe LLM Workflows",
     description:
       "Sanitize PDFs, Word, Excel & Images 100% offline before prompting ChatGPT, Claude, Copilot, Gemini & other LLMs. Zero cloud uploads, zero data leakage.",
-    images: ["https://nocaputils.com/images/pii-shield/social-preview.jpg"],
+    images: [
+      {
+        url: "https://nocaputils.com/images/pii-shield/social-preview.jpg",
+        alt: "PII Shield — 100% Offline Document Redaction & LLM Privacy Guard",
+      },
+    ],
   },
   alternates: {
     canonical: "https://nocaputils.com/pii-shield",
@@ -124,8 +131,8 @@ export default function PiiShieldPage() {
         applicationSubCategory: "Document Redaction & Data Privacy",
         offers: {
           "@type": "Offer",
-          price: 224,
-          priceCurrency: "INR",
+          price: 2.49,
+          priceCurrency: "USD",
           availability: "https://schema.org/InStock",
           description: "Lifetime purchase with free evaluation trial in Microsoft Store",
         },
@@ -202,7 +209,7 @@ export default function PiiShieldPage() {
             name: "How does licensing and the Microsoft Store purchase work?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "PII Shield is distributed securely via the Microsoft Store. It is an affordable one-time purchase of ₹224 (no recurring monthly subscriptions). A free trial is also available directly in the Microsoft Store so you can evaluate it on your Windows PC before purchasing.",
+              text: "PII Shield is distributed securely via the Microsoft Store. It is an affordable one-time purchase of $2.49 (no recurring monthly subscriptions). A free trial is also available directly in the Microsoft Store so you can evaluate it on your Windows PC before purchasing.",
             },
           },
           {

@@ -98,7 +98,7 @@ export default function PiiShieldClient() {
     },
     {
       q: "How does licensing and the Microsoft Store purchase work?",
-      a: "PII Shield is distributed securely via the Microsoft Store. It is an affordable one-time purchase of ₹224 (no recurring monthly subscriptions). A free trial is also available directly in the Microsoft Store so you can evaluate it on your Windows PC before purchasing.",
+      a: "PII Shield is distributed securely via the Microsoft Store. It is an affordable one-time purchase of $2.49 (no recurring monthly subscriptions). A free trial is also available directly in the Microsoft Store so you can evaluate it on your Windows PC before purchasing.",
     },
     {
       q: "Is PII Shield available for macOS or Linux?",
@@ -233,7 +233,7 @@ export default function PiiShieldClient() {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs font-bold uppercase tracking-wider text-[var(--text-soft)]">
-              <span>&#x20B9; 224 Lifetime Purchase</span>
+              <span>$2.49 Lifetime Purchase</span>
               <span>&bull;</span>
               <span>Free Trial Available</span>
               <span>&bull;</span>
@@ -700,7 +700,7 @@ export default function PiiShieldClient() {
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-bold text-[var(--text-main)]">Pricing Model</td>
-                    <td className="py-3 px-4 font-bold text-emerald-700 dark:text-emerald-400">&#x20B9; 224 One-Time Purchase</td>
+                    <td className="py-3 px-4 font-bold text-emerald-700 dark:text-emerald-400">$2.49 One-Time Purchase</td>
                     <td className="py-3 px-4 text-[var(--text-soft)]">$20 - $50 / month subscription</td>
                   </tr>
                   <tr>
@@ -870,7 +870,7 @@ export default function PiiShieldClient() {
               </div>
 
               <div className="mt-4 text-xs font-black uppercase tracking-wider text-black/80">
-                Only &#x20B9; 224 &middot; One-time purchase &middot; Free Trial Available
+                Only $2.49 &middot; One-time purchase &middot; Free Trial Available
               </div>
             </div>
           </section>
