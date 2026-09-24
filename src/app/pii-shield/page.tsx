@@ -48,8 +48,8 @@ export const metadata: Metadata = {
     siteName: "nocaputils",
     images: [
       {
-        url: "https://nocaputils.com/images/pii-shield/social-preview.jpg",
-        secureUrl: "https://nocaputils.com/images/pii-shield/social-preview.jpg",
+        url: "https://nocaputils.com/images/pii-shield/social-preview-v2.jpg",
+        secureUrl: "https://nocaputils.com/images/pii-shield/social-preview-v2.jpg",
         width: 1024,
         height: 571,
         type: "image/jpeg",
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
       "Sanitize PDFs, Word, Excel & Images 100% offline before prompting ChatGPT, Claude, Copilot, Gemini & other LLMs. Zero cloud uploads, zero data leakage.",
     images: [
       {
-        url: "https://nocaputils.com/images/pii-shield/social-preview.jpg",
+        url: "https://nocaputils.com/images/pii-shield/social-preview-v2.jpg",
         alt: "PII Shield — 100% Offline Document Redaction & LLM Privacy Guard",
       },
     ],

@@ -428,7 +428,7 @@ export default function PiiShieldClient() {
             <div className="neo-panel overflow-hidden border-4 border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[6px_6px_0_0_var(--border-main)]">
               <div className="relative aspect-[16/9] w-full border-b-4 border-[var(--border-main)] bg-gray-900">
                 <Image
-                  src="/images/pii-shield/social-preview.jpg"
+                  src="/images/pii-shield/social-preview-v2.jpg"
                   alt="Enterprise Compliance Professional using PII Shield"
                   width={640}
                   height={360}
