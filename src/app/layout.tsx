@@ -54,6 +54,9 @@ export const metadata: Metadata = {
       "Privacy-first tools for everyone. 100% in-browser • no servers • no tracking.",
     images: ["/og-image.jpg"],
   },
+  other: {
+    "cuelinks-verification": "VERIFY-CL-ULRJTTVX",
+  },
 };
 
 export default function RootLayout({
