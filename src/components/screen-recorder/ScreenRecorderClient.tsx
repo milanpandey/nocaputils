@@ -11,20 +11,21 @@ export default function ScreenRecorderClient() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [systemAudioWarning, setSystemAudioWarning] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   // Options
-  const [includeWebcam, setIncludeWebcam] = useState(false);
+  const [includeSystemAudio, setIncludeSystemAudio] = useState(true);
   const [includeMic, setIncludeMic] = useState(true);
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const screenStreamRef = useRef<MediaStream | null>(null);
-  const webcamStreamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
-  const webcamVideoRef = useRef<HTMLVideoElement>(null);
   const livePreviewRef = useRef<HTMLVideoElement>(null);
   const pipWindowRef = useRef<Window | null>(null);
   const pipTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,9 +73,13 @@ export default function ScreenRecorderClient() {
 
   const stopAllStreams = () => {
     screenStreamRef.current?.getTracks().forEach(t => t.stop());
-    webcamStreamRef.current?.getTracks().forEach(t => t.stop());
+    micStreamRef.current?.getTracks().forEach(t => t.stop());
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
     screenStreamRef.current = null;
-    webcamStreamRef.current = null;
+    micStreamRef.current = null;
     closePipWindow();
   };
 
@@ -278,6 +283,7 @@ export default function ScreenRecorderClient() {
 
   const startRecording = useCallback(async () => {
     setError(null);
+    setSystemAudioWarning(null);
     setRecordedBlob(null);
     if (recordedUrl) {
       URL.revokeObjectURL(recordedUrl);
@@ -285,57 +291,90 @@ export default function ScreenRecorderClient() {
     }
 
     try {
-      // Request screen capture
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      // Request screen capture (with system/tab audio if enabled)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const displayMediaOptions: any = {
         video: { frameRate: 30 },
-        audio: true, // system audio if available
-      });
+        audio: includeSystemAudio
+          ? {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            }
+          : false,
+        systemAudio: includeSystemAudio ? "include" : "exclude",
+      };
+
+      const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
       screenStreamRef.current = screenStream;
 
-      // Combined tracks
+      // Combined tracks (start with screen video track)
       const combinedTracks: MediaStreamTrack[] = [...screenStream.getVideoTracks()];
-
-      // Optional webcam
-      if (includeWebcam) {
-        try {
-          const webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
-          webcamStreamRef.current = webcamStream;
-          if (webcamVideoRef.current) {
-            webcamVideoRef.current.srcObject = webcamStream;
-            webcamVideoRef.current.play().catch(() => {});
-          }
-        } catch {
-          console.warn("Webcam not available, continuing without it.");
-        }
-      }
 
       // Optional microphone
       if (includeMic) {
         try {
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          micStream.getAudioTracks().forEach(t => combinedTracks.push(t));
+          const micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          });
+          micStreamRef.current = micStream;
         } catch {
           console.warn("Microphone not available, continuing without it.");
         }
       }
 
-      // Add system audio tracks from screen capture
-      screenStream.getAudioTracks().forEach(t => combinedTracks.push(t));
+      const sysAudioTracks = includeSystemAudio ? screenStream.getAudioTracks() : [];
+      const micAudioTracks = includeMic && micStreamRef.current ? micStreamRef.current.getAudioTracks() : [];
 
-      const combinedStream = new MediaStream(combinedTracks);
-
-      // Show live preview
-      if (livePreviewRef.current) {
-        livePreviewRef.current.srcObject = combinedStream;
-        livePreviewRef.current.play().catch(() => {});
+      if (includeSystemAudio && sysAudioTracks.length === 0) {
+        setSystemAudioWarning(
+          "System audio was not shared by the browser. To record video/system audio (e.g. YouTube), select a Browser Tab or Entire Screen and keep 'Also share audio' enabled in the browser prompt."
+        );
       }
 
+      // Mix audio tracks: MediaRecorder only records a single audio track reliably,
+      // so when both system audio and microphone audio are present we mix them via Web Audio API.
+      if (sysAudioTracks.length > 0 && micAudioTracks.length > 0) {
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const audioCtx = new AudioContextClass();
+        audioCtxRef.current = audioCtx;
+        if (audioCtx.state === "suspended") {
+          await audioCtx.resume();
+        }
+
+        const destination = audioCtx.createMediaStreamDestination();
+
+        const sysSource = audioCtx.createMediaStreamSource(new MediaStream(sysAudioTracks));
+        sysSource.connect(destination);
+
+        const micSource = audioCtx.createMediaStreamSource(new MediaStream(micAudioTracks));
+        micSource.connect(destination);
+
+        destination.stream.getAudioTracks().forEach(t => combinedTracks.push(t));
+      } else if (sysAudioTracks.length > 0) {
+        sysAudioTracks.forEach(t => combinedTracks.push(t));
+      } else if (micAudioTracks.length > 0) {
+        micAudioTracks.forEach(t => combinedTracks.push(t));
+      }
+
+      const combinedStream = new MediaStream(combinedTracks);
+      const hasAudio = combinedTracks.some(t => t.kind === "audio");
+
       // Determine best codec
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-          ? "video/webm;codecs=vp8,opus"
-          : "video/webm";
+      const mimeType = hasAudio
+        ? MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+          ? "video/webm;codecs=vp9,opus"
+          : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+            ? "video/webm;codecs=vp8,opus"
+            : "video/webm"
+        : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+          ? "video/webm;codecs=vp9"
+          : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+            ? "video/webm;codecs=vp8"
+            : "video/webm";
 
       const recorder = new MediaRecorder(combinedStream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -390,7 +429,17 @@ export default function ScreenRecorderClient() {
       }
       stopAllStreams();
     }
-  }, [includeWebcam, includeMic, recordedUrl]);
+  }, [includeSystemAudio, includeMic, recordedUrl, openPipControls]);
+
+  // Attach screen stream to live preview video element once mounted
+  useEffect(() => {
+    if ((recordingState === "recording" || recordingState === "paused") && livePreviewRef.current && screenStreamRef.current) {
+      if (livePreviewRef.current.srcObject !== screenStreamRef.current) {
+        livePreviewRef.current.srcObject = screenStreamRef.current;
+        livePreviewRef.current.play().catch(() => {});
+      }
+    }
+  }, [recordingState]);
 
   const pauseRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
@@ -442,6 +491,7 @@ export default function ScreenRecorderClient() {
     setRecordedBlob(null);
     setRecordedUrl(null);
     setError(null);
+    setSystemAudioWarning(null);
     setElapsed(0);
   };
 
@@ -467,7 +517,7 @@ export default function ScreenRecorderClient() {
               Screen Recorder
             </h1>
             <p className="text-lg font-bold text-[var(--text-soft)]">
-              Record your screen, application window, or browser tab with optional webcam overlay and microphone.
+              Record your screen, application window, or browser tab with optional microphone audio.
               100% private, zero server uploads, no watermarks, no time limits.
             </p>
 
@@ -488,17 +538,17 @@ export default function ScreenRecorderClient() {
                 <h3 className="text-sm font-black uppercase text-[var(--text-main)] tracking-wider mb-4">
                   Recording Options
                 </h3>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <label htmlFor="include-webcam" className="flex items-center gap-3 cursor-pointer">
+                <div className="flex flex-col sm:flex-row gap-6">
+                  <label htmlFor="include-system-audio" className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
-                      id="include-webcam"
-                      checked={includeWebcam}
-                      onChange={(e) => setIncludeWebcam(e.target.checked)}
+                      id="include-system-audio"
+                      checked={includeSystemAudio}
+                      onChange={(e) => setIncludeSystemAudio(e.target.checked)}
                       className="w-5 h-5 accent-[#6A4C93] border-2 border-black"
                     />
                     <span className="text-sm font-black uppercase text-[var(--text-main)]">
-                      🎥 Include Webcam Overlay
+                      🔊 Capture System Audio
                     </span>
                   </label>
 
@@ -511,10 +561,15 @@ export default function ScreenRecorderClient() {
                       className="w-5 h-5 accent-[#6A4C93] border-2 border-black"
                     />
                     <span className="text-sm font-black uppercase text-[var(--text-main)]">
-                      🎙️ Include Microphone Audio
+                      🎙️ Capture Microphone Audio
                     </span>
                   </label>
                 </div>
+                {includeSystemAudio && (
+                  <p className="text-xs font-bold text-[var(--text-soft)] mt-3">
+                    💡 Tip: To capture audio from videos (like YouTube), choose a <strong>Browser Tab</strong> or <strong>Entire Screen</strong> and keep <strong>&quot;Also share audio&quot;</strong> enabled in the browser prompt.
+                  </p>
+                )}
               </div>
             )}
 
@@ -553,6 +608,13 @@ export default function ScreenRecorderClient() {
                     </span>
                   </div>
 
+                  {/* System audio warning if user didn't share audio in browser dialog */}
+                  {systemAudioWarning && (
+                    <div className="w-full max-w-2xl border-4 border-black bg-[#F77F00] text-white p-3 font-bold text-xs" role="status">
+                      ⚠️ {systemAudioWarning}
+                    </div>
+                  )}
+
                   {/* Live preview */}
                   <div className="relative w-full max-w-2xl border-4 border-black bg-black overflow-hidden">
                     <video
@@ -562,17 +624,6 @@ export default function ScreenRecorderClient() {
                       className="w-full"
                       style={{ maxHeight: "360px", objectFit: "contain" }}
                     />
-                    {/* Webcam PiP overlay */}
-                    {includeWebcam && (
-                      <div className="absolute bottom-3 right-3 w-32 h-24 border-3 border-white overflow-hidden rounded-sm shadow-lg">
-                        <video
-                          ref={webcamVideoRef}
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
                   </div>
 
                   {/* Control Buttons */}
@@ -669,8 +720,8 @@ export default function ScreenRecorderClient() {
                   in browser memory until you choose to download it.
                 </p>
                 <p>
-                  Enable the webcam overlay to add a picture-in-picture camera feed, perfect for
-                  tutorials, demos, and walkthroughs.
+                  Include microphone audio to narrate tutorials, demos, and walkthroughs while
+                  capturing your screen or application window.
                 </p>
               </div>
             </div>

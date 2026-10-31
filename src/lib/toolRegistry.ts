@@ -193,11 +193,11 @@ export const ALL_TOOLS: ToolEntry[] = [
   {
     id: "screen-recorder",
     name: "Screen Recorder",
-    description: "Record screen, webcam & mic in-browser.",
+    description: "Record screen & mic in-browser.",
     category: "creator",
     href: "/screen-recorder",
     emoji: "🖥️",
-    keywords: ["screen", "recorder", "capture", "webcam", "microphone", "video", "record"],
+    keywords: ["screen", "recorder", "capture", "microphone", "video", "record"],
     status: "Live",
     color: "#6A4C93",
     artClass: "tool-art-recorder",
