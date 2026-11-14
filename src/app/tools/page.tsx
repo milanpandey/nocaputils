@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import {
@@ -36,12 +36,12 @@ function ToolsPageContent() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a
+          <Link
             href="/"
             className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all"
           >
             ← Home
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -109,15 +109,8 @@ function ToolsPageContent() {
                 {filtered.map((tool) => {
                   const catMeta = CATEGORIES.find((c) => c.key === tool.category);
                   const isAvailable = tool.status === "Live";
-                  const Tag = isAvailable ? "a" : "div";
-
-                  return (
-                    <Tag
-                      key={tool.id}
-                      {...(isAvailable ? { href: tool.href } : {})}
-                      className={`compact-card ${!isAvailable ? "opacity-60 cursor-not-allowed" : ""}`}
-                      id={`tool-${tool.id}`}
-                    >
+                  const cardBody = (
+                    <>
                       <div className="compact-card-emoji">{tool.emoji}</div>
                       <div className="compact-card-body">
                         <div className="compact-card-header">
@@ -131,7 +124,30 @@ function ToolsPageContent() {
                         </div>
                         <p className="compact-card-desc">{tool.description}</p>
                       </div>
-                    </Tag>
+                    </>
+                  );
+
+                  if (isAvailable) {
+                    return (
+                      <Link
+                        key={tool.id}
+                        href={tool.href}
+                        className="compact-card"
+                        id={`tool-${tool.id}`}
+                      >
+                        {cardBody}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={tool.id}
+                      className="compact-card opacity-60 cursor-not-allowed"
+                      id={`tool-${tool.id}`}
+                    >
+                      {cardBody}
+                    </div>
                   );
                 })}
               </div>

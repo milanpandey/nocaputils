@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import { parseReceiptFile, evaluateQAFlags, type ReceiptItem } from "@/lib/workplace/receiptParser";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
 import { CURRENCY_MAP, TOP_CURRENCY_CODES } from "@/lib/workplace/currencyMap";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
@@ -25,6 +27,7 @@ export default function FileBillsClient() {
   const [previewItem, setPreviewItem] = useState<ReceiptItem | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { createUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFilesUpload = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(f => f.type.startsWith("image/"));
@@ -45,12 +48,25 @@ export default function FileBillsClient() {
     setStatusMsg(`Scanning & enhancing ${filesToProcess.length} receipt image(s)...`);
 
     try {
+      const { createWorker } = await import("tesseract.js");
+      const ocrWorker = await createWorker("eng").catch(() => null);
       const newItems: ReceiptItem[] = [];
-      for (let i = 0; i < filesToProcess.length; i++) {
-        const itemNo = receipts.length + i + 1;
-        setStatusMsg(`Analyzing receipt ${i + 1} of ${filesToProcess.length}...`);
-        const item = await parseReceiptFile(filesToProcess[i], itemNo);
-        newItems.push(item);
+
+      try {
+        for (let i = 0; i < filesToProcess.length; i++) {
+          const itemNo = receipts.length + i + 1;
+          setStatusMsg(`Analyzing receipt ${i + 1} of ${filesToProcess.length}...`);
+          const parsed = await parseReceiptFile(filesToProcess[i], itemNo, ocrWorker ?? undefined);
+          const previewUrl = createUrl(
+            `receipt-${parsed.id}`,
+            new Blob([new Uint8Array(parsed.enhancedBytes)], { type: "image/jpeg" })
+          );
+          newItems.push({ ...parsed, previewUrl });
+        }
+      } finally {
+        if (ocrWorker) {
+          await ocrWorker.terminate();
+        }
       }
 
       setReceipts(prev => {
@@ -97,7 +113,7 @@ export default function FileBillsClient() {
     } finally {
       setIsProcessing(false);
     }
-  }, [receipts]);
+  }, [receipts.length, createUrl]);
 
   // Live Re-evaluation of Policy QA Flags on User Edits
   const updateReceipt = <K extends keyof ReceiptItem>(id: string, field: K, value: ReceiptItem[K]) => {
@@ -119,6 +135,7 @@ export default function FileBillsClient() {
 
   const removeReceipt = (id: string) => {
     setHasUserEdited(true);
+    revokeUrl(`receipt-${id}`);
     setReceipts(prev =>
       prev.filter(r => r.id !== id).map((item, idx) => ({ ...item, itemNo: idx + 1 }))
     );
@@ -230,14 +247,14 @@ export default function FileBillsClient() {
         doc.setTextColor(0, 0, 0);
       }
 
-      const imgProps = doc.getImageProperties(r.enhancedDataUrl);
+      const imgProps = doc.getImageProperties(r.enhancedBytes);
       const pdfWidth = pageWidth - 28;
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       const maxHeight = 235;
       const finalHeight = Math.min(pdfHeight, maxHeight);
       const finalWidth = (imgProps.width * finalHeight) / imgProps.height;
 
-      doc.addImage(r.enhancedDataUrl, "JPEG", (pageWidth - finalWidth) / 2, 34, finalWidth, finalHeight);
+      doc.addImage(r.enhancedBytes, "JPEG", (pageWidth - finalWidth) / 2, 34, finalWidth, finalHeight);
     });
 
     doc.save(`Expense_Bills_Ledger_${startDate}_to_${endDate}.pdf`);
@@ -289,9 +306,9 @@ export default function FileBillsClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link">
+          <Link href="/workplaceutilities" className="bauhaus-back-link">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -339,7 +356,10 @@ export default function FileBillsClient() {
 
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files) handleFilesUpload(e.dataTransfer.files);
+              }}
               onClick={() => fileInputRef.current?.click()}
               className="border-4 border-dashed border-[var(--border-main)] bg-[var(--bg-page)] p-8 text-center cursor-pointer hover:bg-[var(--bg-panel-muted)] transition-colors flex flex-col items-center"
             >
@@ -348,7 +368,9 @@ export default function FileBillsClient() {
                 ref={fileInputRef}
                 multiple
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
+                onChange={(e) => {
+                  if (e.target.files) handleFilesUpload(e.target.files);
+                }}
                 className="hidden"
               />
               <span className="text-5xl mb-3">🧾</span>
@@ -457,7 +479,7 @@ export default function FileBillsClient() {
                           title="Click to preview scan"
                         >
                           <img
-                            src={r.enhancedDataUrl}
+                            src={r.previewUrl}
                             alt={r.billName}
                             className="w-full h-full object-contain"
                           />
@@ -597,7 +619,7 @@ export default function FileBillsClient() {
 
                 <div className="flex justify-center border-4 border-black bg-black p-4 max-h-[65vh] overflow-auto">
                   <img
-                    src={previewItem.enhancedDataUrl}
+                    src={previewItem.previewUrl}
                     alt={previewItem.billName}
                     className="max-w-full object-contain"
                   />

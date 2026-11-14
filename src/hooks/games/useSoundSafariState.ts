@@ -55,18 +55,23 @@ export function useSoundSafariState({ speak, soundEnabled }: UseSoundSafariState
   const [streak, setStreak] = useState(0);
   const [totalCorrect, setTotalCorrect] = useState(0);
   const [attempts, setAttempts] = useState(0);
-  const [highScore, setHighScore] = useState<HighScore>({ streak: 0, total: 0 });
+  const [highScore, setHighScore] = useState<HighScore>(loadHighScore);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const innerTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const recentTargetsRef = useRef<string[]>([]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHighScore(loadHighScore());
-  }, []);
+  const shuffleArray = <T,>(items: T[]): T[] => {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
 
   const speakIfEnabled = useCallback(
     (text: string, profile?: SpeechProfile) => {
@@ -111,6 +116,7 @@ export function useSoundSafariState({ speak, soundEnabled }: UseSoundSafariState
 
   const nextRound = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (innerTimerRef.current) clearTimeout(innerTimerRef.current);
     const newRound = round + 1;
     setRound(newRound);
     setAttempts(0);
@@ -128,13 +134,9 @@ export function useSoundSafariState({ speak, soundEnabled }: UseSoundSafariState
     // Keep history of last 12 targets to prevent repetition
     recentTargetsRef.current = [target.id, ...recentTargetsRef.current].slice(0, 12);
 
-    // Build choices: include target + random others
-    const otherAnimals = [...ANIMAL_SOUNDS]
-      .filter(a => a.id !== target.id)
-      .sort(() => Math.random() - 0.5);
-    
-    const selected = [target, ...otherAnimals.slice(0, numChoices - 1)]
-      .sort(() => Math.random() - 0.5);
+    // Build choices with unbiased Fisher-Yates shuffle
+    const otherAnimals = shuffleArray(ANIMAL_SOUNDS.filter(a => a.id !== target.id));
+    const selected = shuffleArray([target, ...otherAnimals.slice(0, numChoices - 1)]);
 
     setChoices(selected);
     setTargetAnimal(target);
@@ -146,7 +148,7 @@ export function useSoundSafariState({ speak, soundEnabled }: UseSoundSafariState
       setPhase("prompting");
       speakIfEnabled(`Which animal makes this sound?`, SPEECH_PROMPT).catch(() => {});
       
-      timerRef.current = setTimeout(() => {
+      innerTimerRef.current = setTimeout(() => {
         // Let user guess immediately
         setPhase("awaiting");
         
@@ -244,6 +246,7 @@ export function useSoundSafariState({ speak, soundEnabled }: UseSoundSafariState
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (innerTimerRef.current) clearTimeout(innerTimerRef.current);
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;

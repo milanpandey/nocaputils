@@ -16,7 +16,7 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
-export function playTone(freq: number, type: OscillatorType = "sine", duration: number = 0.15, volume: number = 0.2): void {
+function playTone(freq: number, type: OscillatorType = "sine", duration: number = 0.15, volume: number = 0.2): void {
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -48,16 +48,21 @@ export function playClick(): void {
   playTone(600, "triangle", 0.04, 0.15);
 }
 
+let chimeTimers: ReturnType<typeof setTimeout>[] = [];
+
 export function playSuccessChime(): void {
   const ctx = getAudioContext();
   if (!ctx) return;
 
+  chimeTimers.forEach((timer) => clearTimeout(timer));
+  chimeTimers = [];
+
   const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
-  notes.forEach((freq, idx) => {
+  chimeTimers = notes.map((freq, idx) =>
     setTimeout(() => {
       playTone(freq, "sine", 0.25, 0.2);
-    }, idx * 75);
-  });
+    }, idx * 75)
+  );
 }
 
 export function playErrorBuzz(): void {

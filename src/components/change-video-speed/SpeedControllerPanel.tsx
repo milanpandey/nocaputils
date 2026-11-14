@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import {
+  attachFFmpegProgress,
+  cleanupFFmpegFiles,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
 
 export default function SpeedControllerPanel() {
   const [videoSrc, setVideoSrc] = useState<string>("");
@@ -22,56 +29,17 @@ export default function SpeedControllerPanel() {
   const [engineStatus, setEngineStatus] = useState("");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
-  
+
   const [resultUrl, setResultUrl] = useState("");
   const [resultSizeMB, setResultSizeMB] = useState(0);
 
-  const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
-  const loadPromiseRef = useRef<Promise<import("@ffmpeg/ffmpeg").FFmpeg> | null>(null);
-  const blobUrlsRef = useRef<{ coreURL: string; wasmURL: string } | null>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const ffmpegBusyRef = useRef(false);
+  const probeTokenRef = useRef(0);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
-  const loadFFmpeg = async (forceFresh = false): Promise<import("@ffmpeg/ffmpeg").FFmpeg> => {
-    if (forceFresh && ffmpegRef.current) {
-      try {
-        ffmpegRef.current.terminate();
-      } catch {}
-      ffmpegRef.current = null;
-      loadPromiseRef.current = null;
-    }
-    if (ffmpegRef.current && ffmpegRef.current.loaded) {
-      return ffmpegRef.current;
-    }
-    if (loadPromiseRef.current) {
-      return await loadPromiseRef.current;
-    }
-
-    const task = (async () => {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
-
-      if (!blobUrlsRef.current) {
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        blobUrlsRef.current = {
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        };
-      }
-
-      const ffmpeg = new FFmpeg();
-      await ffmpeg.load({
-        coreURL: blobUrlsRef.current.coreURL,
-        wasmURL: blobUrlsRef.current.wasmURL,
-      });
-      ffmpegRef.current = ffmpeg;
-      return ffmpeg;
-    })();
-
-    loadPromiseRef.current = task;
-    try {
-      return await task;
-    } finally {
-      loadPromiseRef.current = null;
-    }
+  const loadFFmpeg = async (forceFresh = false): Promise<FFmpeg> => {
+    return getOrCreateFFmpeg(ffmpegRef, { forceFresh });
   };
 
   useEffect(() => {
@@ -86,12 +54,14 @@ export default function SpeedControllerPanel() {
 
   const handleFile = async (file: File) => {
     if (file.type.startsWith("video/")) {
-      const url = URL.createObjectURL(file);
+      const token = ++probeTokenRef.current;
+      const url = replaceUrl("source", URL.createObjectURL(file));
+      revokeUrl("result");
       setVideoSrc(url);
       setVideoFile(file);
       const sizeMB = file.size / (1024 * 1024);
       setOriginalSizeMB(sizeMB);
-      
+
       // Reset statuses
       setResultUrl("");
       setResultSizeMB(0);
@@ -104,15 +74,24 @@ export default function SpeedControllerPanel() {
       setKeepAudio(false);
       setHasAudio(true);
 
-      // Probe FPS & Audio in background
+      // Probe FPS & Audio in background only when engine is idle
       (async () => {
+        if (ffmpegBusyRef.current) return;
+        ffmpegBusyRef.current = true;
+        let ffmpeg: FFmpeg | null = null;
+        let logHandler: ((event: { message: string }) => void) | null = null;
         try {
-          const ffmpeg = await loadFFmpeg();
+          ffmpeg = await loadFFmpeg();
+          if (probeTokenRef.current !== token) return;
+
           const videoBuffer = await file.arrayBuffer();
+          if (probeTokenRef.current !== token) return;
+
           await ffmpeg.writeFile("probe.mp4", new Uint8Array(videoBuffer));
 
           let foundAudio = false;
-          const logHandler = ({ message }: { message: string }) => {
+          logHandler = ({ message }: { message: string }) => {
+            if (probeTokenRef.current !== token) return;
             const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
             if (fpsMatch) {
               setDetectedFps(parseFloat(fpsMatch[1]));
@@ -122,23 +101,27 @@ export default function SpeedControllerPanel() {
             }
           };
           ffmpeg.on("log", logHandler);
-          
+
           try {
             await ffmpeg.exec(["-i", "probe.mp4"]);
           } catch {
-            // ignore
+            // Probing without output returns non-zero after printing stream metadata
           }
-          
-          ffmpeg.off("log", logHandler);
-          setHasAudio(foundAudio);
-          if (!foundAudio) {
-            setKeepAudio(false);
+
+          if (probeTokenRef.current === token) {
+            setHasAudio(foundAudio);
+            if (!foundAudio) {
+              setKeepAudio(false);
+            }
           }
-          try {
-            await ffmpeg.deleteFile("probe.mp4");
-          } catch {}
         } catch (err) {
           console.warn("Failed to probe FPS", err);
+        } finally {
+          if (ffmpeg && logHandler) {
+            ffmpeg.off("log", logHandler);
+          }
+          await cleanupFFmpegFiles(ffmpeg, ["probe.mp4"]);
+          ffmpegBusyRef.current = false;
         }
       })();
     } else {
@@ -175,16 +158,23 @@ export default function SpeedControllerPanel() {
 
   const handleProcess = async () => {
     const effectiveDuration = duration > 0 ? duration : (videoRef.current?.duration || 0);
-    if (!videoFile || effectiveDuration <= 0) return;
+    if (!videoFile || effectiveDuration <= 0 || ffmpegBusyRef.current) return;
+    probeTokenRef.current++;
+    ffmpegBusyRef.current = true;
+    revokeUrl("result");
     setErrorMsg("");
     setResultUrl("");
 
     setIsProcessing(true);
     setProgress(0);
 
+    let activeFFmpeg: FFmpeg | null = null;
+    let detachProgress: (() => void) | null = null;
+
     try {
       setEngineStatus("Initializing video engine...");
       let ffmpeg = await loadFFmpeg();
+      activeFFmpeg = ffmpeg;
       setEngineStatus("");
 
       const videoBuffer = await videoFile.arrayBuffer();
@@ -225,14 +215,11 @@ export default function SpeedControllerPanel() {
 
       if (!useChunkedReversal) {
         // Single-pass processing (forward speed changes or short reverse clips <= 20s)
-        const progressHandler = ({ progress: p }: { progress: number }) => {
-          setProgress(Math.round(Math.min(Math.max(p, 0), 1) * 100));
-        };
-        ffmpeg.on("progress", progressHandler);
+        detachProgress = attachFFmpegProgress(ffmpeg, (p) => {
+          setProgress(Math.round(p * 100));
+        });
 
-        try { await ffmpeg.deleteFile("input.mp4"); } catch {}
-        try { await ffmpeg.deleteFile("output.mp4"); } catch {}
-
+        await cleanupFFmpegFiles(ffmpeg, ["input.mp4", "output.mp4"]);
         await ffmpeg.writeFile("input.mp4", sourceBytes);
 
         const args: string[] = ["-i", "input.mp4"];
@@ -253,7 +240,8 @@ export default function SpeedControllerPanel() {
         args.push("-preset", "ultrafast", "-brand", "mp42", "output.mp4");
 
         const ret = await ffmpeg.exec(args);
-        ffmpeg.off("progress", progressHandler);
+        detachProgress();
+        detachProgress = null;
 
         if (ret !== 0) {
           throw new Error("Video conversion failed. Please check your video format or try different settings.");
@@ -405,28 +393,30 @@ export default function SpeedControllerPanel() {
         throw new Error("Generated video file was empty (0 bytes).");
       }
 
-      const outBlob = new Blob([data as unknown as BlobPart], { type: "video/mp4" });
+      const outBlob = new Blob([new Uint8Array(data)], { type: "video/mp4" });
       if (outBlob.size === 0) {
         throw new Error("Generated video file was empty (0 bytes).");
       }
 
       const outSizeMB = outBlob.size / (1024 * 1024);
-      const outUrl = URL.createObjectURL(outBlob);
-      
+      const outUrl = replaceUrl("result", URL.createObjectURL(outBlob));
+
       setResultSizeMB(outSizeMB);
       setResultUrl(outUrl);
-
-      try { await ffmpeg.deleteFile("input.mp4"); } catch {}
-      try { await ffmpeg.deleteFile("output.mp4"); } catch {}
-
     } catch (err: unknown) {
       console.error("Video processing error:", err);
-      // Clean up WASM state so subsequent attempts start with a fresh engine
-      ffmpegRef.current = null;
-      loadPromiseRef.current = null;
+      if (ffmpegRef.current) {
+        try {
+          ffmpegRef.current.terminate();
+        } catch {}
+        ffmpegRef.current = null;
+      }
       const msg = err instanceof Error ? err.message : "An error occurred during processing.";
       setErrorMsg(msg);
     } finally {
+      detachProgress?.();
+      await cleanupFFmpegFiles(activeFFmpeg, ["input.mp4", "output.mp4", "concat.txt"]);
+      ffmpegBusyRef.current = false;
       setIsProcessing(false);
       setEngineStatus("");
     }
@@ -469,7 +459,10 @@ export default function SpeedControllerPanel() {
                 </div>
                 <button
                   onClick={() => {
+                    revokeUrl("source");
+                    revokeUrl("result");
                     setVideoSrc("");
+                    setVideoFile(null);
                     setResultUrl("");
                   }}
                   className="bg-[#ff7b61] text-black border-2 border-black px-4 py-1 text-xs font-black uppercase pointer-events-auto hover:bg-[#ff947d] transition-colors shadow-[3px_3px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"

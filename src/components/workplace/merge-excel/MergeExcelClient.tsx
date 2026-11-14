@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useWebMCP } from "@/hooks/useWebMCP";
+import { formatFileSize } from "@/lib/formatters";
+import { triggerBlobDownload } from "@/lib/download";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import * as XLSX from "xlsx";
@@ -25,14 +28,6 @@ export default function MergeExcelClient() {
   const [outputFormat, setOutputFormat] = useState<"xlsx" | "xls" | "csv">("xlsx");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
 
   const handleFilesUpload = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(f => {
@@ -155,22 +150,20 @@ export default function MergeExcelClient() {
 
       const outBuffer = XLSX.write(masterWorkbook, { bookType, type: "array" });
       const blob = new Blob([new Uint8Array(outBuffer)], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
+      triggerBlobDownload(blob, `Merged_Workbook_${Date.now()}.${fileExt}`);
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Merged_Workbook_${Date.now()}.${fileExt}`;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      setStatusMsg("");
+      setStatusMsg(
+        outputFormat === "csv" && totalSheets > 1
+          ? "Note: CSV format only supports a single sheet; exported the first worksheet tab."
+          : ""
+      );
     } catch (err: unknown) {
       console.error("Excel Merge error:", err);
       setError("Failed to merge Excel workbooks.");
     } finally {
       setIsProcessing(false);
     }
-  }, [excelItems, outputFormat]);
+  }, [excelItems, outputFormat, totalSheets]);
 
   // ── WebMCP Tool Registration ──────────────────────────────────────────────
   useWebMCP(useMemo(() => [
@@ -241,9 +234,9 @@ export default function MergeExcelClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
+          <Link href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -263,7 +256,10 @@ export default function MergeExcelClient() {
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files) handleFilesUpload(e.dataTransfer.files);
+              }}
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
               tabIndex={0}
@@ -276,7 +272,9 @@ export default function MergeExcelClient() {
                 ref={fileInputRef}
                 multiple
                 accept=".xlsx,.xls,.csv"
-                onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
+                onChange={(e) => {
+                  if (e.target.files) handleFilesUpload(e.target.files);
+                }}
                 className="hidden"
                 id="merge-excel-input"
                 aria-label="Select Excel or CSV files"

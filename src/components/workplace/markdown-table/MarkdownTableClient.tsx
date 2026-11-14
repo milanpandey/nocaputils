@@ -167,17 +167,14 @@ export default function MarkdownTableClient() {
   };
 
   // ── Copy ───────────────────────────────────────────────────────
-  const handleCopy = async () => {
+  const copyWithFeedback = async (setFlag: (val: boolean) => void) => {
     await navigator.clipboard.writeText(markdown);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setFlag(true);
+    setTimeout(() => setFlag(false), 2000);
   };
 
-  const handleCopyOutput = async () => {
-    await navigator.clipboard.writeText(markdown);
-    setCopiedOutput(true);
-    setTimeout(() => setCopiedOutput(false), 2000);
-  };
+  const handleCopy = () => copyWithFeedback(setCopied);
+  const handleCopyOutput = () => copyWithFeedback(setCopiedOutput);
 
   // ── CSV Import ────────────────────────────────────────────────
   const handleCsvImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

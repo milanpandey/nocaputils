@@ -202,25 +202,6 @@ button {
   letter-spacing: -5px;
 }
 
-.tool-art-pencil {
-  background: 
-    linear-gradient(135deg, rgba(255, 165, 0, 0.15) 0%, transparent 60%),
-    linear-gradient(180deg, #111827 0%, #0f172a 100%);
-  position: relative;
-}
-
-.tool-art-pencil::before {
-  content: "✎";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 3rem;
-  color: #ffa500;
-  text-shadow: 4px 4px 0px #000;
-  opacity: 0.8;
-}
-
 .tool-art-mp3 {
   background: 
     repeating-linear-gradient(90deg, rgba(153, 255, 153, 0.1) 0px, rgba(153, 255, 153, 0.1) 1px, transparent 1px, transparent 10px),
@@ -321,13 +302,6 @@ button {
 
 .phone-screen {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-}
-
-.phone-card {
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 0.75rem;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
 .subtle-pattern {
@@ -664,106 +638,6 @@ button {
 }
 .bauhaus-game-card:hover .bauhaus-game-play {
   gap: 0.85rem;
-}
-
-/* ── Coming Soon Cards ── */
-.bauhaus-coming-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 1rem;
-}
-
-.bauhaus-coming-card {
-  position: relative;
-  border: 3px solid var(--bauhaus-black);
-  background: var(--bg-panel);
-  padding: 1.5rem;
-  opacity: 0.65;
-  overflow: hidden;
-}
-:root.dark .bauhaus-coming-card {
-  border-color: var(--text-main);
-}
-
-.bauhaus-coming-accent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 6px;
-  height: 100%;
-}
-
-.bauhaus-coming-emoji {
-  font-size: 1.75rem;
-  margin-bottom: 0.75rem;
-  display: block;
-}
-
-.bauhaus-coming-name {
-  font-size: 1rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
-  color: var(--text-main);
-  margin-bottom: 0.35rem;
-}
-
-.bauhaus-coming-desc {
-  font-size: 0.75rem;
-  color: var(--text-soft);
-  line-height: 1.5;
-  margin-bottom: 0.75rem;
-}
-
-.bauhaus-coming-label {
-  font-size: 0.625rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: var(--text-soft);
-  border: 2px solid var(--text-soft);
-  padding: 0.15rem 0.5rem;
-  display: inline-block;
-}
-
-.bauhaus-coming-card--more {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  border-style: dashed;
-  opacity: 0.45;
-}
-
-.bauhaus-more-pattern {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.bauhaus-more-circle {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--bauhaus-red);
-  opacity: 0.6;
-}
-
-.bauhaus-more-square {
-  width: 20px;
-  height: 20px;
-  background: var(--bauhaus-blue);
-  opacity: 0.6;
-}
-
-.bauhaus-more-triangle {
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-bottom: 20px solid var(--bauhaus-yellow);
-  opacity: 0.6;
 }
 
 
@@ -1530,7 +1404,7 @@ button {
   max-width: 24rem;
 }
 
-.mm-start-hint, .cq-start-hint, .ca-start-hint, .ss-start-hint, .sb-start-hint {
+.mm-start-hint, .ca-start-hint, .ss-start-hint, .sb-start-hint {
   font-size: 0.75rem;
   opacity: 0.7;
 }
@@ -1608,7 +1482,7 @@ button {
   animation: wtl-pulse 1s ease-in-out infinite;
 }
 
-.mm-score-icon, .cq-score-icon, .ca-score-icon, .ss-score-icon, .sb-score-icon {
+.mm-score-icon, .cq-score-icon {
   font-size: 0.9rem;
 }
 
@@ -1639,7 +1513,7 @@ button {
 }
 
 /* Common attempt dots */
-.mm-attempts, .cq-attempts, .ca-attempts, .ss-attempts, .sb-attempts {
+.ca-attempts, .ss-attempts, .sb-attempts {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
@@ -1909,14 +1783,6 @@ button {
 
 .cq-choice-emoji {
   font-size: 2.5rem;
-}
-
-.cq-choice-color-name {
-  font-size: 0.7rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.8);
 }
 
 .cq-choice--correct {
@@ -3675,27 +3541,12 @@ button {
   background: #e2e8f0;
 }
 
-/* ── Icon (now sits above the text in the rotated context) ── */
-.feedback-tab__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-}
-
 /* ── Mobile ──────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .feedback-tab {
     font-size: 10px;
     padding: 10px 8px;
     gap: 6px;
-  }
-
-  .feedback-tab__icon {
-    width: 12px;
-    height: 12px;
   }
 }
 

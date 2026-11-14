@@ -20,6 +20,28 @@ export interface CQResult {
   scores: Record<PersonalityColor, number>;
 }
 
+function readInitialHistory(): CQResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = localStorage.getItem("nocaputils_cq_history");
+    return saved ? (JSON.parse(saved) as CQResult[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readCanResume(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const saved = localStorage.getItem("nocaputils_cq_progress");
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    return Boolean(parsed.answers && parsed.answers.length > 0 && parsed.answers.length < 10);
+  } catch {
+    return false;
+  }
+}
+
 export function useColorQuestState({
   speak,
   soundEnabled,
@@ -32,26 +54,8 @@ export function useColorQuestState({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<CQChoice[]>([]);
   const [result, setResult] = useState<CQResult | null>(null);
-  const [history, setHistory] = useState<CQResult[]>([]);
-  const [canResume, setCanResume] = useState(false);
-
-  // Load history & potential resume state on mount
-  useEffect(() => {
-    try {
-      const savedHistory = localStorage.getItem("nocaputils_cq_history");
-      if (savedHistory) setHistory(JSON.parse(savedHistory));
-
-      const savedProgress = localStorage.getItem("nocaputils_cq_progress");
-      if (savedProgress) {
-        const parsed = JSON.parse(savedProgress);
-        if (parsed.answers && parsed.answers.length > 0 && parsed.answers.length < 10) {
-          setCanResume(true);
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to read LocalStorage", e);
-    }
-  }, []);
+  const [history, setHistory] = useState<CQResult[]>(readInitialHistory);
+  const [canResume, setCanResume] = useState(readCanResume);
 
   // Save progress automatically
   useEffect(() => {
@@ -61,8 +65,8 @@ export function useColorQuestState({
           "nocaputils_cq_progress",
           JSON.stringify({ questions, answers, currentIndex })
         );
-      } catch (e) {
-        // ignore
+      } catch {
+        // ignore storage errors
       }
     }
   }, [phase, questions, answers, currentIndex]);
@@ -89,7 +93,7 @@ export function useColorQuestState({
             setPhase("playing");
             return;
           }
-        } catch (e) {
+        } catch {
           console.warn("Could not resume");
         }
       }
@@ -160,14 +164,14 @@ export function useColorQuestState({
       const updated = [newResult, ...prev].slice(0, 5); // Keep last 5
       try {
         localStorage.setItem("nocaputils_cq_history", JSON.stringify(updated));
-      } catch (e) {}
+      } catch {}
       return updated;
     });
 
     // Clear progress
     try {
       localStorage.removeItem("nocaputils_cq_progress");
-    } catch (e) {}
+    } catch {}
   }, []);
 
   const selectChoice = useCallback(

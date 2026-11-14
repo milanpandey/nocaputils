@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   getTripTeaLink,
@@ -45,12 +46,12 @@ export default function Home() {
                 </span>
                 . No uploads, zero servers, total control.{" "}
                 Check out the{" "}
-                <a
+                <Link
                   href="/blog"
                   className="inline-block border-2 border-[var(--border-main)] bg-[var(--accent)] px-1.5 py-0.5 font-black text-black shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)] transition-all"
                 >
                   Blog
-                </a>{" "}
+                </Link>{" "}
                 for creator tips &amp; tool updates.
               </p>
             </div>
@@ -149,12 +150,12 @@ export default function Home() {
                 Runs 100% locally with GLiNER Named Entity Recognition and OCR.
               </p>
               <div className="flex flex-wrap items-center gap-4">
-                <a
+                <Link
                   href="/pii-shield?cid=homepage"
                   className="neo-button neo-button-theme inline-flex items-center gap-2 px-6 py-3.5 text-sm font-black uppercase tracking-[0.15em] transition-colors"
                 >
                   Explore PII Shield &rarr;
-                </a>
+                </Link>
                 <a
                   href={getPiiShieldStoreLink(PII_SHIELD_CAMPAIGN_HOMEPAGE, false)}
                   target="_blank"
@@ -173,7 +174,7 @@ export default function Home() {
             </div>
 
             <div className="flex items-center justify-center">
-              <a
+              <Link
                 href="/pii-shield?cid=homepage"
                 className="group relative block w-full max-w-md rotate-[2deg] border-4 border-[var(--border-main)] bg-white p-3 shadow-[8px_8px_0_0_var(--border-main)] dark:bg-gray-900 transition-transform hover:rotate-0"
               >
@@ -188,7 +189,7 @@ export default function Home() {
                   <span>Native Windows Redaction</span>
                   <span className="text-[#2A9D8F]">Tauri v2 + Local AI</span>
                 </div>
-              </a>
+              </Link>
             </div>
           </section>
 
@@ -209,7 +210,7 @@ export default function Home() {
               {POPULAR_TOOLS.map((tool) => {
                 const catMeta = CATEGORIES.find((c) => c.key === tool.category);
                 return (
-                  <a
+                  <Link
                     key={tool.id}
                     href={tool.href}
                     className="compact-card"
@@ -228,7 +229,7 @@ export default function Home() {
                       </div>
                       <p className="compact-card-desc">{tool.description}</p>
                     </div>
-                  </a>
+                  </Link>
                 );
               })}
             </div>
@@ -244,7 +245,7 @@ export default function Home() {
 
             <div className="category-grid">
               {CATEGORIES.map((cat) => (
-                <a
+                <Link
                   key={cat.key}
                   href={cat.href}
                   className="category-card"
@@ -261,7 +262,7 @@ export default function Home() {
                     <p className="category-card-desc">{cat.tagline}</p>
                   </div>
                   <span className="category-card-arrow">→</span>
-                </a>
+                </Link>
               ))}
             </div>
           </section>
@@ -275,12 +276,12 @@ export default function Home() {
               Discover all {POPULAR_TOOLS.length > 0 ? "28+" : ""} tools in one place.
             </p>
             <div className="mt-12">
-              <a
+              <Link
                 href="/tools"
                 className="neo-button neo-button-theme inline-flex px-12 py-5 text-2xl font-black uppercase tracking-[0.2em] transition-all"
               >
                 Explore All Tools
-              </a>
+              </Link>
             </div>
           </section>
 

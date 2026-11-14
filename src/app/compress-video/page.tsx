@@ -66,7 +66,7 @@ export default function CompressVideoPage() {
                   </p>
                   <p>
                     Simply drop your video, select your target size, and let our browser-based engine
-                    do the heavy lifting. You'll get a preview of the estimated quality and file size
+                    do the heavy lifting. You&apos;ll get a preview of the estimated quality and file size
                     before you even start the compression process.
                   </p>
                 </div>
@@ -101,7 +101,7 @@ export default function CompressVideoPage() {
                        What is the limit for Discord?
                     </p>
                     <p className="mt-2">
-                      Discord's file limit for free users is currently 25MB. Simply select the 25MB
+                      Discord&apos;s file limit for free users is currently 25MB. Simply select the 25MB
                       preset in our tool to ensure your video will upload successfully every time.
                     </p>
                   </div>

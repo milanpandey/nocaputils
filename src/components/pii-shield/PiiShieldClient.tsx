@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -15,45 +15,44 @@ import {
   PII_SHIELD_THIRD_PARTY_LICENSES_URL,
 } from "@/lib/constants";
 
+const emptySubscribe = () => () => {};
+
+function getClientCampaign(): string {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("cid") || params.get("ref") || PII_SHIELD_CAMPAIGN_PAGE;
+}
+
+function getClientOs(): "windows" | "mac" | "other" {
+  const nav = window.navigator as {
+    userAgent?: string;
+    platform?: string;
+    userAgentData?: { platform?: string };
+  };
+  const ua = nav.userAgent || "";
+  const platform = nav.userAgentData?.platform || nav.platform || "";
+  if (
+    /Macintosh|MacIntel|MacPPC|Mac68K|Mac OS X|macOS/i.test(platform) ||
+    /Macintosh|Mac OS X|macOS/i.test(ua)
+  ) {
+    return "mac";
+  }
+  if (/Win32|Win64|Windows|WinCE/i.test(platform) || /Windows/i.test(ua)) {
+    return "windows";
+  }
+  return "other";
+}
+
 export default function PiiShieldClient() {
   const [activeTab, setActiveTab] = useState<number>(0);
   const [demoMode, setDemoMode] = useState<"raw" | "pseudonymized">("pseudonymized");
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
-  const [campaign, setCampaign] = useState<string>(PII_SHIELD_CAMPAIGN_PAGE);
-  const [detectedOs, setDetectedOs] = useState<"windows" | "mac" | "other" | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const customCid = params.get("cid") || params.get("ref");
-      if (customCid) {
-        setCampaign(customCid);
-      }
-
-      // Detect OS for platform-aware CTA buttons
-      const nav = window.navigator as {
-        userAgent?: string;
-        platform?: string;
-        userAgentData?: { platform?: string };
-      };
-      const ua = nav.userAgent || "";
-      const platform = nav.userAgentData?.platform || nav.platform || "";
-      if (
-        /Macintosh|MacIntel|MacPPC|Mac68K|Mac OS X|macOS/i.test(platform) ||
-        /Macintosh|Mac OS X|macOS/i.test(ua)
-      ) {
-        setDetectedOs("mac");
-      } else if (
-        /Win32|Win64|Windows|WinCE/i.test(platform) ||
-        /Windows/i.test(ua)
-      ) {
-        setDetectedOs("windows");
-      } else {
-        setDetectedOs("other");
-      }
-    }
-  }, []);
+  const campaign = useSyncExternalStore(
+    emptySubscribe,
+    getClientCampaign,
+    () => PII_SHIELD_CAMPAIGN_PAGE
+  );
+  const detectedOs = useSyncExternalStore(emptySubscribe, getClientOs, () => null);
 
   const storeWebUrl = getPiiShieldStoreLink(campaign, false);
   const storeProtocolUrl = getPiiShieldStoreLink(campaign, true);

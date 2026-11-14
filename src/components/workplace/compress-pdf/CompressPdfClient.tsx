@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useWebMCP } from "@/hooks/useWebMCP";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatFileSize } from "@/lib/formatters";
+import { canvasToBytes, withPdfDocument } from "@/lib/pdfWorker";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -20,23 +24,17 @@ export default function CompressPdfClient() {
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const [exportFileName, setExportFileName] = useState<string>("");
 
-  const handleFileSelect = async (selectedFile: File) => {
+  const handleFileSelect = useCallback(async (selectedFile: File) => {
     if (selectedFile.type !== "application/pdf" && !selectedFile.name.toLowerCase().endsWith(".pdf")) {
       setError("Invalid file format. Please upload a valid PDF document (.pdf)");
       return;
     }
 
+    revokeUrl("result");
     setFile(selectedFile);
     setExportFileName(selectedFile.name.replace(/\.pdf$/i, "") + "_compressed.pdf");
     setError(null);
@@ -45,12 +43,9 @@ export default function CompressPdfClient() {
     setStatusMsg("Analyzing PDF structure & page count...");
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      setPageCount(pdf.numPages);
+      const numPages = await withPdfDocument(arrayBuffer, async (pdf) => pdf.numPages);
+      setPageCount(numPages);
       setStatusMsg("");
     } catch (err) {
       console.error("PDF read error:", err);
@@ -58,7 +53,7 @@ export default function CompressPdfClient() {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [revokeUrl]);
 
   const estimateReductionPct = Math.round(20 + (compressionLevel / 100) * 55);
   const estimatedSizeBytes = file ? Math.round(file.size * (1 - estimateReductionPct / 100)) : 0;
@@ -66,57 +61,55 @@ export default function CompressPdfClient() {
   const compressPdf = useCallback(async () => {
     if (!file) return;
 
+    revokeUrl("result");
     setIsProcessing(true);
     setError(null);
     setStatusMsg("Initializing PDF compression engine...");
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       const { PDFDocument } = await import("pdf-lib");
-
       const arrayBuffer = await file.arrayBuffer();
-      const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const totalPages = pdfDoc.numPages;
-
       const compressedPdf = await PDFDocument.create();
 
       const scale = 1.6 - (compressionLevel / 100) * 0.7;
       const jpgQuality = 0.85 - (compressionLevel / 100) * 0.35;
 
-      for (let p = 1; p <= totalPages; p++) {
-        setStatusMsg(`Compressing page ${p} of ${totalPages}...`);
-        const page = await pdfDoc.getPage(p);
-        const viewport = page.getViewport({ scale });
+      await withPdfDocument(arrayBuffer, async (pdfDoc) => {
+        const totalPages = pdfDoc.numPages;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d");
+        for (let p = 1; p <= totalPages; p++) {
+          setStatusMsg(`Compressing page ${p} of ${totalPages}...`);
+          const page = await pdfDoc.getPage(p);
+          const viewport = page.getViewport({ scale });
 
-        if (ctx) {
-          await (page as unknown as { render: (params: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> } })
-            .render({ canvasContext: ctx, viewport }).promise;
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d");
 
-          const jpegDataUrl = canvas.toDataURL("image/jpeg", jpgQuality);
-          const jpgImageBytes = await fetch(jpegDataUrl).then(res => res.arrayBuffer());
-          const embeddedJpg = await compressedPdf.embedJpg(jpgImageBytes);
+          if (ctx) {
+            await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+            const jpgImageBytes = await canvasToBytes(canvas, "image/jpeg", jpgQuality);
+            const embeddedJpg = await compressedPdf.embedJpg(jpgImageBytes);
 
-          const newPage = compressedPdf.addPage([viewport.width / scale, viewport.height / scale]);
-          newPage.drawImage(embeddedJpg, {
-            x: 0,
-            y: 0,
-            width: viewport.width / scale,
-            height: viewport.height / scale,
-          });
+            const newPage = compressedPdf.addPage([viewport.width / scale, viewport.height / scale]);
+            newPage.drawImage(embeddedJpg, {
+              x: 0,
+              y: 0,
+              width: viewport.width / scale,
+              height: viewport.height / scale,
+            });
+          } else {
+            canvas.width = 0;
+            canvas.height = 0;
+          }
         }
-      }
+      });
 
       setStatusMsg("Optimizing PDF structure & saving stream...");
       const pdfBytes = await compressedPdf.save();
       const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
-      const downloadUrl = URL.createObjectURL(blob);
+      const downloadUrl = replaceUrl("result", URL.createObjectURL(blob));
 
       setResultStats({
         originalBytes: file.size,
@@ -131,7 +124,7 @@ export default function CompressPdfClient() {
     } finally {
       setIsProcessing(false);
     }
-  }, [file, compressionLevel]);
+  }, [file, compressionLevel, replaceUrl, revokeUrl]);
 
   // ── WebMCP Tool Registration ──────────────────────────────────────────────
   useWebMCP(useMemo(() => [
@@ -192,15 +185,15 @@ export default function CompressPdfClient() {
         return `PDF compressed successfully.`;
       },
     },
-  ], [file, pageCount, isProcessing, compressPdf]));
+  ], [file, pageCount, isProcessing, compressPdf, handleFileSelect]));
 
   return (
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
+          <Link href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -221,7 +214,7 @@ export default function CompressPdfClient() {
             {!file ? (
               <div
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); e.dataTransfer.files?.[0] && handleFileSelect(e.dataTransfer.files[0]); }}
+                onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.[0]) handleFileSelect(e.dataTransfer.files[0]); }}
                 onClick={() => fileInputRef.current?.click()}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
                 tabIndex={0}
@@ -233,7 +226,7 @@ export default function CompressPdfClient() {
                   type="file"
                   ref={fileInputRef}
                   accept="application/pdf,.pdf"
-                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  onChange={(e) => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
                   className="hidden"
                   id="compress-pdf-file-input"
                   aria-label="Select PDF File to Compress"

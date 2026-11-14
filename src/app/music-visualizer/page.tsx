@@ -60,7 +60,7 @@ export default function MusicVisualizerPage() {
                   <p>
                     Whether you are posting a cover song, a bass-boosted remix, or just need a simple
                     waveform over a background image, our tool has you covered. You can apply instant
-                    audio effects like "Slowed + Reverb" or "Nightcore" and have the visualizer react
+                    audio effects like &quot;Slowed + Reverb&quot; or &quot;Nightcore&quot; and have the visualizer react
                     perfectly to the modified audio.
                   </p>
                   <p>
@@ -99,8 +99,8 @@ export default function MusicVisualizerPage() {
                        What audio effects are included?
                     </p>
                     <p className="mt-2">
-                      You can instantly apply popular social media audio edits like "Bass Boosted",
-                      "Slowed + Reverb", or "Nightcore". The visualizer will perfectly sync with the
+                      You can instantly apply popular social media audio edits like &quot;Bass Boosted&quot;,
+                      &quot;Slowed + Reverb&quot;, or &quot;Nightcore&quot;. The visualizer will perfectly sync with the
                       applied audio effect.
                     </p>
                   </div>

@@ -1,5 +1,5 @@
 export const SHOW_TRIPTEA = false;
-export const TRIPTEA_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.triptea.app";
+const TRIPTEA_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.triptea.app";
 
 /**
  * Generates a Google Play Store link for TripTea with UTM parameters.
@@ -93,13 +93,13 @@ export const TOOL_FEEDBACK_URLS: Record<string, string> = {
 
 // ─── PII Shield Constants & Microsoft Store Campaign Tracking ────────────────
 
-export const PII_SHIELD_STORE_ID = "9NM785C34320";
+const PII_SHIELD_STORE_ID = "9NM785C34320";
 export const PII_SHIELD_CAMPAIGN_HOMEPAGE = "homepage";
 export const PII_SHIELD_CAMPAIGN_PAGE = "piishield_page";
-export const PII_SHIELD_DEFAULT_CAMPAIGN = "website";
+const PII_SHIELD_DEFAULT_CAMPAIGN = "website";
 
-export const PII_SHIELD_STORE_WEB_BASE = `https://apps.microsoft.com/detail/${PII_SHIELD_STORE_ID}`;
-export const PII_SHIELD_STORE_PROTOCOL_BASE = `ms-windows-store://pdp/?productid=${PII_SHIELD_STORE_ID}`;
+const PII_SHIELD_STORE_WEB_BASE = `https://apps.microsoft.com/detail/${PII_SHIELD_STORE_ID}`;
+const PII_SHIELD_STORE_PROTOCOL_BASE = `ms-windows-store://pdp/?productid=${PII_SHIELD_STORE_ID}`;
 
 /** Documentation & Legal links hosted on Firebase */
 export const PII_SHIELD_DOCS_URL = "https://okpi-5e20b.web.app/piishield/about.html";

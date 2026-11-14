@@ -1,10 +1,26 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useSyncExternalStore } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatClockTime } from "@/lib/formatters";
+import { triggerBlobDownload } from "@/lib/download";
 
 type RecordingState = "idle" | "recording" | "paused" | "stopped";
+
+interface ExtendedDisplayMediaOptions extends DisplayMediaStreamOptions {
+  systemAudio?: "include" | "exclude";
+}
+
+interface DocumentPiPWindow extends Window {
+  documentPictureInPicture?: {
+    requestWindow(opts: { width: number; height: number }): Promise<Window>;
+  };
+}
+
+const emptySubscribe = () => () => {};
 
 export default function ScreenRecorderClient() {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -25,22 +41,53 @@ export default function ScreenRecorderClient() {
   const micStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const previewVideoRef = useRef<HTMLVideoElement>(null);
   const livePreviewRef = useRef<HTMLVideoElement>(null);
   const pipWindowRef = useRef<Window | null>(null);
   const pipTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [pipSupported, setPipSupported] = useState(false);
+  const elapsedRef = useRef(0);
   const [pipOpen, setPipOpen] = useState(false);
 
-  // Check Document PiP support on mount
+  const pipSupported = useSyncExternalStore(
+    emptySubscribe,
+    () => typeof window !== "undefined" && "documentPictureInPicture" in window,
+    () => false
+  );
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
+
   useEffect(() => {
-    setPipSupported("documentPictureInPicture" in window);
+    elapsedRef.current = elapsed;
+  }, [elapsed]);
+
+  const pauseRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.pause();
+      setRecordingState("paused");
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, []);
+
+  const resumeRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
+      mediaRecorderRef.current.resume();
+      setRecordingState("recording");
+      timerRef.current = setInterval(() => {
+        setElapsed(prev => prev + 1);
+      }, 1000);
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
   }, []);
 
   // Keyboard shortcuts: Space = pause/resume, Escape = stop
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       if (recordingState === "recording" && e.code === "Space") {
@@ -57,33 +104,9 @@ export default function ScreenRecorderClient() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordingState]);
+  }, [recordingState, pauseRecording, resumeRecording, stopRecording]);
 
-  // Cleanup streams on unmount
-  useEffect(() => {
-    return () => {
-      stopAllStreams();
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
-      if (pipWindowRef.current) pipWindowRef.current.close();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const stopAllStreams = () => {
-    screenStreamRef.current?.getTracks().forEach(t => t.stop());
-    micStreamRef.current?.getTracks().forEach(t => t.stop());
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-    screenStreamRef.current = null;
-    micStreamRef.current = null;
-    closePipWindow();
-  };
-
-  const closePipWindow = () => {
+  const closePipWindow = useCallback(() => {
     if (pipTimerRef.current) {
       clearInterval(pipTimerRef.current);
       pipTimerRef.current = null;
@@ -93,15 +116,38 @@ export default function ScreenRecorderClient() {
     }
     pipWindowRef.current = null;
     setPipOpen(false);
-  };
+  }, []);
 
-  // Open Document Picture-in-Picture floating controls
+  const stopAllStreams = useCallback(() => {
+    screenStreamRef.current?.getTracks().forEach(t => t.stop());
+    micStreamRef.current?.getTracks().forEach(t => t.stop());
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    screenStreamRef.current = null;
+    micStreamRef.current = null;
+    closePipWindow();
+  }, [closePipWindow]);
+
+  // Cleanup streams on unmount
+  useEffect(() => {
+    const pipWin = pipWindowRef.current;
+    const timer = timerRef.current;
+    return () => {
+      stopAllStreams();
+      if (timer) clearInterval(timer);
+      if (pipWin) pipWin.close();
+    };
+  }, [stopAllStreams]);
+
+  // Open Document Picture-in-Picture floating controls (requires transient user activation)
   const openPipControls = useCallback(async () => {
-    if (!("documentPictureInPicture" in window)) return;
+    const pipApi = (window as DocumentPiPWindow).documentPictureInPicture;
+    if (!pipApi) return;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({
+      const pipWin = await pipApi.requestWindow({
         width: 340,
         height: 100,
       });
@@ -245,19 +291,13 @@ export default function ScreenRecorderClient() {
         closePipWindow();
       });
 
-      // Sync timer to PiP window
-      let pipElapsed = elapsed;
+      // Sync timer to PiP window using live elapsedRef
       pipTimerRef.current = setInterval(() => {
-        if (!isPaused) {
-          pipElapsed++;
-        }
         const timerEl = doc.getElementById("pip-timer");
         if (timerEl) {
-          const m = Math.floor(pipElapsed / 60).toString().padStart(2, "0");
-          const s = (pipElapsed % 60).toString().padStart(2, "0");
-          timerEl.textContent = `${m}:${s}`;
+          timerEl.textContent = formatClockTime(elapsedRef.current);
         }
-      }, 1000);
+      }, 500);
 
       // Handle PiP window being closed by the user
       pipWin.addEventListener("pagehide", () => {
@@ -272,28 +312,17 @@ export default function ScreenRecorderClient() {
     } catch (err) {
       console.warn("Document PiP not available:", err);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsed]);
-
-  const formatTime = (seconds: number): string => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  };
+  }, [closePipWindow]);
 
   const startRecording = useCallback(async () => {
     setError(null);
     setSystemAudioWarning(null);
     setRecordedBlob(null);
-    if (recordedUrl) {
-      URL.revokeObjectURL(recordedUrl);
-      setRecordedUrl(null);
-    }
+    revokeUrl("recording");
+    setRecordedUrl(null);
 
     try {
-      // Request screen capture (with system/tab audio if enabled)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const displayMediaOptions: any = {
+      const displayMediaOptions: ExtendedDisplayMediaOptions = {
         video: { frameRate: 30 },
         audio: includeSystemAudio
           ? {
@@ -387,7 +416,7 @@ export default function ScreenRecorderClient() {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         setRecordedBlob(blob);
-        const url = URL.createObjectURL(blob);
+        const url = replaceUrl("recording", URL.createObjectURL(blob));
         setRecordedUrl(url);
         setRecordingState("stopped");
 
@@ -414,12 +443,6 @@ export default function ScreenRecorderClient() {
         setElapsed(prev => prev + 1);
       }, 1000);
 
-      // Auto-open floating PiP controls if supported
-      if ("documentPictureInPicture" in window) {
-        // Small delay to let the recording state settle
-        setTimeout(() => openPipControls(), 500);
-      }
-
     } catch (err: unknown) {
       console.error("Recording error:", err);
       if ((err as DOMException)?.name === "NotAllowedError") {
@@ -429,7 +452,7 @@ export default function ScreenRecorderClient() {
       }
       stopAllStreams();
     }
-  }, [includeSystemAudio, includeMic, recordedUrl, openPipControls]);
+  }, [includeSystemAudio, includeMic, replaceUrl, revokeUrl, stopAllStreams, closePipWindow]);
 
   // Attach screen stream to live preview video element once mounted
   useEffect(() => {
@@ -441,39 +464,9 @@ export default function ScreenRecorderClient() {
     }
   }, [recordingState]);
 
-  const pauseRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.pause();
-      setRecordingState("paused");
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  };
-
-  const resumeRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
-      mediaRecorderRef.current.resume();
-      setRecordingState("recording");
-      timerRef.current = setInterval(() => {
-        setElapsed(prev => prev + 1);
-      }, 1000);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
   const downloadRecording = () => {
-    if (!recordedBlob || !recordedUrl) return;
-    const link = document.createElement("a");
-    link.href = recordedUrl;
-    link.download = `screen_recording_${Date.now()}.webm`;
-    link.click();
+    if (!recordedBlob) return;
+    triggerBlobDownload(recordedBlob, `screen_recording_${Date.now()}.webm`);
   };
 
   const resetAll = () => {
@@ -485,7 +478,7 @@ export default function ScreenRecorderClient() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
-    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+    revokeUrl("recording");
 
     setRecordingState("idle");
     setRecordedBlob(null);
@@ -501,9 +494,9 @@ export default function ScreenRecorderClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/creator-tools" className="bauhaus-back-link" aria-label="Return to Creator Tools Hub">
+          <Link href="/creator-tools" className="bauhaus-back-link" aria-label="Return to Creator Tools Hub">
             <span aria-hidden="true">←</span> Creator Tools
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -600,7 +593,7 @@ export default function ScreenRecorderClient() {
                         </span>
                       )}
                       <span className="text-4xl font-black tracking-[0.1em] font-mono">
-                        {formatTime(elapsed)}
+                        {formatClockTime(elapsed)}
                       </span>
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] mt-1 block opacity-70">
@@ -649,6 +642,14 @@ export default function ScreenRecorderClient() {
                     >
                       ⏹ Stop Recording
                     </button>
+                    {pipSupported && !pipOpen && (
+                      <button
+                        onClick={openPipControls}
+                        className="neo-button bg-[#222] text-white font-black uppercase px-6 py-3 text-sm"
+                      >
+                        ⧉ Pop-out Controls
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -661,14 +662,13 @@ export default function ScreenRecorderClient() {
                       Recording Complete!
                     </h3>
                     <p className="text-sm font-bold uppercase tracking-wider mt-1">
-                      Duration: {formatTime(elapsed)} · Size: {fileSizeMB} MB
+                      Duration: {formatClockTime(elapsed)} · Size: {fileSizeMB} MB
                     </p>
                   </div>
 
                   {/* Preview Player */}
                   <div className="w-full max-w-2xl border-4 border-black bg-black overflow-hidden">
                     <video
-                      ref={previewVideoRef}
                       src={recordedUrl}
                       controls
                       playsInline
@@ -814,7 +814,7 @@ export default function ScreenRecorderClient() {
               </span>
             )}
             <span className="text-white font-mono font-black text-lg tracking-wider">
-              {formatTime(elapsed)}
+              {formatClockTime(elapsed)}
             </span>
             <span className="text-white/50 text-[10px] font-black uppercase tracking-widest hidden sm:inline">
               {recordingState === "recording" ? "REC" : "PAUSED"}

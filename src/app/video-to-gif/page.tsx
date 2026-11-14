@@ -83,8 +83,8 @@ export default function VideoToGifPage() {
                       Is there a file size limit?
                     </p>
                     <p className="mt-2">
-                       We don't impose artificial limits on file size. Your only limitation is your
-                       device's memory and performance, as everything happens in your browser.
+                       We don&apos;t impose artificial limits on file size. Your only limitation is your
+                       device&apos;s memory and performance, as everything happens in your browser.
                     </p>
                   </div>
                   <div>
@@ -93,7 +93,7 @@ export default function VideoToGifPage() {
                     </p>
                     <p className="mt-2">
                       Yes. By adjusting the FPS and resolution in our settings, you can easily create
-                      optimized GIFs that fit within Discord's upload limits for free users.
+                      optimized GIFs that fit within Discord&apos;s upload limits for free users.
                     </p>
                   </div>
                   <div>

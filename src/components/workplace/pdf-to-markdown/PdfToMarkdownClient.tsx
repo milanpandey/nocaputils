@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useWebMCP } from "@/hooks/useWebMCP";
+import { withPdfDocument } from "@/lib/pdfWorker";
+import { triggerBlobDownload } from "@/lib/download";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -293,36 +296,41 @@ export default function PdfToMarkdownClient() {
     setStatusMsg("Initializing local OCR engine (Tesseract)…");
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("eng");
-
       const arrayBuffer = await activeFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const numPages = pdf.numPages;
-      setPageCount(numPages);
 
-      const ocrPages: string[] = [];
+      const ocrPages = await withPdfDocument(arrayBuffer, async (pdf) => {
+        const numPages = pdf.numPages;
+        setPageCount(numPages);
 
-      for (let p = 1; p <= numPages; p++) {
-        setStatusMsg(`Scanning page ${p} of ${numPages} with OCR…`);
-        const page = await pdf.getPage(p);
-        const viewport = page.getViewport({ scale: 2 }); // High-DPI for crisp character recognition
+        const worker = await createWorker("eng");
+        const collected: string[] = [];
+        try {
+          for (let p = 1; p <= numPages; p++) {
+            setStatusMsg(`Scanning page ${p} of ${numPages} with OCR…`);
+            const page = await pdf.getPage(p);
+            const viewport = page.getViewport({ scale: 2 }); // High-DPI for crisp character recognition
 
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d")!;
-        await (page as any).render({ canvasContext: ctx, viewport, canvas }).promise;
-
-        const ret = await worker.recognize(canvas);
-        const text = ret.data.text || "";
-        ocrPages.push(text.trim());
-      }
-
-      await worker.terminate();
+            const canvas = document.createElement("canvas");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            try {
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+                const ret = await worker.recognize(canvas);
+                collected.push((ret.data.text || "").trim());
+              }
+            } finally {
+              canvas.width = 0;
+              canvas.height = 0;
+            }
+          }
+        } finally {
+          await worker.terminate();
+        }
+        return collected;
+      });
 
       setStatusMsg("Formatting Markdown…");
       let md = ocrPages.join("\n\n---\n\n");
@@ -334,7 +342,7 @@ export default function PdfToMarkdownClient() {
       if (md) {
         setStatusMsg("Rendering preview…");
         const { marked } = await import("marked");
-        const html = await marked(md);
+        const html = sanitizeHtml(await marked(md));
         setRenderedHtml(html);
       }
 
@@ -366,41 +374,39 @@ export default function PdfToMarkdownClient() {
     setStatusMsg("Loading PDF engine…");
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       setStatusMsg("Reading PDF bytes…");
       const arrayBuffer = await selectedFile.arrayBuffer();
 
       setStatusMsg("Opening PDF document…");
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const numPages = pdf.numPages;
-      setPageCount(numPages);
+      const pageItems = await withPdfDocument(arrayBuffer, async (pdf) => {
+        const numPages = pdf.numPages;
+        setPageCount(numPages);
+        setStatusMsg(`Extracting text from ${numPages} page${numPages !== 1 ? "s" : ""}…`);
 
-      setStatusMsg(`Extracting text from ${numPages} page${numPages !== 1 ? "s" : ""}…`);
+        const collected: {
+          items: TextItem[];
+          pageWidth: number;
+          pageHeight: number;
+        }[] = [];
 
-      const pageItems: {
-        items: TextItem[];
-        pageWidth: number;
-        pageHeight: number;
-      }[] = [];
+        for (let p = 1; p <= numPages; p++) {
+          setStatusMsg(`Extracting page ${p} of ${numPages}…`);
+          const page = await pdf.getPage(p);
+          const viewport = page.getViewport({ scale: 1 });
+          const textContent = await page.getTextContent();
 
-      for (let p = 1; p <= numPages; p++) {
-        setStatusMsg(`Extracting page ${p} of ${numPages}…`);
-        const page = await pdf.getPage(p);
-        const viewport = page.getViewport({ scale: 1 });
-        const textContent = await page.getTextContent();
+          const items: TextItem[] = (textContent.items as TextItem[]).filter(
+            (it) => "str" in it && typeof it.str === "string",
+          );
 
-        const items: TextItem[] = (textContent.items as TextItem[]).filter(
-          (it) => "str" in it && typeof it.str === "string",
-        );
-
-        pageItems.push({
-          items,
-          pageWidth: viewport.width,
-          pageHeight: viewport.height,
-        });
-      }
+          collected.push({
+            items,
+            pageWidth: viewport.width,
+            pageHeight: viewport.height,
+          });
+        }
+        return collected;
+      });
 
       // Check if we got any text at all
       const totalChars = pageItems.reduce(
@@ -426,7 +432,7 @@ export default function PdfToMarkdownClient() {
       if (md) {
         setStatusMsg("Rendering preview…");
         const { marked } = await import("marked");
-        const html = await marked(md);
+        const html = sanitizeHtml(await marked(md));
         setRenderedHtml(html);
       }
 
@@ -464,12 +470,7 @@ export default function PdfToMarkdownClient() {
     if (!markdown) return;
     const baseName = file?.name.replace(/\.pdf$/i, "") ?? "document";
     const blob = new Blob([markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${baseName}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `${baseName}.md`);
   };
 
   const words =

@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
+const getSpeechSupported = () =>
+  typeof window !== "undefined" && Boolean(window.speechSynthesis);
+const getServerSnapshot = () => false;
 
 function getKidFriendlyVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   // Preference order: warm, clear English female voices
@@ -33,15 +38,17 @@ function getKidFriendlyVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoi
 }
 
 export function useSpeech() {
-  const [isSupported, setIsSupported] = useState(false);
+  const isSupported = useSyncExternalStore(
+    emptySubscribe,
+    getSpeechSupported,
+    getServerSnapshot
+  );
   const [isSpeaking, setIsSpeaking] = useState(false);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const enabledRef = useRef(true);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsSupported(true);
+    if (!isSupported) return;
 
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
@@ -54,8 +61,9 @@ export function useSpeech() {
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
     return () => {
       window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+      window.speechSynthesis.cancel();
     };
-  }, []);
+  }, [isSupported]);
 
   const speak = useCallback(
     (text: string, rate = 0.85, pitch = 1.1): Promise<void> => {
@@ -76,19 +84,18 @@ export function useSpeech() {
         const complete = () => {
           if (!hasResolved) {
             hasResolved = true;
+            clearTimeout(fallbackTimer);
             setIsSpeaking(false);
             resolve();
           }
         };
+        const fallbackTimer = setTimeout(complete, text.length * 100 + 3000);
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = complete;
         utterance.onerror = complete;
 
         synth.speak(utterance);
-
-        // Fallback timeout in case onend never fires (common browser bug)
-        setTimeout(complete, text.length * 100 + 3000);
       });
     },
     [isSupported]

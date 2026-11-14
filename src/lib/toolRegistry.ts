@@ -569,10 +569,6 @@ export function getToolsByCategory(category: ToolCategory): ToolEntry[] {
   return ALL_TOOLS.filter((t) => t.category === category);
 }
 
-export function getCategoryMeta(category: ToolCategory): CategoryMeta | undefined {
-  return CATEGORIES.find((c) => c.key === category);
-}
-
 // ─── Client-Side Search ─────────────────────────────────────────────────────
 
 export function searchTools(query: string): ToolEntry[] {

@@ -1,85 +1,27 @@
-import ThemeToggle from "@/components/ThemeToggle";
-import Footer from "@/components/Footer";
+import CategoryHubPage from "@/components/CategoryHubPage";
 import { getToolsByCategory } from "@/lib/toolRegistry";
 
 const tests = getToolsByCategory("personality");
 
 export default function PersonalityHub() {
   return (
-    <div className="bauhaus-page min-h-screen">
-      <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
-        <div className="mb-8 flex items-center justify-between">
-          <a href="/" className="bauhaus-back-link">
-            <span aria-hidden="true">←</span> Home
-          </a>
-          <ThemeToggle />
-        </div>
-
-        <main className="flex flex-1 flex-col items-center">
-          {/* ── Hero ── */}
-          <section className="bauhaus-hero mb-20">
-            {/* Decorative shapes */}
-            <div className="bauhaus-hero-shapes" aria-hidden="true">
-              <div className="bauhaus-shape bauhaus-shape--circle-red" style={{ background: "#9C27B0" }} />
-              <div className="bauhaus-shape bauhaus-shape--rect-blue" style={{ background: "#2A9D8F" }} />
-              <div className="bauhaus-shape bauhaus-shape--tri-yellow" style={{ borderBottomColor: "#F77F00" }} />
-              <div className="bauhaus-shape bauhaus-shape--line-1" />
-              <div className="bauhaus-shape bauhaus-shape--line-2" />
-            </div>
-
-            <h1 className="bauhaus-title">
-              <span className="bauhaus-title-top" style={{ fontSize: "clamp(3rem, 9vw, 6.5rem)" }}>
-                PERSONALITY TESTS
-              </span>
-              <span className="bauhaus-title-sub">by nocaputils</span>
-            </h1>
-
-            <p className="bauhaus-tagline">
-              Free. Private. Insightful.<br />
-              <span className="bauhaus-tagline-small">No downloads · No ads · 100% browser-based</span>
-            </p>
-          </section>
-
-          {/* ── Tests Grid ── */}
-          <section className="mb-16 w-full max-w-5xl">
-            <h2 className="bauhaus-section-title">
-              <span className="bauhaus-section-dot" style={{ background: "#9C27B0" }} aria-hidden="true" />
-              Take Test
-            </h2>
-
-            <div className="bauhaus-game-grid">
-              {tests.map((test) => (
-                <a
-                  key={test.id}
-                  href={test.href}
-                  className="bauhaus-game-card"
-                  id={`test-card-${test.id}`}
-                >
-                  <div className="bauhaus-game-card-accent" style={{ background: test.color }} />
-                  <div className="bauhaus-game-card-body">
-                    <div className="bauhaus-game-card-top">
-                      <span className="bauhaus-game-emoji">{test.emoji}</span>
-                      <div className="bauhaus-game-badges">
-                        <span className="bauhaus-badge bauhaus-badge--live">{test.status}</span>
-                        {test.badge && (
-                          <span className="bauhaus-badge bauhaus-badge--age">{test.badge}</span>
-                        )}
-                      </div>
-                    </div>
-                    <h3 className="bauhaus-game-name">{test.name}</h3>
-                    <p className="bauhaus-game-desc">{test.description}</p>
-                    <div className="bauhaus-game-play" style={{ color: test.color }}>
-                      Take Test <span aria-hidden="true">→</span>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </section>
-        </main>
-
-        <Footer />
-      </div>
-    </div>
+    <CategoryHubPage
+      title="PERSONALITY TESTS"
+      titleFontSize="clamp(3rem, 9vw, 6.5rem)"
+      taglineLead="Free. Private. Insightful."
+      taglineSub="No downloads · No ads · 100% browser-based"
+      sectionTitle="Take Test"
+      sectionDotColor="#9C27B0"
+      tools={tests}
+      actionLabel="Take Test"
+      cardIdPrefix="test-card"
+      useToolColorForAction
+      shapes={{
+        circleColor: "#9C27B0",
+        rectColor: "#2A9D8F",
+        triColor: "#F77F00",
+        showLines: true,
+      }}
+    />
   );
 }

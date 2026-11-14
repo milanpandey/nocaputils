@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useWebMCP } from "@/hooks/useWebMCP";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatFileSize } from "@/lib/formatters";
+import { triggerBlobDownload } from "@/lib/download";
+import { withPdfDocument, canvasToBytes } from "@/lib/pdfWorker";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -27,14 +32,7 @@ export default function PdfMergeClient() {
   const [compressionPreset, setCompressionPreset] = useState<"original" | "balanced" | "max">("balanced");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  const { createUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFilesUpload = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(
@@ -58,9 +56,6 @@ export default function PdfMergeClient() {
     setStatusMsg(`Loading ${filesToProcess.length} PDF file(s)...`);
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       const newItems: PdfFileItem[] = [];
 
       for (let i = 0; i < filesToProcess.length; i++) {
@@ -68,28 +63,30 @@ export default function PdfMergeClient() {
         setStatusMsg(`Analyzing page structure & preview for ${file.name}...`);
 
         const arrayBuffer = await file.arrayBuffer();
-        const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const pageCount = pdfDoc.numPages;
+        const itemId = `pdf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-        let previewUrl = "";
-        try {
-          const page = await pdfDoc.getPage(1);
-          const viewport = page.getViewport({ scale: 0.5 });
-          const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            await (page as unknown as { render: (params: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> } })
-              .render({ canvasContext: ctx, viewport }).promise;
-            previewUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const { pageCount, previewUrl } = await withPdfDocument(arrayBuffer, async (pdfDoc) => {
+          let thumbUrl = "";
+          try {
+            const page = await pdfDoc.getPage(1);
+            const viewport = page.getViewport({ scale: 0.5 });
+            const canvas = document.createElement("canvas");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+              const bytes = await canvasToBytes(canvas, "image/jpeg", 0.8);
+              thumbUrl = createUrl(`preview-${itemId}`, new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }));
+            }
+          } catch (e) {
+            console.warn("Page preview generation skipped:", e);
           }
-        } catch (e) {
-          console.warn("Page preview generation skipped:", e);
-        }
+          return { pageCount: pdfDoc.numPages, previewUrl: thumbUrl };
+        });
 
         newItems.push({
-          id: `pdf_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: itemId,
           file,
           name: file.name,
           sizeFormatted: formatFileSize(file.size),
@@ -107,7 +104,7 @@ export default function PdfMergeClient() {
     } finally {
       setIsProcessing(false);
     }
-  }, [pdfItems]);
+  }, [createUrl, pdfItems.length]);
 
   const moveUp = (index: number) => {
     if (index === 0) return;
@@ -135,6 +132,7 @@ export default function PdfMergeClient() {
 
   const removeItem = (id: string) => {
     setHasUserEdited(true);
+    revokeUrl(`preview-${id}`);
     setPdfItems(prev => prev.filter(item => item.id !== id));
   };
 
@@ -157,45 +155,39 @@ export default function PdfMergeClient() {
       const mergedPdf = await PDFDocument.create();
 
       if (enableCompression) {
-        const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
         const scale = compressionPreset === "max" ? 1.0 : compressionPreset === "balanced" ? 1.4 : 1.8;
         const jpgQuality = compressionPreset === "max" ? 0.55 : compressionPreset === "balanced" ? 0.75 : 0.88;
 
         let processedPages = 0;
         for (const item of pdfItems) {
           const buffer = await item.file.arrayBuffer();
-          const pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
+          await withPdfDocument(buffer, async (pdfDoc) => {
+            for (let p = 1; p <= pdfDoc.numPages; p++) {
+              processedPages++;
+              setStatusMsg(`Compressing & merging page ${processedPages} of ${totalPages}...`);
+              const page = await pdfDoc.getPage(p);
+              const viewport = page.getViewport({ scale });
 
-          for (let p = 1; p <= pdfDoc.numPages; p++) {
-            processedPages++;
-            setStatusMsg(`Compressing & merging page ${processedPages} of ${totalPages}...`);
-            const page = await pdfDoc.getPage(p);
-            const viewport = page.getViewport({ scale });
+              const canvas = document.createElement("canvas");
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              const ctx = canvas.getContext("2d");
 
-            const canvas = document.createElement("canvas");
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            const ctx = canvas.getContext("2d");
+              if (ctx) {
+                await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+                const jpgImageBytes = await canvasToBytes(canvas, "image/jpeg", jpgQuality);
+                const embeddedJpg = await mergedPdf.embedJpg(jpgImageBytes);
 
-            if (ctx) {
-              await (page as unknown as { render: (params: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> } })
-                .render({ canvasContext: ctx, viewport }).promise;
-
-              const jpegDataUrl = canvas.toDataURL("image/jpeg", jpgQuality);
-              const jpgImageBytes = await fetch(jpegDataUrl).then(res => res.arrayBuffer());
-              const embeddedJpg = await mergedPdf.embedJpg(jpgImageBytes);
-
-              const newPage = mergedPdf.addPage([viewport.width / scale, viewport.height / scale]);
-              newPage.drawImage(embeddedJpg, {
-                x: 0,
-                y: 0,
-                width: viewport.width / scale,
-                height: viewport.height / scale,
-              });
+                const newPage = mergedPdf.addPage([viewport.width / scale, viewport.height / scale]);
+                newPage.drawImage(embeddedJpg, {
+                  x: 0,
+                  y: 0,
+                  width: viewport.width / scale,
+                  height: viewport.height / scale,
+                });
+              }
             }
-          }
+          });
         }
       } else {
         for (let i = 0; i < pdfItems.length; i++) {
@@ -204,7 +196,9 @@ export default function PdfMergeClient() {
           const fileBuffer = await item.file.arrayBuffer();
           const pdf = await PDFDocument.load(fileBuffer);
           const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-          copiedPages.forEach((page: any) => mergedPdf.addPage(page));
+          for (const page of copiedPages) {
+            mergedPdf.addPage(page);
+          }
         }
       }
 
@@ -212,12 +206,7 @@ export default function PdfMergeClient() {
       const mergedPdfBytes = await mergedPdf.save();
 
       const blob = new Blob([new Uint8Array(mergedPdfBytes)], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Merged_Document_${Date.now()}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, `Merged_Document_${Date.now()}.pdf`);
 
       setStatusMsg("");
     } catch (err: unknown) {
@@ -295,9 +284,9 @@ export default function PdfMergeClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
+          <Link href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -317,7 +306,10 @@ export default function PdfMergeClient() {
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-8 sm:p-10 mb-8">
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files) handleFilesUpload(e.dataTransfer.files);
+              }}
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
               tabIndex={0}

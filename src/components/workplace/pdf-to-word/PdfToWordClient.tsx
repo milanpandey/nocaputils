@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
+import { withPdfDocument, canvasToBytes } from "@/lib/pdfWorker";
+import { triggerBlobDownload } from "@/lib/download";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import { Document, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun, Packer, AlignmentType, WidthType, HeadingLevel, LevelFormat } from "docx";
@@ -56,40 +59,32 @@ export default function PdfToWordClient() {
     setStatusMsg("Initializing PDF parsing engine...");
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-      const pdfDoc = await loadingTask.promise;
-
-      const totalPages = pdfDoc.numPages;
-      setPageCount(totalPages);
-      setStatusMsg(`Extracting structure, tables, and text from ${totalPages} page(s)...`);
-
       const docxChildren: (Paragraph | Table)[] = [];
 
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        setProgress(Math.round(10 + (pageNum / totalPages) * 70));
-        setStatusMsg(`Converting page ${pageNum} of ${totalPages}...`);
+      await withPdfDocument(arrayBuffer, async (pdfDoc) => {
+        const totalPages = pdfDoc.numPages;
+        setPageCount(totalPages);
+        setStatusMsg(`Extracting structure, tables, and text from ${totalPages} page(s)...`);
 
-        const page = await pdfDoc.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const viewport = page.getViewport({ scale: 1.5 });
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          setProgress(Math.round(10 + (pageNum / totalPages) * 70));
+          setStatusMsg(`Converting page ${pageNum} of ${totalPages}...`);
 
-        // Page image (optional)
-        if (includeImages) {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+          const page = await pdfDoc.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const viewport = page.getViewport({ scale: 1.5 });
 
-          if (ctx) {
-            await (page as unknown as { render: (params: { canvasContext: CanvasRenderingContext2D; viewport: unknown; canvas: HTMLCanvasElement }) => { promise: Promise<void> } })
-              .render({ canvasContext: ctx, viewport, canvas }).promise;
-            const imgDataUrl = canvas.toDataURL("image/png");
-            const base64Data = imgDataUrl.replace(/^data:image\/png;base64,/, "");
-            const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+          // Page image (optional)
+          if (includeImages) {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            if (ctx) {
+              await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+              const imageBytes = await canvasToBytes(canvas, "image/png");
 
             if (totalPages > 1) {
               docxChildren.push(
@@ -276,6 +271,7 @@ export default function PdfToWordClient() {
           }
         }
       }
+      });
 
       setProgress(85);
       setStatusMsg("Packaging Microsoft Word (.docx) binary stream...");
@@ -320,13 +316,8 @@ export default function PdfToWordClient() {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
       const originalName = file.name.replace(/\.pdf$/i, "");
-      link.download = `${originalName}_converted.docx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, `${originalName}_converted.docx`);
 
       setProgress(100);
       setStatusMsg("Conversion completed successfully.");
@@ -337,15 +328,15 @@ export default function PdfToWordClient() {
     } finally {
       setIsProcessing(false);
     }
-  }, [file]);
+  }, [file, includeImages]);
 
   return (
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
+          <Link href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 

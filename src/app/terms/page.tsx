@@ -31,7 +31,7 @@ export default function TermsPage() {
 
             <h2 className="mb-4 mt-8 text-2xl font-bold uppercase">2. Use of Service</h2>
             <p className="mb-4">
-              Our tools are provided "as is" and "as available". We do not guarantee that the service 
+              Our tools are provided &quot;as is&quot; and &quot;as available&quot;. We do not guarantee that the service 
               will be uninterrupted or error-free. You are responsible for the content you process.
             </p>
 

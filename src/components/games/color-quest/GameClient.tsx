@@ -1,11 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSpeech } from "@/hooks/games/useSpeech";
 import { useColorQuestState } from "@/hooks/games/useColorQuestState";
 import { STRINGS, PERSONALITIES } from "@/lib/games/colorQuestData";
 
-export default function ColorQuestClient() {
+interface ColorQuestClientProps {
+  backHref?: string;
+  backLabel?: string;
+}
+
+export default function ColorQuestClient({
+  backHref = "/personality",
+  backLabel = "Personality",
+}: ColorQuestClientProps = {}) {
   const { speak, setEnabled, isSupported } = useSpeech();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showCompare, setShowCompare] = useState(false);
@@ -55,10 +64,10 @@ export default function ColorQuestClient() {
     <div className="cq-game">
       {/* ── Header (Hidden when printing) ── */}
       <header className="cq-header print-hidden">
-        <a href="/personality" className="cq-back-link">
+        <Link href={backHref} className="cq-back-link">
           <span aria-hidden="true">←</span>
-          <span className="cq-back-text">Personality</span>
-        </a>
+          <span className="cq-back-text">{backLabel}</span>
+        </Link>
 
         <div className="cq-header-controls">
           <button

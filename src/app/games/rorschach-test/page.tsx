@@ -17,5 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function RorschachTestPage() {
-  return <GameClient />;
+  return <GameClient backHref="/games" backLabel="Games" />;
 }

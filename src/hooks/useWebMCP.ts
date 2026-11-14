@@ -5,7 +5,12 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
+const getWebMCPSupported = () =>
+  typeof document !== "undefined" && "modelContext" in document;
+const getServerSnapshot = () => false;
 
 export interface WebMCPTool {
   name: string;
@@ -46,16 +51,17 @@ export interface WebMCPTool {
  * ```
  */
 export function useWebMCP(tools: WebMCPTool[]) {
-  const [isSupported, setIsSupported] = useState(false);
+  const isSupported = useSyncExternalStore(
+    emptySubscribe,
+    getWebMCPSupported,
+    getServerSnapshot
+  );
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    // Feature-detect WebMCP
-    if (typeof document === "undefined" || !("modelContext" in document)) {
+    if (!isSupported) {
       return;
     }
-
-    setIsSupported(true);
 
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -88,7 +94,7 @@ export function useWebMCP(tools: WebMCPTool[]) {
       controller.abort();
       controllerRef.current = null;
     };
-  }, [tools]);
+  }, [tools, isSupported]);
 
   return { isSupported };
 }

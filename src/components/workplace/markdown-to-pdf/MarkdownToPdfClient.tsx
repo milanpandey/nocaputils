@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useWebMCP } from "@/hooks/useWebMCP";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -166,7 +167,7 @@ export default function MarkdownToPdfClient() {
 
   const buildHtmlDocument = useCallback(async (md: string, forPrint = false) => {
     const { marked } = await import("marked");
-    const body = await marked(md);
+    const body = sanitizeHtml(await marked(md));
     const css = THEME_STYLES[theme];
     const pageSize = PAPER_SIZES[paperSize];
     return `<!DOCTYPE html>
@@ -234,7 +235,7 @@ export default function MarkdownToPdfClient() {
 
     try {
       const { marked } = await import("marked");
-      const body = await marked(source);
+      const body = sanitizeHtml(await marked(source));
       const css = THEME_STYLES[theme];
       const pageSize = PAPER_SIZES[paperSize];
 
@@ -299,7 +300,7 @@ export default function MarkdownToPdfClient() {
   };
 
   /* ---- Direct Download PDF (Canvas + Searchable Text Layer) ---- */
-  const handleGeneratePdf = async () => {
+  const handleGeneratePdf = useCallback(async () => {
     if (!source.trim()) {
       setError("Please enter some Markdown content.");
       return;
@@ -308,12 +309,13 @@ export default function MarkdownToPdfClient() {
     setError(null);
     setStatusMsg("Rendering Markdown to HTML…");
 
+    let createdIframe: HTMLIFrameElement | null = null;
     try {
       const { marked } = await import("marked");
       const { default: html2canvas } = await import("html2canvas");
       const { jsPDF } = await import("jspdf");
 
-      const htmlBody = await marked(source);
+      const htmlBody = sanitizeHtml(await marked(source));
       const css = THEME_STYLES[theme];
 
       // ---- Page & margin dimensions (pixels at 96 dpi) ----
@@ -346,6 +348,7 @@ export default function MarkdownToPdfClient() {
 
       // ---- Render in off-screen iframe ----
       const iframe = document.createElement("iframe");
+      createdIframe = iframe;
       iframe.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${contentW}px;border:0;`;
       document.body.appendChild(iframe);
 
@@ -521,6 +524,8 @@ export default function MarkdownToPdfClient() {
 
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
         const imgDisplayH = (canvas.height / canvas.width) * contentW;
+        canvas.width = 0;
+        canvas.height = 0;
 
         pdf.addImage(
           imgData, "JPEG",
@@ -575,16 +580,18 @@ export default function MarkdownToPdfClient() {
         }
       }
 
-      document.body.removeChild(iframe);
+      iframe.remove();
+      createdIframe = null;
       pdf.save("document.pdf");
       setStatusMsg("");
     } catch (err) {
       console.error(err);
       setError("Failed to generate PDF. Please try again.");
     } finally {
+      createdIframe?.remove();
       setIsGenerating(false);
     }
-  };
+  }, [source, theme, paperSize]);
 
   const words = source.trim() === "" ? 0 : source.trim().split(/\s+/).length;
 

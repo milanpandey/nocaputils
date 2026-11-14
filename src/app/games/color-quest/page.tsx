@@ -17,5 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function ColorQuestPage() {
-  return <GameClient />;
+  return <GameClient backHref="/games" backLabel="Games" />;
 }

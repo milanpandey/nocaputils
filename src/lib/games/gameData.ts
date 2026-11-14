@@ -128,7 +128,7 @@ export const KEYBOARD_ROWS = [
 ];
 
 // ── Character Colors (Bauhaus palette cycle) ──
-export const CHAR_COLORS = [
+const CHAR_COLORS = [
   "#E63946", // red
   "#457B9D", // blue
   "#F4D35E", // yellow
@@ -143,13 +143,6 @@ export function getCharColor(char: string): string {
   const code = char.charCodeAt(0);
   return CHAR_COLORS[code % CHAR_COLORS.length];
 }
-
-// ── CVC Word List (for future Word Typing mode) ──
-export const CVC_WORDS = {
-  tier1: ["CAT", "DOG", "SUN", "BIG", "RED", "HAT", "PIG", "CUP", "BUS", "BED"],
-  tier2: ["FROG", "SHIP", "CLAP", "DRUM", "FLAT"],
-  tier3: ["DUCK", "FISH", "BIRD", "JUMP", "KING", "PLAY", "RING", "SING", "TREE"],
-};
 
 // ═══════════════════════════════════════════════════════════════
 // MEMORY MATCH — Themes
@@ -211,37 +204,6 @@ export const MEMORY_GRID_SIZES: Record<MemoryDifficulty, { cols: number; pairs: 
   medium: { cols: 4, pairs: 6 },
   hard: { cols: 4, pairs: 8 },
 };
-
-// ═══════════════════════════════════════════════════════════════
-// COLOR QUEST — Colors & Objects
-// ═══════════════════════════════════════════════════════════════
-export interface GameColor {
-  name: string;
-  hex: string;
-  darkHex: string; // slightly darker variant for borders
-}
-
-export const GAME_COLORS: GameColor[] = [
-  { name: "Red", hex: "#E63946", darkHex: "#c0313d" },
-  { name: "Blue", hex: "#457B9D", darkHex: "#396886" },
-  { name: "Yellow", hex: "#F4D35E", darkHex: "#d4b43e" },
-  { name: "Green", hex: "#2A9D8F", darkHex: "#228276" },
-  { name: "Orange", hex: "#F77F00", darkHex: "#d06d00" },
-  { name: "Purple", hex: "#6A4C93", darkHex: "#563d78" },
-  { name: "Pink", hex: "#FF6B9D", darkHex: "#d9587f" },
-  { name: "Brown", hex: "#8B6914", darkHex: "#735610" },
-];
-
-export const COLOR_OBJECTS = [
-  { emoji: "🎈", name: "balloon" },
-  { emoji: "⭐", name: "star" },
-  { emoji: "🚗", name: "car" },
-  { emoji: "🌸", name: "flower" },
-  { emoji: "🐟", name: "fish" },
-  { emoji: "🦋", name: "butterfly" },
-  { emoji: "🎁", name: "gift" },
-  { emoji: "💎", name: "diamond" },
-];
 
 // ═══════════════════════════════════════════════════════════════
 // COUNT ALONG — Counting Objects

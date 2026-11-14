@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { getTripTeaLink } from "@/lib/constants";
+import { useState, useRef } from "react";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import TripTeaBanner from "@/components/TripTeaBanner";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import {
+  attachFFmpegProgress,
+  cleanupFFmpegFiles,
+  execFFmpeg,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
 
 export default function CompressorPanel() {
   const [videoSrc, setVideoSrc] = useState<string>("");
@@ -11,7 +19,7 @@ export default function CompressorPanel() {
 
   const [duration, setDuration] = useState(0);
   const [originalSizeMB, setOriginalSizeMB] = useState(0);
-  
+
   const [targetSizeMB, setTargetSizeMB] = useState(25);
   const [targetHeight, setTargetHeight] = useState<number | null>(null); // null = original
   const [keepAudio, setKeepAudio] = useState(true);
@@ -19,21 +27,23 @@ export default function CompressorPanel() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
-  
+
   const [compressedUrl, setCompressedUrl] = useState("");
   const [compressedSizeMB, setCompressedSizeMB] = useState(0);
 
-  const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFile = (file: File) => {
     if (file.type.startsWith("video/")) {
-      const url = URL.createObjectURL(file);
+      const url = replaceUrl("source", URL.createObjectURL(file));
+      revokeUrl("result");
       setVideoSrc(url);
       setVideoFile(file);
       const sizeMB = file.size / (1024 * 1024);
       setOriginalSizeMB(sizeMB);
       setTargetSizeMB(parseFloat(sizeMB.toFixed(1)));
-      
+
       // Reset statuses
       setCompressedUrl("");
       setCompressedSizeMB(0);
@@ -88,82 +98,62 @@ export default function CompressorPanel() {
 
     setIsProcessing(true);
     setProgress(0);
+    revokeUrl("result");
+
+    let ffmpeg: FFmpeg | null = null;
+    let detachProgress: (() => void) | null = null;
 
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
+      ffmpeg = await getOrCreateFFmpeg(ffmpegRef);
+      detachProgress = attachFFmpegProgress(ffmpeg, (p) => {
+        setProgress(Math.round(p * 100));
+      });
 
-      if (!ffmpegRef.current) {
-        const ffmpeg = new FFmpeg();
-        ffmpeg.on("progress", ({ progress: p }) => {
-          setProgress(Math.round(Math.min(p, 1) * 100));
-        });
+      await cleanupFFmpegFiles(ffmpeg, ["input.mp4", "output.mp4"]);
 
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        });
-        ffmpegRef.current = ffmpeg;
-      }
-
-      const ffmpeg = ffmpegRef.current;
-
-      // Ensure we clear out old files if they exist to free up memory
-      try { await ffmpeg.deleteFile("input.mp4"); } catch (e) {}
-      try { await ffmpeg.deleteFile("output.mp4"); } catch (e) {}
-
-      // Write source
       const videoBuffer = await videoFile.arrayBuffer();
       await ffmpeg.writeFile("input.mp4", new Uint8Array(videoBuffer));
 
-      // Construct FFmpeg args
-      // -b:v specifies average video bitrate
-      // -maxrate and -bufsize enforce standard limits for variable bitrates so it respects our physical constraint
-      let args: string[] = [
+      const args: string[] = [
         "-i", "input.mp4",
         "-b:v", `${videoBitrateKbps}k`,
         "-maxrate", `${videoBitrateKbps * 1.5}k`,
-        "-bufsize", `${videoBitrateKbps * 2}k`, 
-        "-preset", "ultrafast" // WASM is slow, ultrafast helps considerably in browser
+        "-bufsize", `${videoBitrateKbps * 2}k`,
+        "-preset", "ultrafast",
       ];
 
       if (targetHeight) {
-         // Scale proportionally preserving aspect ratio. 
-         // Force width to be divisible by 2 to prevent "not divisible by 2" ffmpeg error.
-         args.push("-vf", `scale='trunc(oh*a/2)*2':${targetHeight}`);
+        args.push("-vf", `scale='trunc(oh*a/2)*2':${targetHeight}`);
       }
 
       if (keepAudio) {
-         args.push("-c:a", "aac", "-b:a", "128k");
+        args.push("-c:a", "aac", "-b:a", "128k");
       } else {
-         args.push("-an");
+        args.push("-an");
       }
 
-      args.push("-brand", "mp42");
-      args.push("output.mp4");
+      args.push("-brand", "mp42", "output.mp4");
 
-      // Execute compression
-      await ffmpeg.exec(args);
+      await execFFmpeg(ffmpeg, args, "Video compression");
 
-      // Read output
       const data = await ffmpeg.readFile("output.mp4");
-      // Coerce correctly to prevent BlobPart TS errors
-      const outBlob = new Blob([data as any], { type: "video/mp4" });
+      if (!(data instanceof Uint8Array)) {
+        throw new Error("Unexpected compressed output buffer.");
+      }
+      const outBlob = new Blob([new Uint8Array(data)], { type: "video/mp4" });
       const outSizeMB = outBlob.size / (1024 * 1024);
-      const outUrl = URL.createObjectURL(outBlob);
-      
+      const outUrl = replaceUrl("result", URL.createObjectURL(outBlob));
+
       setCompressedSizeMB(outSizeMB);
       setCompressedUrl(outUrl);
-
-      // Cleanup
-      await ffmpeg.deleteFile("input.mp4");
-      await ffmpeg.deleteFile("output.mp4");
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err.message || "An error occurred during video compression.");
+      setErrorMsg(
+        err instanceof Error ? err.message : "An error occurred during video compression."
+      );
     } finally {
+      detachProgress?.();
+      await cleanupFFmpegFiles(ffmpeg, ["input.mp4", "output.mp4"]);
       setIsProcessing(false);
     }
   };
@@ -205,7 +195,10 @@ export default function CompressorPanel() {
                 </div>
                 <button
                   onClick={() => {
+                    revokeUrl("source");
+                    revokeUrl("result");
                     setVideoSrc("");
+                    setVideoFile(null);
                     setCompressedUrl("");
                   }}
                   className="bg-[#ff7b61] text-black border-2 border-black px-4 py-1 text-xs font-black uppercase pointer-events-auto hover:bg-[#ff947d] transition-colors shadow-[3px_3px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"
@@ -253,37 +246,7 @@ export default function CompressorPanel() {
             </div>
 
             {/* TripTea Promoted App Card */}
-            <div className="mt-8 bg-[#111111] border-4 border-black p-6 shadow-[8px_8px_0_0_#000] flex flex-col md:flex-row gap-6 md:items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-2xl font-black uppercase italic leading-none tracking-[-0.04em] mb-3 text-white">
-                  Meet{" "}
-                  <span className="inline-block border-2 border-black bg-[#d7fc70] px-2 py-0.5 text-black not-italic shadow-[3px_3px_0_0_#000]">
-                    TripTea
-                  </span>
-                </h3>
-                <p className="text-sm font-bold uppercase leading-relaxed text-[#9ca3af] mb-4 xl:max-w-md">
-                  Simply describe your dream vacation in plain language, and our AI creates a complete, day-by-day itinerary tailored to your preferences.
-                </p>
-                <a
-                  href={getTripTeaLink("video_compressor")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-[#ff33ff] text-black border-2 border-black px-4 py-2 text-xs font-black uppercase inline-block hover:bg-[#ff66ff] transition-colors shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000]"
-                >
-                  Download on Google Play
-                </a>
-              </div>
-              <div className="hidden lg:flex items-center justify-center shrink-0 w-32 h-32 rotate-[3deg] border-4 border-black bg-[#d7fc70] p-2 shadow-[6px_6px_0_0_#000]">
-                <div className="w-full h-full bg-black border-2 border-black overflow-hidden relative">
-                  <img
-                    src="/media/app_screen.jpg"
-                    alt="TripTea app screen"
-                    className="w-full h-full object-cover object-top opacity-80"
-                  />
-                  <div className="absolute inset-0 border-4 border-[#ff33ff] z-10 pointer-events-none mix-blend-screen opacity-50"></div>
-                </div>
-              </div>
-            </div>
+            <TripTeaBanner source="video_compressor" />
           </div>
 
           {/* Right Column: Settings */}

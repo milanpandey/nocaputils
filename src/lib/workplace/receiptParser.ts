@@ -1,4 +1,6 @@
-import { detectCurrency, getBrowserLocaleCurrency, CURRENCY_MAP } from "./currencyMap";
+import { detectCurrency, getBrowserLocaleCurrency } from "./currencyMap";
+import { canvasToBytes } from "@/lib/pdfWorker";
+import type { Worker } from "tesseract.js";
 
 export interface QAFlags {
   isDuplicate: boolean;
@@ -13,8 +15,8 @@ export interface QAFlags {
 export interface ReceiptItem {
   id: string;
   file: File;
-  imageDataUrl: string;
-  enhancedDataUrl: string;
+  previewUrl: string;
+  enhancedBytes: Uint8Array;
   itemNo: number;
   billName: string;
   date: string; // YYYY-MM-DD
@@ -27,7 +29,7 @@ export interface ReceiptItem {
   qaFlags: QAFlags;
 }
 
-export const GLOBAL_VENDORS = [
+const GLOBAL_VENDORS = [
   "Starbucks", "McDonald's", "Uber", "Lyft", "Subway", "Dunkin'", "KFC", "Burger King",
   "Domino's", "Pizza Hut", "Taco Bell", "Wendy's", "Chipotle", "Panera Bread", "Costa Coffee",
   "Walmart", "Target", "Carrefour", "Tesco", "Aldi", "Lidl", "7-Eleven", "CVS", "Walgreens",
@@ -68,7 +70,7 @@ export function evaluateQAFlags(
 ): QAFlags {
   const messages: string[] = [];
   let isAlcohol = false;
-  let isZeroAmount = item.amount === 0;
+  const isZeroAmount = item.amount === 0;
   let isOver60Days = false;
   let isFutureDate = false;
   let isOffensive = false;
@@ -137,7 +139,7 @@ export function evaluateQAFlags(
 /**
  * Strict Vendor Name Sanitizer and Dictionary Verifier.
  */
-function sanitizeVendorName(rawText: string, fileName: string): string {
+function sanitizeVendorName(rawText: string): string {
   const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length >= 3);
   
   for (const line of lines.slice(0, 5)) {
@@ -206,9 +208,9 @@ function parseLocaleDate(rawText: string, currencyCode: string): string {
 
   const numMatch = clean.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (numMatch) {
-    let [, first, second, yearStr] = numMatch;
-    let num1 = parseInt(first, 10);
-    let num2 = parseInt(second, 10);
+    const [, first, second, yearStr] = numMatch;
+    const num1 = parseInt(first, 10);
+    const num2 = parseInt(second, 10);
     let year = parseInt(yearStr, 10);
     if (year < 100) year += 2000;
 
@@ -289,137 +291,146 @@ function parseLocaleAmount(text: string, currencyCode: string): { amount: number
 }
 
 /**
- * Image enhancement with Automatic Receipt Background Bounding-Box Cropping.
+ * Downscales oversized photos (<= 1600px max edge), enhances contrast, trims
+ * empty margins, and encodes as JPEG bytes while releasing canvas memory.
  */
-export async function enhanceReceiptImage(file: File): Promise<{ originalUrl: string; enhancedUrl: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const originalUrl = e.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const srcCanvas = document.createElement("canvas");
-        srcCanvas.width = img.width;
-        srcCanvas.height = img.height;
-        const ctx = srcCanvas.getContext("2d");
-        if (!ctx) return resolve({ originalUrl, enhancedUrl: originalUrl });
+export async function enhanceReceiptImage(file: File): Promise<Uint8Array> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Failed to decode receipt image"));
+      el.src = objectUrl;
+    });
 
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
-        const data = imageData.data;
+    const MAX_DIM = 1600;
+    const scale = Math.min(1, MAX_DIM / Math.max(img.width || 1, img.height || 1));
+    const targetW = Math.max(1, Math.round(img.width * scale));
+    const targetH = Math.max(1, Math.round(img.height * scale));
 
-        // Pass 1: Adaptive paper brightness threshold
-        let minBrightness = 255;
-        let maxBrightness = 0;
+    const srcCanvas = document.createElement("canvas");
+    srcCanvas.width = targetW;
+    srcCanvas.height = targetH;
+    try {
+      const ctx = srcCanvas.getContext("2d");
+      if (!ctx) return new Uint8Array(await file.arrayBuffer());
 
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          if (avg < minBrightness) minBrightness = avg;
-          if (avg > maxBrightness) maxBrightness = avg;
-        }
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      const data = imageData.data;
 
-        const contrastRange = maxBrightness - minBrightness || 1;
-        const paperThreshold = minBrightness + contrastRange * 0.45;
+      let minBrightness = 255;
+      let maxBrightness = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        if (avg < minBrightness) minBrightness = avg;
+        if (avg > maxBrightness) maxBrightness = avg;
+      }
 
-        // Pass 2: Row & Column Density Analysis to isolate receipt paper
-        const rowPaperCounts = new Int32Array(srcCanvas.height);
-        const colPaperCounts = new Int32Array(srcCanvas.width);
+      const contrastRange = maxBrightness - minBrightness || 1;
+      const paperThreshold = minBrightness + contrastRange * 0.45;
+      const rowPaperCounts = new Int32Array(targetH);
+      const colPaperCounts = new Int32Array(targetW);
 
-        for (let y = 0; y < srcCanvas.height; y++) {
-          for (let x = 0; x < srcCanvas.width; x++) {
-            const idx = (y * srcCanvas.width + x) * 4;
-            const avg = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-            if (avg >= paperThreshold) {
-              rowPaperCounts[y]++;
-              colPaperCounts[x]++;
-            }
+      for (let y = 0; y < targetH; y++) {
+        for (let x = 0; x < targetW; x++) {
+          const idx = (y * targetW + x) * 4;
+          const avg = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+          if (avg >= paperThreshold) {
+            rowPaperCounts[y]++;
+            colPaperCounts[x]++;
           }
         }
+      }
 
-        // Filter out sparse background noise (require >= 8% paper density)
-        const minRowDensity = srcCanvas.width * 0.08;
-        const minColDensity = srcCanvas.height * 0.08;
+      const minRowDensity = targetW * 0.08;
+      const minColDensity = targetH * 0.08;
+      let minY = 0;
+      while (minY < targetH && rowPaperCounts[minY] < minRowDensity) minY++;
+      let maxY = targetH - 1;
+      while (maxY > minY && rowPaperCounts[maxY] < minRowDensity) maxY--;
+      let minX = 0;
+      while (minX < targetW && colPaperCounts[minX] < minColDensity) minX++;
+      let maxX = targetW - 1;
+      while (maxX > minX && colPaperCounts[maxX] < minColDensity) maxX--;
 
-        let minY = 0;
-        while (minY < srcCanvas.height && rowPaperCounts[minY] < minRowDensity) minY++;
+      for (let i = 0; i < data.length; i += 4) {
+        let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        avg = ((avg - minBrightness) / contrastRange) * 255;
+        if (avg > 185) avg = 255;
+        else if (avg < 80) avg = Math.max(0, avg - 30);
+        data[i] = avg;
+        data[i + 1] = avg;
+        data[i + 2] = avg;
+      }
+      ctx.putImageData(imageData, 0, 0);
 
-        let maxY = srcCanvas.height - 1;
-        while (maxY > minY && rowPaperCounts[maxY] < minRowDensity) maxY--;
+      const padX = Math.round(targetW * 0.02);
+      const padY = Math.round(targetH * 0.02);
+      minX = Math.max(0, minX - padX);
+      minY = Math.max(0, minY - padY);
+      maxX = Math.min(targetW - 1, maxX + padX);
+      maxY = Math.min(targetH - 1, maxY + padY);
 
-        let minX = 0;
-        while (minX < srcCanvas.width && colPaperCounts[minX] < minColDensity) minX++;
-
-        let maxX = srcCanvas.width - 1;
-        while (maxX > minX && colPaperCounts[maxX] < minColDensity) maxX--;
-
-        // Apply contrast boost to pixels
-        for (let i = 0; i < data.length; i += 4) {
-          let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          avg = ((avg - minBrightness) / contrastRange) * 255;
-          if (avg > 185) avg = 255;
-          else if (avg < 80) avg = Math.max(0, avg - 30);
-
-          data[i] = avg;
-          data[i + 1] = avg;
-          data[i + 2] = avg;
+      const cropW = maxX - minX + 1;
+      const cropH = maxY - minY + 1;
+      if (cropW < targetW * 0.98 || cropH < targetH * 0.98) {
+        const cropCanvas = document.createElement("canvas");
+        cropCanvas.width = cropW;
+        cropCanvas.height = cropH;
+        const cropCtx = cropCanvas.getContext("2d");
+        if (cropCtx) {
+          cropCtx.drawImage(srcCanvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+          return await canvasToBytes(cropCanvas, "image/jpeg", 0.92);
         }
-        ctx.putImageData(imageData, 0, 0);
+      }
 
-        // Safety padding (2%)
-        const padX = Math.round(srcCanvas.width * 0.02);
-        const padY = Math.round(srcCanvas.height * 0.02);
-
-        minX = Math.max(0, minX - padX);
-        minY = Math.max(0, minY - padY);
-        maxX = Math.min(srcCanvas.width - 1, maxX + padX);
-        maxY = Math.min(srcCanvas.height - 1, maxY + padY);
-
-        const cropW = maxX - minX + 1;
-        const cropH = maxY - minY + 1;
-
-        // Perform crop if background padding was trimmed
-        if (cropW < srcCanvas.width * 0.98 || cropH < srcCanvas.height * 0.98) {
-          const cropCanvas = document.createElement("canvas");
-          cropCanvas.width = cropW;
-          cropCanvas.height = cropH;
-          const cropCtx = cropCanvas.getContext("2d");
-          if (cropCtx) {
-            cropCtx.drawImage(srcCanvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-            const enhancedUrl = cropCanvas.toDataURL("image/jpeg", 0.92);
-            return resolve({ originalUrl, enhancedUrl });
-          }
-        }
-
-        const enhancedUrl = srcCanvas.toDataURL("image/jpeg", 0.92);
-        resolve({ originalUrl, enhancedUrl });
-      };
-      img.onerror = () => resolve({ originalUrl, enhancedUrl: originalUrl });
-      img.src = originalUrl;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+      return await canvasToBytes(srcCanvas, "image/jpeg", 0.92);
+    } finally {
+      srcCanvas.width = 0;
+      srcCanvas.height = 0;
+    }
+  } catch {
+    return new Uint8Array(await file.arrayBuffer());
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 /**
- * OCR & Policy QA Scanner for Receipt Images.
+ * OCR & Policy QA Scanner for Receipt Images. Reuses an optional shared Tesseract
+ * worker across batches to avoid booting a WASM worker per receipt.
  */
-export async function parseReceiptFile(file: File, itemNo: number): Promise<ReceiptItem> {
-  const id = `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-  const { originalUrl, enhancedUrl } = await enhanceReceiptImage(file);
+export async function parseReceiptFile(
+  file: File,
+  itemNo: number,
+  sharedWorker?: Worker
+): Promise<ReceiptItem> {
+  const id = `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const enhancedBytes = await enhanceReceiptImage(file);
 
   let rawText = "";
+  let ownsWorker = false;
+  let worker = sharedWorker;
   try {
-    const { createWorker } = await import("tesseract.js");
-    const worker = await createWorker("eng");
-    const ret = await worker.recognize(enhancedUrl);
+    if (!worker) {
+      const { createWorker } = await import("tesseract.js");
+      worker = await createWorker("eng");
+      ownsWorker = true;
+    }
+    const imageBlob = new Blob([new Uint8Array(enhancedBytes)], { type: "image/jpeg" });
+    const ret = await worker.recognize(imageBlob);
     rawText = ret.data.text || "";
-    await worker.terminate();
   } catch (err: unknown) {
     console.warn("Tesseract OCR fallback triggered:", err);
+  } finally {
+    if (ownsWorker && worker) {
+      await worker.terminate();
+    }
   }
 
-  const billName = sanitizeVendorName(rawText, file.name);
+  const billName = sanitizeVendorName(rawText);
 
   const detectedCurrency = detectCurrency(rawText);
   const browserFallback = getBrowserLocaleCurrency();
@@ -470,8 +481,8 @@ export async function parseReceiptFile(file: File, itemNo: number): Promise<Rece
   return {
     id,
     file,
-    imageDataUrl: originalUrl,
-    enhancedDataUrl: enhancedUrl,
+    previewUrl: "",
+    enhancedBytes,
     itemNo,
     billName,
     date,

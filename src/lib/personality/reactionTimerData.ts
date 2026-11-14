@@ -19,7 +19,7 @@ export interface BenchmarkTier {
   description: string;
 }
 
-export function getBenchmark(avgMs: number): BenchmarkTier {
+function getBenchmark(avgMs: number): BenchmarkTier {
   if (avgMs <= 180) {
     return {
       title: "Esports & F1 Driver Reflex",

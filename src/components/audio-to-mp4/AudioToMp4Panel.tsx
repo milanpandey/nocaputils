@@ -1,12 +1,20 @@
 "use client";
 
 import { useState, useRef } from "react";
-import TripTeaBanner from "../TripTeaBanner";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import {
+  attachFFmpegProgress,
+  cleanupFFmpegFiles,
+  execFFmpeg,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
+import { canvasToBytes } from "@/lib/pdfWorker";
 
 export default function AudioToMp4Panel() {
   const [audioSrc, setAudioSrc] = useState<string>("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
-  
+
   const [imageSrc, setImageSrc] = useState<string>("");
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -16,15 +24,17 @@ export default function AudioToMp4Panel() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
-  
+
   const [mp4Url, setMp4Url] = useState("");
   const [mp4SizeMB, setMp4SizeMB] = useState(0);
 
-  const ffmpegRef = useRef<any>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleAudioFile = (file: File) => {
     if (file.type.startsWith("audio/")) {
-      const url = URL.createObjectURL(file);
+      const url = replaceUrl("audio", URL.createObjectURL(file));
+      revokeUrl("result");
       setAudioSrc(url);
       setAudioFile(file);
       setMp4Url("");
@@ -38,7 +48,7 @@ export default function AudioToMp4Panel() {
 
   const handleImageFile = (file: File) => {
     if (file.type.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
+      const url = replaceUrl("image", URL.createObjectURL(file));
       setImageSrc(url);
       setImageFile(file);
     } else {
@@ -51,37 +61,23 @@ export default function AudioToMp4Panel() {
     setIsProcessing(true);
     setProgress(0);
     setErrorMsg("");
+    revokeUrl("result");
+
+    const ext = audioFile.name.split(".").pop()?.toLowerCase() || "mp3";
+    const inputAudio = `input.${ext}`;
+    const inputImage = "image.jpg";
+    const outputName = "output.mp4";
+
+    let ffmpeg: FFmpeg | null = null;
+    let detachProgress: (() => void) | null = null;
 
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
-
-      if (!ffmpegRef.current) {
-        const ffmpeg = new FFmpeg();
-        ffmpeg.on("progress", ({ progress: p }) => {
-          setProgress(Math.round(Math.min(p, 1) * 100));
-        });
-
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        });
-        ffmpegRef.current = ffmpeg;
-      }
-
-      const ffmpeg = ffmpegRef.current;
-
-      // Capture FFmpeg logs for debugging
-      const logs: string[] = [];
-      ffmpeg.on("log", ({ message }: { message: string }) => {
-        logs.push(message);
+      ffmpeg = await getOrCreateFFmpeg(ffmpegRef);
+      detachProgress = attachFFmpegProgress(ffmpeg, (p) => {
+        setProgress(Math.round(p * 100));
       });
-      
-      const ext = audioFile.name.split('.').pop()?.toLowerCase() || "mp3";
-      const inputAudio = `input.${ext}`;
-      const inputImage = "image.jpg";
-      const outputName = "output.mp4";
+
+      await cleanupFFmpegFiles(ffmpeg, [inputAudio, inputImage, outputName]);
 
       const isCopyable = ["mp3", "m4a", "aac"].includes(ext);
       const audioCodecArgs = isCopyable ? ["-c:a", "copy"] : ["-c:a", "aac", "-b:a", "192k"];
@@ -89,7 +85,6 @@ export default function AudioToMp4Panel() {
       const audioBuffer = await audioFile.arrayBuffer();
       await ffmpeg.writeFile(inputAudio, new Uint8Array(audioBuffer));
 
-      // Prepare the cover image — use user image or generate a black frame
       if (imageFile) {
         const imageBuffer = await imageFile.arrayBuffer();
         await ffmpeg.writeFile(inputImage, new Uint8Array(imageBuffer));
@@ -101,10 +96,7 @@ export default function AudioToMp4Panel() {
         const ctx2d = canvas.getContext("2d")!;
         ctx2d.fillStyle = "#000000";
         ctx2d.fillRect(0, 0, 1280, 720);
-        const blackBlob = await new Promise<Blob>((res) =>
-          canvas.toBlob((b) => res(b!), "image/jpeg", 0.9)
-        );
-        const blackBuf = new Uint8Array(await blackBlob.arrayBuffer());
+        const blackBuf = await canvasToBytes(canvas, "image/jpeg", 0.9);
         await ffmpeg.writeFile(inputImage, blackBuf);
       }
 
@@ -127,24 +119,23 @@ export default function AudioToMp4Panel() {
         outputName,
       ];
 
-      const ret = await ffmpeg.exec(ffmpegArgs);
-      if (ret !== 0) {
-        console.error("FFmpeg logs:", logs.join("\n"));
-        throw new Error("FFmpeg conversion failed. Check console for details.");
-      }
+      await execFFmpeg(ffmpeg, ffmpegArgs, "Audio to MP4 conversion");
 
       const data = await ffmpeg.readFile(outputName);
-      const outBlob = new Blob([data as any], { type: "video/mp4" });
+      if (!(data instanceof Uint8Array)) {
+        throw new Error("Unexpected MP4 output buffer.");
+      }
+      const outBlob = new Blob([new Uint8Array(data)], { type: "video/mp4" });
       setMp4SizeMB(outBlob.size / (1024 * 1024));
-      setMp4Url(URL.createObjectURL(outBlob));
-
-      await ffmpeg.deleteFile(inputAudio);
-      if (imageFile) await ffmpeg.deleteFile(inputImage);
-      await ffmpeg.deleteFile(outputName);
-    } catch (err: any) {
+      setMp4Url(replaceUrl("result", URL.createObjectURL(outBlob)));
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err.message || "An error occurred during conversion.");
+      setErrorMsg(
+        err instanceof Error ? err.message : "An error occurred during conversion."
+      );
     } finally {
+      detachProgress?.();
+      await cleanupFFmpegFiles(ffmpeg, [inputAudio, inputImage, outputName]);
       setIsProcessing(false);
     }
   };
@@ -185,7 +176,13 @@ export default function AudioToMp4Panel() {
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-black uppercase italic text-[var(--text-main)]">Audio & Background</h3>
                 <button
-                  onClick={() => { setAudioFile(null); setMp4Url(""); }}
+                  onClick={() => {
+                    revokeUrl("audio");
+                    revokeUrl("result");
+                    setAudioSrc("");
+                    setAudioFile(null);
+                    setMp4Url("");
+                  }}
                   className="bg-accent text-black border-2 border-black px-4 py-1 text-xs font-black uppercase shadow-[3px_3px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"
                 >
                   Change Audio
@@ -212,7 +209,11 @@ export default function AudioToMp4Panel() {
                     <>
                       <img src={imageSrc} alt="Thumbnail" className="w-full h-full object-contain" />
                       <button
-                        onClick={() => { setImageFile(null); setImageSrc(""); }}
+                        onClick={() => {
+                          revokeUrl("image");
+                          setImageFile(null);
+                          setImageSrc("");
+                        }}
                         className="absolute top-2 right-2 bg-neo-pink text-white border-2 border-black px-2 py-1 text-[10px] font-black uppercase shadow-[2px_2px_0_0_#000]"
                       >
                         Remove
@@ -247,8 +248,6 @@ export default function AudioToMp4Panel() {
                  </div>
               </div>
             </div>
-
-            <TripTeaBanner source="mp3_to_mp4" />
           </div>
 
           <div className="space-y-6">

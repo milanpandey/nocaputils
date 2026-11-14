@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -14,57 +15,119 @@ interface DiffLine {
   text: string;
 }
 
-/** Myers-style LCS-based line diff */
+const MAX_DP_CELLS = 1_500_000;
+
+/**
+ * Line diff with common prefix/suffix trimming, O(n) push/reverse backtracking,
+ * and a bounded fallback when comparing huge multi-thousand-line inputs.
+ */
 function computeDiff(
   oldText: string,
   newText: string,
   options: { trimWhitespace: boolean; caseInsensitive: boolean }
 ): DiffLine[] {
-  let oldLines = oldText.split("\n");
-  let newLines = newText.split("\n");
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
 
   const normalize = (line: string) => {
-    let l = line;
-    if (options.trimWhitespace) l = l.trim();
+    let l = options.trimWhitespace ? line.trim() : line;
     if (options.caseInsensitive) l = l.toLowerCase();
     return l;
   };
 
-  // LCS table
-  const m = oldLines.length;
-  const n = newLines.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  const oldNorm = oldLines.map(normalize);
+  const newNorm = newLines.map(normalize);
 
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (normalize(oldLines[i - 1]) === normalize(newLines[j - 1])) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+  // Strip shared prefix and suffix first so unchanged blocks cost O(n)
+  let prefixLen = 0;
+  const minLen = Math.min(oldLines.length, newLines.length);
+  while (prefixLen < minLen && oldNorm[prefixLen] === newNorm[prefixLen]) {
+    prefixLen++;
+  }
+
+  let suffixLen = 0;
+  while (
+    suffixLen < minLen - prefixLen &&
+    oldNorm[oldLines.length - 1 - suffixLen] === newNorm[newLines.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  const prefix: DiffLine[] = [];
+  for (let p = 0; p < prefixLen; p++) {
+    prefix.push({ type: "equal", oldLine: p + 1, newLine: p + 1, text: oldLines[p] });
+  }
+
+  const m = oldLines.length - prefixLen - suffixLen;
+  const n = newLines.length - prefixLen - suffixLen;
+  const middleReversed: DiffLine[] = [];
+
+  if (m === 0) {
+    for (let j = n; j > 0; j--) {
+      middleReversed.push({ type: "added", newLine: prefixLen + j, text: newLines[prefixLen + j - 1] });
+    }
+  } else if (n === 0) {
+    for (let i = m; i > 0; i--) {
+      middleReversed.push({ type: "removed", oldLine: prefixLen + i, text: oldLines[prefixLen + i - 1] });
+    }
+  } else if (m * n > MAX_DP_CELLS) {
+    // Bounded line-by-line fallback for massive inputs to prevent main-thread stalls / OOM
+    for (let k = n; k > 0; k--) {
+      middleReversed.push({ type: "added", newLine: prefixLen + k, text: newLines[prefixLen + k - 1] });
+    }
+    for (let k = m; k > 0; k--) {
+      middleReversed.push({ type: "removed", oldLine: prefixLen + k, text: oldLines[prefixLen + k - 1] });
+    }
+  } else {
+    const stride = n + 1;
+    const dp = new Int32Array((m + 1) * stride);
+
+    for (let i = 1; i <= m; i++) {
+      const rowOffset = i * stride;
+      const prevRowOffset = (i - 1) * stride;
+      const oNorm = oldNorm[prefixLen + i - 1];
+      for (let j = 1; j <= n; j++) {
+        if (oNorm === newNorm[prefixLen + j - 1]) {
+          dp[rowOffset + j] = dp[prevRowOffset + j - 1] + 1;
+        } else {
+          const up = dp[prevRowOffset + j];
+          const left = dp[rowOffset + j - 1];
+          dp[rowOffset + j] = up >= left ? up : left;
+        }
+      }
+    }
+
+    let i = m;
+    let j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldNorm[prefixLen + i - 1] === newNorm[prefixLen + j - 1]) {
+        middleReversed.push({
+          type: "equal",
+          oldLine: prefixLen + i,
+          newLine: prefixLen + j,
+          text: oldLines[prefixLen + i - 1],
+        });
+        i--;
+        j--;
+      } else if (j > 0 && (i === 0 || dp[i * stride + (j - 1)] >= dp[(i - 1) * stride + j])) {
+        middleReversed.push({ type: "added", newLine: prefixLen + j, text: newLines[prefixLen + j - 1] });
+        j--;
+      } else if (i > 0) {
+        middleReversed.push({ type: "removed", oldLine: prefixLen + i, text: oldLines[prefixLen + i - 1] });
+        i--;
       }
     }
   }
 
-  // Backtrack to produce diff
-  const result: DiffLine[] = [];
-  let i = m,
-    j = n;
-
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && normalize(oldLines[i - 1]) === normalize(newLines[j - 1])) {
-      result.unshift({ type: "equal", oldLine: i, newLine: j, text: oldLines[i - 1] });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({ type: "added", newLine: j, text: newLines[j - 1] });
-      j--;
-    } else if (i > 0) {
-      result.unshift({ type: "removed", oldLine: i, text: oldLines[i - 1] });
-      i--;
-    }
+  middleReversed.reverse();
+  const suffix: DiffLine[] = [];
+  for (let s = 0; s < suffixLen; s++) {
+    const oldIdx = oldLines.length - suffixLen + s;
+    const newIdx = newLines.length - suffixLen + s;
+    suffix.push({ type: "equal", oldLine: oldIdx + 1, newLine: newIdx + 1, text: oldLines[oldIdx] });
   }
 
-  return result;
+  return [...prefix, ...middleReversed, ...suffix];
 }
 
 /** Character-level diff for inline highlight within a single line pair */
@@ -92,21 +155,22 @@ function charDiff(oldStr: string, newStr: string): { oldSegments: { text: string
     }
   }
 
-  // Backtrack
-  const ops: { type: "eq" | "del" | "ins"; char: string }[] = [];
+  // Backtrack using push() + reverse() to avoid O(n^2) Array.unshift
+  const opsReversed: { type: "eq" | "del" | "ins"; char: string }[] = [];
   let i = m, j = n;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldStr[i - 1] === newStr[j - 1]) {
-      ops.unshift({ type: "eq", char: oldStr[i - 1] });
+      opsReversed.push({ type: "eq", char: oldStr[i - 1] });
       i--; j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      ops.unshift({ type: "ins", char: newStr[j - 1] });
+      opsReversed.push({ type: "ins", char: newStr[j - 1] });
       j--;
     } else {
-      ops.unshift({ type: "del", char: oldStr[i - 1] });
+      opsReversed.push({ type: "del", char: oldStr[i - 1] });
       i--;
     }
   }
+  const ops = opsReversed.reverse();
 
   // Build segments
   const oldSegments: { text: string; changed: boolean }[] = [];
@@ -191,9 +255,9 @@ export default function DiffComparatorClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
+          <Link href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
             ← Dev Tools
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 

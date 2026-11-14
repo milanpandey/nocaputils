@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -18,7 +19,12 @@ function decodeJwt(token: string): JwtParts | null {
     const decodeBase64Url = (str: string): string => {
       let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
       while (base64.length % 4 !== 0) base64 += "=";
-      return atob(base64);
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new TextDecoder().decode(bytes);
     };
 
     const header = JSON.parse(decodeBase64Url(parts[0]));
@@ -116,9 +122,9 @@ export default function JwtDecoderClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
+          <Link href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
             ← Dev Tools
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 

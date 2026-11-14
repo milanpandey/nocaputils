@@ -106,9 +106,8 @@ type Props = {
   onContainerResize: (w: number) => void;
 };
 
-export type TimelinePanelHandle = {
-  /* currently unused, reserved for imperative scroll-to-playhead */
-};
+/* currently unused, reserved for imperative scroll-to-playhead */
+export type TimelinePanelHandle = Record<string, never>;
 
 const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePanel(
   {
@@ -154,6 +153,43 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
     [totalDuration],
   );
 
+  const themeColorsRef = useRef({
+    bgMuted: "#ece8df",
+    textSoft: "#4b5563",
+  });
+
+  useEffect(() => {
+    const syncColors = () => {
+      const style = getComputedStyle(document.documentElement);
+      themeColorsRef.current = {
+        bgMuted: style.getPropertyValue("--bg-panel-muted").trim() || "#ece8df",
+        textSoft: style.getPropertyValue("--text-soft").trim() || "#4b5563",
+      };
+    };
+    syncColors();
+    const observer = new MutationObserver(syncColors);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme", "style"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  /* ---- resize backing store only when timeline width changes ---- */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(timelineWidth * dpr);
+    canvas.height = Math.floor(TIMELINE_HEIGHT * dpr);
+    canvas.style.width = `${timelineWidth}px`;
+    canvas.style.height = `${TIMELINE_HEIGHT}px`;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }, [timelineWidth]);
+
   /* ---- draw ---- */
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -161,25 +197,20 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
     const w = timelineWidth;
     const h = TIMELINE_HEIGHT;
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
     const m = getMetrics(w);
     const ppSec = m.innerWidth / Math.max(totalDuration, 0.01);
+    const { bgMuted, textSoft } = themeColorsRef.current;
 
     // bg
-    ctx.fillStyle = "var(--bg-panel-muted, #ece8df)";
+    ctx.fillStyle = bgMuted;
     ctx.fillRect(0, 0, w, h);
 
     // labels
-    ctx.fillStyle = "var(--text-soft, #4b5563)";
+    ctx.fillStyle = textSoft;
     ctx.font = "800 10px sans-serif";
     ctx.fillText("VIDEO", TIMELINE_INSET, VIDEO_TRACK_Y + 17);
     ctx.fillText("AUDIO", TIMELINE_INSET, AUDIO_TRACK_Y + 17);
@@ -193,7 +224,7 @@ const TimelinePanel = forwardRef<TimelinePanelHandle, Props>(function TimelinePa
       ctx.moveTo(x, 14);
       ctx.lineTo(x, h - 10);
       ctx.stroke();
-      ctx.fillStyle = "var(--text-soft, #4b5563)";
+      ctx.fillStyle = textSoft;
       ctx.font = "700 9px sans-serif";
       ctx.fillText(`${s}s`, x + 3, 11);
     }

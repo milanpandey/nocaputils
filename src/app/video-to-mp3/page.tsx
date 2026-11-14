@@ -65,8 +65,8 @@ export default function VideoToMp3Page() {
                   </p>
                   <p>
                     Simply select your video file, choose your desired bitrate (up to 320kbps for CD-quality
-                    sound), and hit convert. Since there's no upload step, the process is limited only by
-                    your computer's speed, not your internet bandwidth.
+                    sound), and hit convert. Since there&apos;s no upload step, the process is limited only by
+                    your computer&apos;s speed, not your internet bandwidth.
                   </p>
                 </div>
               </div>
@@ -81,7 +81,7 @@ export default function VideoToMp3Page() {
                       What is the best bitrate to use?
                     </p>
                     <p className="mt-2">
-                       For most purposes, 192kbps is the "sweet spot" between file size and quality. If you're
+                       For most purposes, 192kbps is the &quot;sweet spot&quot; between file size and quality. If you&apos;re
                        working with high-fidelity music or professional voiceovers, choose 320kbps for
                        maximum clarity.
                     </p>
@@ -91,8 +91,8 @@ export default function VideoToMp3Page() {
                       Is my data safe?
                     </p>
                     <p className="mt-2">
-                      Yes. Unlike other converters, we don't store or even see your video. The conversion
-                      happens entirely within your browser's memory using WebAssembly.
+                      Yes. Unlike other converters, we don&apos;t store or even see your video. The conversion
+                      happens entirely within your browser&apos;s memory using WebAssembly.
                     </p>
                   </div>
                   <div>

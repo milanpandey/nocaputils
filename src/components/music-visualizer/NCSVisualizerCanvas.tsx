@@ -369,7 +369,9 @@ function NCSVisualizerCanvas(props: VisualizerProps) {
   } = props;
 
   const propsRef = useRef(props);
-  propsRef.current = props;
+  useEffect(() => {
+    propsRef.current = props;
+  });
 
   // ── Mutable render state ──
   const smoothedRef = useRef<Float32Array>(new Float32Array(360));
@@ -488,7 +490,6 @@ function NCSVisualizerCanvas(props: VisualizerProps) {
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasRef]);
 
   return (

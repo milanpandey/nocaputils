@@ -2,8 +2,10 @@
 
 import { useState, useRef } from "react";
 import JSZip from "jszip";
-import Link from "next/link";
-import { getTripTeaLink } from "@/lib/constants";
+import TripTeaBanner from "@/components/TripTeaBanner";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatTimeMillis } from "@/lib/formatters";
+import { triggerBlobDownload } from "@/lib/download";
 
 export default function ExtractorPanel() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -23,12 +25,12 @@ export default function ExtractorPanel() {
   const [batchIntervalSec, setBatchIntervalSec] = useState<number>(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFile = (file: File) => {
     if (file.type.startsWith("video/")) {
       setVideoFile(file);
-      const url = URL.createObjectURL(file);
+      const url = replaceUrl("source", URL.createObjectURL(file));
       setVideoSrc(url);
     } else {
       alert("Please upload a valid video file.");
@@ -52,13 +54,6 @@ export default function ExtractorPanel() {
     }
   };
 
-  const formatTime = (timeInSeconds: number) => {
-    const mins = Math.floor(timeInSeconds / 60);
-    const secs = Math.floor(timeInSeconds % 60);
-    const ms = Math.floor((timeInSeconds % 1) * 1000);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-  };
-
   const captureFrame = (filename = "frame.jpg", type = "image/jpeg") => {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -71,12 +66,17 @@ export default function ExtractorPanel() {
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL(type, 0.95);
-
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = filename;
-    a.click();
+    canvas.toBlob(
+      (blob) => {
+        canvas.width = 0;
+        canvas.height = 0;
+        if (blob) {
+          triggerBlobDownload(blob, filename);
+        }
+      },
+      type,
+      0.95
+    );
   };
 
   const seekAndCapture = async (time: number, filename: string) => {
@@ -142,6 +142,8 @@ export default function ExtractorPanel() {
                   // Convert to blob and add to zip
                   canvas.toBlob(
                     (blob) => {
+                      canvas.width = 0;
+                      canvas.height = 0;
                       if (blob) {
                         const fileName = `frame_${addedFrames.toString().padStart(4, "0")}.jpg`;
                         zip.file(fileName, blob);
@@ -153,6 +155,8 @@ export default function ExtractorPanel() {
                     0.95
                   );
                 } else {
+                  canvas.width = 0;
+                  canvas.height = 0;
                   resolve();
                 }
               } else {
@@ -177,12 +181,10 @@ export default function ExtractorPanel() {
 
       if (addedFrames > 0) {
         const zipBlob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(zipBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frames_${addedFrames}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerBlobDownload(
+          zipBlob,
+          `${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frames_${addedFrames}.zip`
+        );
       } else {
         alert("Failed to extract any frames.");
       }
@@ -231,7 +233,11 @@ export default function ExtractorPanel() {
                   Live Preview
                 </div>
                 <button
-                  onClick={() => setVideoSrc("")}
+                  onClick={() => {
+                    revokeUrl("source");
+                    setVideoSrc("");
+                    setVideoFile(null);
+                  }}
                   className="bg-[#ff7b61] text-black border-2 border-black px-4 py-1 text-xs font-black uppercase pointer-events-auto hover:bg-[#ff947d] transition-colors shadow-[3px_3px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"
                 >
                   Close Video
@@ -288,37 +294,7 @@ export default function ExtractorPanel() {
             </div>
 
             {/* TripTea Promoted App Card */}
-            <div className="mt-8 bg-[#111111] border-4 border-black p-6 shadow-[8px_8px_0_0_#000] flex flex-col md:flex-row gap-6 md:items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-2xl font-black uppercase italic leading-none tracking-[-0.04em] mb-3 text-white">
-                  Meet{" "}
-                  <span className="inline-block border-2 border-black bg-[#d7fc70] px-2 py-0.5 text-black not-italic shadow-[3px_3px_0_0_#000]">
-                    TripTea
-                  </span>
-                </h3>
-                <p className="text-sm font-bold uppercase leading-relaxed text-[#9ca3af] mb-4 xl:max-w-md">
-                  Simply describe your dream vacation in plain language, and our AI creates a complete, day-by-day itinerary tailored to your preferences.
-                </p>
-                <a
-                  href={getTripTeaLink("frame_extractor")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-[#ff33ff] text-black border-2 border-black px-4 py-2 text-xs font-black uppercase inline-block hover:bg-[#ff66ff] transition-colors shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000]"
-                >
-                  Download on Google Play
-                </a>
-              </div>
-              <div className="hidden lg:flex items-center justify-center shrink-0 w-32 h-32 rotate-[3deg] border-4 border-black bg-[#d7fc70] p-2 shadow-[6px_6px_0_0_#000]">
-                <div className="w-full h-full bg-black border-2 border-black overflow-hidden relative">
-                  <img
-                    src="/media/app_screen.jpg"
-                    alt="TripTea app screen"
-                    className="w-full h-full object-cover object-top opacity-80"
-                  />
-                  <div className="absolute inset-0 border-4 border-[#ff33ff] z-10 pointer-events-none mix-blend-screen opacity-50"></div>
-                </div>
-              </div>
-            </div>
+            <TripTeaBanner source="frame_extractor" />
           </div>
 
           {/* Right Column: Control Panels */}
@@ -334,7 +310,7 @@ export default function ExtractorPanel() {
               </div>
               
               <button 
-                onClick={() => captureFrame(`${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frame_${formatTime(currentTime).replace(/:/g, '-')}.jpg`)}
+                onClick={() => captureFrame(`${videoFile?.name.replace(/\.[^/.]+$/, "") || "video"}_frame_${formatTimeMillis(currentTime).replace(/:/g, '-')}.jpg`)}
                 className="w-full bg-[#d7fc70] text-black border-4 border-black py-4 font-black uppercase text-sm shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:shadow-[2px_2px_0_0_#000]"
               >
                 📸 Capture Current Frame

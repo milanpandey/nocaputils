@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useWebMCP } from "@/hooks/useWebMCP";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatFileSize } from "@/lib/formatters";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import JSZip from "jszip";
@@ -32,14 +35,7 @@ export default function ArchiveFilesClient() {
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  const { createUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFilesUpload = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -53,7 +49,7 @@ export default function ArchiveFilesClient() {
     const filesToProcess = fileArray.slice(0, availableSlots);
 
     const newItems: ArchiveFileItem[] = filesToProcess.map(file => ({
-      id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       file,
       name: file.name,
       sizeFormatted: formatFileSize(file.size),
@@ -63,11 +59,13 @@ export default function ArchiveFilesClient() {
 
     setFileItems(prev => [...prev, ...newItems]);
     setError(null);
+    revokeUrl("archive");
     setResultStats(null);
-  }, [fileItems]);
+  }, [fileItems, revokeUrl]);
 
   const removeItem = (id: string) => {
     setFileItems(prev => prev.filter(item => item.id !== id));
+    revokeUrl("archive");
     setResultStats(null);
   };
 
@@ -113,7 +111,8 @@ export default function ArchiveFilesClient() {
         }
       );
 
-      const downloadUrl = URL.createObjectURL(content);
+      revokeUrl("archive");
+      const downloadUrl = createUrl("archive", content);
       const filename = `${customArchiveName.trim() || "Workplace_Archive"}.zip`;
 
       const link = document.createElement("a");
@@ -135,7 +134,7 @@ export default function ArchiveFilesClient() {
     } finally {
       setIsProcessing(false);
     }
-  }, [fileItems, compressionPreset, customArchiveName, totalInputBytes]);
+  }, [fileItems, compressionPreset, customArchiveName, totalInputBytes, createUrl, revokeUrl]);
 
   // ── WebMCP Tool Registration ──────────────────────────────────────────────
   useWebMCP(useMemo(() => [
@@ -212,9 +211,9 @@ export default function ArchiveFilesClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
+          <Link href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -234,7 +233,10 @@ export default function ArchiveFilesClient() {
           <div className="w-full max-w-4xl neo-panel bg-[var(--bg-panel)] p-4 sm:p-6 mb-6">
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.dataTransfer.files && handleFilesUpload(e.dataTransfer.files); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files) handleFilesUpload(e.dataTransfer.files);
+              }}
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
               tabIndex={0}
@@ -246,7 +248,9 @@ export default function ArchiveFilesClient() {
                 type="file"
                 ref={fileInputRef}
                 multiple
-                onChange={(e) => e.target.files && handleFilesUpload(e.target.files)}
+                onChange={(e) => {
+                  if (e.target.files) handleFilesUpload(e.target.files);
+                }}
                 className="hidden"
                 id="archive-files-input"
                 aria-label="Select Files to Archive"

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { triggerBlobDownload } from "@/lib/download";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -67,15 +69,18 @@ export default function MarkdownEditorClient() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Render markdown whenever source changes
+  // Render sanitized markdown HTML whenever source changes (debounced 150ms)
   useEffect(() => {
     let active = true;
-    (async () => {
+    const timer = window.setTimeout(async () => {
       const { marked } = await import("marked");
-      const result = await marked(source);
+      const result = sanitizeHtml(await marked(source));
       if (active) setHtml(result);
-    })();
-    return () => { active = false; };
+    }, 150);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [source]);
 
   // Apply toolbar format
@@ -123,24 +128,14 @@ export default function MarkdownEditorClient() {
   // Export .md
   const handleExportMd = () => {
     const blob = new Blob([source], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "document.md";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, "document.md");
   };
 
   // Export .html
   const handleExportHtml = () => {
     const full = `<!DOCTYPE html>\n<html>\n<head><meta charset="utf-8"><title>Document</title></head>\n<body>\n${html}\n</body>\n</html>`;
     const blob = new Blob([full], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "document.html";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, "document.html");
   };
 
   const handleCopyMd = async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import Link from "next/link";
 import cronstrue from "cronstrue";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
@@ -21,107 +22,160 @@ const PRESETS: { label: string; cron: string }[] = [
 const FIELD_LABELS = ["Minute", "Hour", "Day (Month)", "Month", "Day (Week)"];
 const FIELD_RANGES = ["0–59", "0–23", "1–31", "1–12", "0–7 (Sun=0 or 7)"];
 
+const FIELD_BOUNDS: [number, number][] = [
+  [0, 59],
+  [0, 23],
+  [1, 31],
+  [1, 12],
+  [0, 7],
+];
+
+function parseCronField(field: string, min: number, max: number): number[] | null {
+  if (!field) return null;
+  const values = new Set<number>();
+
+  for (const sub of field.split(",")) {
+    if (!sub) return null;
+    if (sub === "*") {
+      for (let i = min; i <= max; i++) values.add(i);
+    } else if (sub.includes("/")) {
+      const slashParts = sub.split("/");
+      if (slashParts.length !== 2) return null;
+      const [range, stepStr] = slashParts;
+      const step = parseInt(stepStr, 10);
+      if (!/^\d+$/.test(stepStr) || Number.isNaN(step) || step <= 0) return null;
+
+      let start = min;
+      let end = max;
+      if (range !== "*") {
+        if (range.includes("-")) {
+          const bounds = range.split("-");
+          if (bounds.length !== 2) return null;
+          start = parseInt(bounds[0], 10);
+          end = parseInt(bounds[1], 10);
+        } else {
+          start = parseInt(range, 10);
+        }
+      }
+      if (Number.isNaN(start) || Number.isNaN(end) || start < min || end > max || start > end) {
+        return null;
+      }
+      for (let i = start; i <= end; i += step) values.add(i);
+    } else if (sub.includes("-")) {
+      const bounds = sub.split("-");
+      if (bounds.length !== 2) return null;
+      const start = parseInt(bounds[0], 10);
+      const end = parseInt(bounds[1], 10);
+      if (Number.isNaN(start) || Number.isNaN(end) || start < min || end > max || start > end) {
+        return null;
+      }
+      for (let i = start; i <= end; i++) values.add(i);
+    } else {
+      if (!/^\d+$/.test(sub)) return null;
+      const val = parseInt(sub, 10);
+      if (Number.isNaN(val) || val < min || val > max) return null;
+      values.add(val);
+    }
+  }
+
+  return values.size > 0 ? Array.from(values).sort((a, b) => a - b) : null;
+}
+
 function getNextExecutions(cron: string, count: number): Date[] {
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return [];
 
-  try {
-    const results: Date[] = [];
-    const now = new Date();
-    const current = new Date(now);
-    current.setSeconds(0, 0);
-    current.setMinutes(current.getMinutes() + 1);
+  const minutes = parseCronField(parts[0], 0, 59);
+  const hours = parseCronField(parts[1], 0, 23);
+  const daysOfMonth = parseCronField(parts[2], 1, 31);
+  const months = parseCronField(parts[3], 1, 12);
+  const rawDow = parseCronField(parts[4], 0, 7);
+  if (!minutes || !hours || !daysOfMonth || !months || !rawDow) return [];
 
-    const parseField = (field: string, min: number, max: number): number[] => {
-      const values: Set<number> = new Set();
-      const subParts = field.split(",");
+  const daysOfWeek = Array.from(new Set(rawDow.map((d) => (d === 7 ? 0 : d)))).sort((a, b) => a - b);
+  const isDomRestricted = parts[2] !== "*";
+  const isDowRestricted = parts[4] !== "*";
 
-      for (const sub of subParts) {
-        if (sub === "*") {
-          for (let i = min; i <= max; i++) values.add(i);
-        } else if (sub.includes("/")) {
-          const [range, stepStr] = sub.split("/");
-          const step = parseInt(stepStr, 10);
-          const start = range === "*" ? min : parseInt(range, 10);
-          for (let i = start; i <= max; i += step) values.add(i);
-        } else if (sub.includes("-")) {
-          const [startStr, endStr] = sub.split("-");
-          const start = parseInt(startStr, 10);
-          const end = parseInt(endStr, 10);
-          for (let i = start; i <= end; i++) values.add(i);
-        } else {
-          values.add(parseInt(sub, 10));
-        }
-      }
-      return Array.from(values).sort((a, b) => a - b);
-    };
+  const results: Date[] = [];
+  const cursor = new Date();
+  cursor.setSeconds(0, 0);
+  cursor.setMinutes(cursor.getMinutes() + 1);
 
-    const minutes = parseField(parts[0], 0, 59);
-    const hours = parseField(parts[1], 0, 23);
-    const daysOfMonth = parseField(parts[2], 1, 31);
-    const months = parseField(parts[3], 1, 12);
-    let daysOfWeek = parseField(parts[4], 0, 7);
-    // Normalize Sunday: 7 → 0
-    if (daysOfWeek.includes(7)) {
-      daysOfWeek = [...new Set([...daysOfWeek.filter(d => d !== 7), 0])].sort((a, b) => a - b);
-    }
+  const maxTime = cursor.getTime() + 45 * 366 * 24 * 60 * 60 * 1000;
+  let guard = 0;
 
-    const isDayOfMonthRestricted = parts[2] !== "*";
-    const isDayOfWeekRestricted = parts[4] !== "*";
-
-    const maxIterations = 525960; // ~1 year of minutes
-    for (let iter = 0; iter < maxIterations && results.length < count; iter++) {
-      const m = current.getMinutes();
-      const h = current.getHours();
-      const dom = current.getDate();
-      const mon = current.getMonth() + 1;
-      const dow = current.getDay();
-
-      const minuteMatch = minutes.includes(m);
-      const hourMatch = hours.includes(h);
-      const monthMatch = months.includes(mon);
-
-      let dayMatch: boolean;
-      if (isDayOfMonthRestricted && isDayOfWeekRestricted) {
-        dayMatch = daysOfMonth.includes(dom) || daysOfWeek.includes(dow);
-      } else if (isDayOfMonthRestricted) {
-        dayMatch = daysOfMonth.includes(dom);
-      } else if (isDayOfWeekRestricted) {
-        dayMatch = daysOfWeek.includes(dow);
+  while (cursor.getTime() <= maxTime && results.length < count && guard++ < 8000) {
+    const mon = cursor.getMonth() + 1;
+    if (!months.includes(mon)) {
+      const nextMon = months.find((m) => m > mon);
+      if (nextMon !== undefined) {
+        cursor.setMonth(nextMon - 1, 1);
       } else {
-        dayMatch = true;
+        cursor.setFullYear(cursor.getFullYear() + 1, months[0] - 1, 1);
       }
-
-      if (minuteMatch && hourMatch && dayMatch && monthMatch) {
-        results.push(new Date(current));
-      }
-
-      current.setMinutes(current.getMinutes() + 1);
+      cursor.setHours(0, 0, 0, 0);
+      continue;
     }
 
-    return results;
-  } catch {
-    return [];
+    const dom = cursor.getDate();
+    const dow = cursor.getDay();
+    const dayMatch =
+      isDomRestricted && isDowRestricted
+        ? daysOfMonth.includes(dom) || daysOfWeek.includes(dow)
+        : isDomRestricted
+          ? daysOfMonth.includes(dom)
+          : isDowRestricted
+            ? daysOfWeek.includes(dow)
+            : true;
+
+    if (!dayMatch) {
+      cursor.setDate(dom + 1);
+      cursor.setHours(0, 0, 0, 0);
+      continue;
+    }
+
+    const h = cursor.getHours();
+    if (!hours.includes(h)) {
+      const nextH = hours.find((hr) => hr > h);
+      if (nextH !== undefined) {
+        cursor.setHours(nextH, minutes[0], 0, 0);
+      } else {
+        cursor.setDate(dom + 1);
+        cursor.setHours(hours[0], minutes[0], 0, 0);
+      }
+      continue;
+    }
+
+    const m = cursor.getMinutes();
+    if (!minutes.includes(m)) {
+      const nextM = minutes.find((minVal) => minVal > m);
+      if (nextM !== undefined) {
+        cursor.setMinutes(nextM, 0, 0);
+      } else {
+        cursor.setHours(h + 1, minutes[0], 0, 0);
+      }
+      continue;
+    }
+
+    results.push(new Date(cursor));
+    cursor.setMinutes(m + 1, 0, 0);
   }
+
+  return results;
 }
 
 function validateCron(cron: string): string | null {
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return "A cron expression must have exactly 5 fields separated by spaces.";
 
-  const patterns = [
-    /^(\*|([0-9]|[1-5][0-9])([-,]([0-9]|[1-5][0-9]))*)(\/(([0-9]|[1-5][0-9])))?\s*$/,
-    /^(\*|([0-9]|1[0-9]|2[0-3])([-,]([0-9]|1[0-9]|2[0-3]))*)(\/(([0-9]|1[0-9]|2[0-3])))?\s*$/,
-    /^(\*|([1-9]|[12][0-9]|3[01])([-,]([1-9]|[12][0-9]|3[01]))*)(\/(([1-9]|[12][0-9]|3[01])))?\s*$/,
-    /^(\*|([1-9]|1[0-2])([-,]([1-9]|1[0-2]))*)(\/(([1-9]|1[0-2])))?\s*$/,
-    /^(\*|[0-7]([-,][0-7])*)(\/([ 0-7]))?\s*$/,
-  ];
-
   for (let i = 0; i < 5; i++) {
-    // Simple validation — allow common patterns
     const field = parts[i];
     if (!/^[\d,\-\*\/]+$/.test(field)) {
       return `Field "${FIELD_LABELS[i]}" contains invalid characters.`;
+    }
+    const [min, max] = FIELD_BOUNDS[i];
+    if (!parseCronField(field, min, max)) {
+      return `Field "${FIELD_LABELS[i]}" is out of range (${FIELD_RANGES[i]}) or uses an invalid step/range.`;
     }
   }
 
@@ -170,9 +224,9 @@ export default function CronVisualizerClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
+          <Link href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
             ← Dev Tools
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 

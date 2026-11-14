@@ -66,7 +66,7 @@ export default function VideoFrameExtractorPage() {
                   </p>
                   <p>
                     Simply drop your video, navigate to the desired timestamp using the timeline, and
-                    click "Capture". You can also use our **Batch Mode** to automatically extract frames
+                    click &quot;Capture&quot;. You can also use our **Batch Mode** to automatically extract frames
                     at specific intervals throughout the entire video.
                   </p>
                 </div>

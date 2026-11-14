@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -16,7 +17,12 @@ async function computeHash(algorithm: string, text: string): Promise<string> {
 
 function base64Encode(text: string): string {
   try {
-    return btoa(unescape(encodeURIComponent(text)));
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   } catch {
     return "Error: Invalid input";
   }
@@ -24,7 +30,12 @@ function base64Encode(text: string): string {
 
 function base64Decode(text: string): string {
   try {
-    return decodeURIComponent(escape(atob(text)));
+    const binary = atob(text);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
   } catch {
     return "Error: Invalid Base64";
   }
@@ -55,9 +66,9 @@ export default function HashBase64Client() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
+          <Link href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
             ← Dev Tools
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 
@@ -113,11 +124,9 @@ function HashTab() {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!input) {
-      setHashes([]);
-      return;
-    }
+    if (!input) return;
 
+    let cancelled = false;
     const algorithms = [
       { algo: "SHA-1", label: "SHA-1" },
       { algo: "SHA-256", label: "SHA-256" },
@@ -131,8 +140,16 @@ function HashTab() {
         label,
         hash: await computeHash(algo, input),
       }))
-    ).then(setHashes);
+    ).then((resolved) => {
+      if (!cancelled) setHashes(resolved);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [input]);
+
+  const visibleHashes = input ? hashes : [];
 
   const copyHash = (hash: string, label: string) => {
     navigator.clipboard.writeText(hash).then(() => {
@@ -158,9 +175,9 @@ function HashTab() {
         />
       </div>
 
-      {hashes.length > 0 && (
+      {visibleHashes.length > 0 && (
         <div className="mt-6 flex flex-col gap-4">
-          {hashes.map(({ label, hash }) => (
+          {visibleHashes.map(({ label, hash }) => (
             <div key={label} className="neo-panel overflow-hidden">
               <div className="flex items-center justify-between border-b-4 border-[var(--border-main)] px-6 py-3" style={{ background: "#3B82F6" }}>
                 <span className="text-xs font-black uppercase tracking-[0.2em] text-white">{label}</span>

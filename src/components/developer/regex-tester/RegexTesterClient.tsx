@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -10,6 +11,31 @@ interface MatchInfo {
   groups: { [key: string]: string | undefined };
   captures: (string | undefined)[];
 }
+
+const REGEX_WORKER_SOURCE = `
+self.onmessage = function(e) {
+  const { pattern, flags, testString } = e.data;
+  try {
+    const ensuredFlags = flags.includes("g") ? flags : flags + "g";
+    const regex = new RegExp(pattern, ensuredFlags);
+    const results = [];
+    let m;
+    while ((m = regex.exec(testString)) !== null) {
+      results.push({
+        index: m.index,
+        match: m[0],
+        groups: m.groups || {},
+        captures: Array.prototype.slice.call(m, 1),
+      });
+      if (m[0].length === 0) regex.lastIndex++;
+      if (results.length > 200) break;
+    }
+    self.postMessage({ matches: results, error: null });
+  } catch (err) {
+    self.postMessage({ matches: [], error: err && err.message ? err.message : String(err) });
+  }
+};
+`;
 
 const CHEATSHEET = [
   { category: "Characters", items: [
@@ -55,6 +81,10 @@ export default function RegexTesterClient() {
   const [testString, setTestString] = useState("Contact us at support@example.com or sales@nocaputils.org for more info.");
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [evalResult, setEvalResult] = useState<{ matches: MatchInfo[]; error: string | null }>({
+    matches: [],
+    error: null,
+  });
 
   const toggleFlag = (flag: string) => {
     setFlags((prev) =>
@@ -62,31 +92,56 @@ export default function RegexTesterClient() {
     );
   };
 
-  const { matches, error: regexError } = useMemo(() => {
-    if (!pattern) return { matches: [] as MatchInfo[], error: null };
+  // Run regex matching off the main thread in a Worker with a 250ms ReDoS timeout
+  useEffect(() => {
+    if (!pattern) return;
 
-    try {
-      const ensuredFlags = flags.includes("g") ? flags : flags + "g";
-      const regex = new RegExp(pattern, ensuredFlags);
-      const results: MatchInfo[] = [];
-      let m: RegExpExecArray | null;
+    let cancelled = false;
+    const workerBlob = new Blob([REGEX_WORKER_SOURCE], { type: "application/javascript" });
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const worker = new Worker(workerUrl);
 
-      while ((m = regex.exec(testString)) !== null) {
-        results.push({
-          index: m.index,
-          match: m[0],
-          groups: m.groups ?? {},
-          captures: Array.from(m).slice(1),
-        });
-        if (m[0].length === 0) regex.lastIndex++;
-        if (results.length > 200) break;
-      }
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      cancelled = true;
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      setEvalResult({
+        matches: [],
+        error: "Pattern execution timed out after 250ms (possible ReDoS backtracking).",
+      });
+    }, 250);
 
-      return { matches: results, error: null };
-    } catch (err) {
-      return { matches: [] as MatchInfo[], error: (err as Error).message };
-    }
+    worker.onmessage = (e: MessageEvent<{ matches: MatchInfo[]; error: string | null }>) => {
+      if (cancelled) return;
+      cancelled = true;
+      window.clearTimeout(timer);
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      setEvalResult(e.data);
+    };
+
+    worker.onerror = (err: ErrorEvent) => {
+      if (cancelled) return;
+      cancelled = true;
+      window.clearTimeout(timer);
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      setEvalResult({ matches: [], error: err.message || "Invalid regular expression" });
+    };
+
+    worker.postMessage({ pattern, flags, testString });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
   }, [pattern, flags, testString]);
+
+  const matches = useMemo(() => (pattern ? evalResult.matches : []), [pattern, evalResult.matches]);
+  const regexError = pattern ? evalResult.error : null;
 
   const highlightedText = useMemo(() => {
     if (!pattern || regexError || matches.length === 0) return null;
@@ -130,9 +185,9 @@ export default function RegexTesterClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
+          <Link href="/developer-tools" className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all">
             ← Dev Tools
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 

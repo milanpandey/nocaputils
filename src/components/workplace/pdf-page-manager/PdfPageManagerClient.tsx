@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
+import { withPdfDocument, canvasToBytes } from "@/lib/pdfWorker";
+import { triggerBlobDownload } from "@/lib/download";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 
@@ -20,6 +24,7 @@ export default function PdfPageManagerClient() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { createUrl, revokePrefix } = useTrackedObjectUrls();
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     if (selectedFile.type !== "application/pdf" && !selectedFile.name.toLowerCase().endsWith(".pdf")) {
@@ -32,41 +37,40 @@ export default function PdfPageManagerClient() {
     setSuccessMsg(null);
     setIsLoading(true);
     setStatusMsg("Loading PDF and generating page thumbnails...");
+    revokePrefix("page-");
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const totalPages = pdfDoc.numPages;
+      const items = await withPdfDocument(arrayBuffer, async (pdfDoc) => {
+        const totalPages = pdfDoc.numPages;
+        const rendered: PageItem[] = [];
 
-      const items: PageItem[] = [];
+        for (let i = 1; i <= totalPages; i++) {
+          setStatusMsg(`Rendering thumbnail for page ${i} of ${totalPages}...`);
+          const page = await pdfDoc.getPage(i);
+          const viewport = page.getViewport({ scale: 0.4 });
 
-      for (let i = 1; i <= totalPages; i++) {
-        setStatusMsg(`Rendering thumbnail for page ${i} of ${totalPages}...`);
-        const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({ scale: 0.4 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d");
 
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d");
+          let thumbnailUrl = "";
+          if (ctx) {
+            await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+            const bytes = await canvasToBytes(canvas, "image/jpeg", 0.7);
+            thumbnailUrl = createUrl(`page-${i - 1}`, new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }));
+          }
 
-        let thumbnailUrl = "";
-        if (ctx) {
-          await (page as unknown as { render: (params: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> } })
-            .render({ canvasContext: ctx, viewport }).promise;
-          thumbnailUrl = canvas.toDataURL("image/jpeg", 0.7);
+          rendered.push({
+            pageIndex: i - 1,
+            rotation: 0,
+            deleted: false,
+            thumbnailUrl,
+          });
         }
-
-        items.push({
-          pageIndex: i - 1,
-          rotation: 0,
-          deleted: false,
-          thumbnailUrl,
-        });
-      }
+        return rendered;
+      });
 
       setPages(items);
       setStatusMsg("");
@@ -76,7 +80,7 @@ export default function PdfPageManagerClient() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [createUrl, revokePrefix]);
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -154,13 +158,8 @@ export default function PdfPageManagerClient() {
       const pdfBytes = await outDoc.save();
 
       const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
       const baseName = file.name.replace(/\.pdf$/i, "");
-      link.download = `${baseName}_modified.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, `${baseName}_modified.pdf`);
 
       setSuccessMsg("Modified PDF downloaded successfully!");
       setStatusMsg("");
@@ -208,13 +207,8 @@ export default function PdfPageManagerClient() {
       setStatusMsg("Compressing ZIP archive...");
       const zipBlob = await zip.generateAsync({ type: "blob" });
 
-      const url = URL.createObjectURL(zipBlob);
-      const link = document.createElement("a");
-      link.href = url;
       const baseName = file.name.replace(/\.pdf$/i, "");
-      link.download = `${baseName}_split_pages.zip`;
-      link.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(zipBlob, `${baseName}_split_pages.zip`);
 
       setSuccessMsg(`${activePages.length} pages exported as individual PDFs in a ZIP archive!`);
       setStatusMsg("");
@@ -227,6 +221,7 @@ export default function PdfPageManagerClient() {
   }, [file, activePages]);
 
   const resetAll = () => {
+    revokePrefix("page-");
     setFile(null);
     setPages([]);
     setError(null);
@@ -239,9 +234,9 @@ export default function PdfPageManagerClient() {
     <div className="subtle-pattern min-h-screen">
       <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pb-10 pt-8 md:px-10 md:pt-12">
         <div className="mb-8 flex items-center justify-between">
-          <a href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
+          <Link href="/workplaceutilities" className="bauhaus-back-link" aria-label="Return to Workplace Utilities Hub">
             <span aria-hidden="true">←</span> Workplace Utilities
-          </a>
+          </Link>
           <ThemeToggle />
         </div>
 

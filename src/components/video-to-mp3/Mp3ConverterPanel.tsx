@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { getTripTeaLink } from "@/lib/constants";
-import TripTeaBanner from "../TripTeaBanner";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import {
+  attachFFmpegProgress,
+  cleanupFFmpegFiles,
+  execFFmpeg,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
 
 export default function Mp3ConverterPanel() {
   const [videoSrc, setVideoSrc] = useState<string>("");
@@ -15,11 +21,13 @@ export default function Mp3ConverterPanel() {
   const [mp3Url, setMp3Url] = useState("");
   const [mp3SizeMB, setMp3SizeMB] = useState(0);
 
-  const ffmpegRef = useRef<any>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFile = (file: File) => {
     if (file.type.startsWith("video/")) {
-      const url = URL.createObjectURL(file);
+      const url = replaceUrl("source", URL.createObjectURL(file));
+      revokeUrl("result");
       setVideoSrc(url);
       setVideoFile(file);
       setMp3Url("");
@@ -44,52 +52,47 @@ export default function Mp3ConverterPanel() {
     setIsProcessing(true);
     setProgress(0);
     setErrorMsg("");
+    revokeUrl("result");
+
+    const dotIndex = videoFile.name.lastIndexOf(".");
+    const ext = dotIndex > 0 ? videoFile.name.slice(dotIndex + 1).toLowerCase() : "mp4";
+    const inputName = `input.${ext}`;
+    const outputName = "output.mp3";
+
+    let ffmpeg: FFmpeg | null = null;
+    let detachProgress: (() => void) | null = null;
 
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
+      ffmpeg = await getOrCreateFFmpeg(ffmpegRef);
+      detachProgress = attachFFmpegProgress(ffmpeg, (p) => {
+        setProgress(Math.round(p * 100));
+      });
 
-      if (!ffmpegRef.current) {
-        const ffmpeg = new FFmpeg();
-        ffmpeg.on("progress", ({ progress: p }) => {
-          setProgress(Math.round(Math.min(p, 1) * 100));
-        });
-
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        });
-        ffmpegRef.current = ffmpeg;
-      }
-
-      const ffmpeg = ffmpegRef.current;
-      const inputName = "input" + videoFile.name.substring(videoFile.name.lastIndexOf("."));
-      const outputName = "output.mp3";
-
+      await cleanupFFmpegFiles(ffmpeg, [inputName, outputName]);
       const videoBuffer = await videoFile.arrayBuffer();
       await ffmpeg.writeFile(inputName, new Uint8Array(videoBuffer));
 
-      await ffmpeg.exec([
-        "-i", inputName,
-        "-vn",
-        "-acodec", "libmp3lame",
-        "-ab", bitrate,
-        "-ar", "44100",
-        outputName
-      ]);
+      await execFFmpeg(
+        ffmpeg,
+        ["-i", inputName, "-vn", "-acodec", "libmp3lame", "-ab", bitrate, "-ar", "44100", outputName],
+        "MP3 extraction"
+      );
 
       const data = await ffmpeg.readFile(outputName);
-      const outBlob = new Blob([data as any], { type: "audio/mp3" });
+      if (!(data instanceof Uint8Array)) {
+        throw new Error("Unexpected MP3 output buffer.");
+      }
+      const outBlob = new Blob([new Uint8Array(data)], { type: "audio/mp3" });
       setMp3SizeMB(outBlob.size / (1024 * 1024));
-      setMp3Url(URL.createObjectURL(outBlob));
-
-      await ffmpeg.deleteFile(inputName);
-      await ffmpeg.deleteFile(outputName);
-    } catch (err: any) {
+      setMp3Url(replaceUrl("result", URL.createObjectURL(outBlob)));
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err.message || "An error occurred during conversion.");
+      setErrorMsg(
+        err instanceof Error ? err.message : "An error occurred during conversion."
+      );
     } finally {
+      detachProgress?.();
+      await cleanupFFmpegFiles(ffmpeg, [inputName, outputName]);
       setIsProcessing(false);
     }
   };
@@ -124,7 +127,13 @@ export default function Mp3ConverterPanel() {
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-black uppercase italic text-[var(--text-main)]">Selected Video</h3>
                 <button
-                  onClick={() => { setVideoFile(null); setMp3Url(""); }}
+                  onClick={() => {
+                    revokeUrl("source");
+                    revokeUrl("result");
+                    setVideoSrc("");
+                    setVideoFile(null);
+                    setMp3Url("");
+                  }}
                   className="bg-accent text-black border-2 border-black px-4 py-1 text-xs font-black uppercase shadow-[3px_3px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"
                 >
                   Change File
@@ -142,8 +151,6 @@ export default function Mp3ConverterPanel() {
                  </div>
               </div>
             </div>
-
-            <TripTeaBanner source="video_to_mp3" />
           </div>
 
           <div className="space-y-6">

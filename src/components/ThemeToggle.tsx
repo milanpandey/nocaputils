@@ -1,25 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
+
+function getInitialDarkMode(): boolean {
+  if (typeof window === "undefined") return false;
+  const savedTheme = window.localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return savedTheme ? savedTheme === "dark" : prefersDark;
+}
 
 export default function ThemeToggle() {
-  const [darkMode, setDarkMode] = useState<boolean | null>(null);
-
-  // Read theme only on client after mount — avoids SSR hydration mismatch
-  useEffect(() => {
-    const savedTheme = window.localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setDarkMode(savedTheme ? savedTheme === "dark" : prefersDark);
-  }, []);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  const [darkMode, setDarkMode] = useState<boolean>(getInitialDarkMode);
 
   useEffect(() => {
-    if (darkMode === null) return;
+    if (!mounted) return;
     document.documentElement.classList.toggle("dark", darkMode);
     window.localStorage.setItem("theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
+  }, [darkMode, mounted]);
 
-  // Render nothing until we know the theme (prevents flash + hydration mismatch)
-  if (darkMode === null) {
+  // Render neutral placeholder until mounted so SSR and client markup match
+  if (!mounted) {
     return (
       <button
         type="button"

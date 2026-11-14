@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSpeech } from "@/hooks/games/useSpeech";
 import { useRorschachState } from "@/hooks/games/useRorschachState";
 import { COLOR_THEMES, type ColorTheme } from "@/lib/games/rorschachData";
 
-export default function RorschachGameClient() {
+interface RorschachGameClientProps {
+  backHref?: string;
+  backLabel?: string;
+}
+
+export default function RorschachGameClient({
+  backHref = "/personality",
+  backLabel = "Personality",
+}: RorschachGameClientProps = {}) {
   const { speak, setEnabled, isSupported } = useSpeech();
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
@@ -43,10 +52,10 @@ export default function RorschachGameClient() {
     <div className="rt-game">
       {/* Header */}
       <header className="rt-header">
-        <a href="/personality" className="rt-back-link">
+        <Link href={backHref} className="rt-back-link">
           <span aria-hidden="true">←</span>
-          <span className="rt-back-text">Personality</span>
-        </a>
+          <span className="rt-back-text">{backLabel}</span>
+        </Link>
 
         <div className="rt-header-controls">
           {/* Color theme selector */}

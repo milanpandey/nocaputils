@@ -13,6 +13,14 @@ import {
   audioBufferToWav,
   type OfflineAudioEffects,
 } from "./useAudioEngine";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatClockTime } from "@/lib/formatters";
+import {
+  cleanupFFmpegFiles,
+  execFFmpeg,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
 
 /* ======================================================================
    Constants
@@ -55,13 +63,8 @@ const GLOW_LEVELS = [
   { value: 2, label: "High" },
 ];
 
-function fmtTime(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
-
 const EXPORT_FPS = 30;
+const fmtTime = formatClockTime;
 
 /* ======================================================================
    Component
@@ -123,8 +126,9 @@ export default function MusicVisualizerPanel() {
 
   // ── Refs ──
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const ffmpegRef = useRef<any>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
   const cancelledRef = useRef(false);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   // ── Audio engine ──
   const engine = useAudioEngine();
@@ -231,17 +235,7 @@ export default function MusicVisualizerPanel() {
      ──────────────────────────────────────────────────────────────────── */
 
   const ensureFFmpeg = useCallback(async () => {
-    if (ffmpegRef.current) return ffmpegRef.current;
-    const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-    const { toBlobURL } = await import("@ffmpeg/util");
-    const ffmpeg = new FFmpeg();
-    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    });
-    ffmpegRef.current = ffmpeg;
-    return ffmpeg;
+    return getOrCreateFFmpeg(ffmpegRef);
   }, []);
 
   /* ────────────────────────────────────────────────────────────────────
@@ -260,21 +254,30 @@ export default function MusicVisualizerPanel() {
     setErrorMsg("");
     if (mode === "preview") {
       setIsPreviewMode(true);
+      revokeUrl("preview");
       setPreviewUrl("");
     } else {
       setIsPreviewMode(false);
+      revokeUrl("export");
       setExportUrl("");
     }
 
     // Pause live playback so we own the canvas
     engine.pause();
 
+    const audioFSName = "processed_audio.wav";
+    let audioCtx: AudioContext | null = null;
+    let offCanvas: HTMLCanvasElement | null = null;
+    let ffmpeg: FFmpeg | null = null;
+    const tempFrameFiles: string[] = [];
+
     try {
       // 1. Decode the raw audio file
       const arrayBuf = await audioFile.arrayBuffer();
-      const audioCtx = new AudioContext();
+      audioCtx = new AudioContext();
       const rawBuffer = await audioCtx.decodeAudioData(arrayBuf);
-      audioCtx.close();
+      await audioCtx.close();
+      audioCtx = null;
 
       // 2. Resolve the current audio effect settings
       let fxSpeed = 1, fxBass = 0, fxReverb = 0, fxPitch = true, fxGain = 0;
@@ -297,7 +300,6 @@ export default function MusicVisualizerPanel() {
           fxGain = customGain;
           break;
         }
-        // "none" — all defaults
       }
 
       const fx: OfflineAudioEffects = {
@@ -321,7 +323,7 @@ export default function MusicVisualizerPanel() {
       // 4. Create an offscreen canvas at full export resolution
       const W = aspectCfg.w;
       const H = aspectCfg.h;
-      const offCanvas = document.createElement("canvas");
+      offCanvas = document.createElement("canvas");
       offCanvas.width = W;
       offCanvas.height = H;
       const offCtx = offCanvas.getContext("2d", { alpha: false })!;
@@ -346,12 +348,14 @@ export default function MusicVisualizerPanel() {
       // 6. Initialise render state (smoothing, particles, beat detection)
       const smoothed = new Float32Array(180);
       const particles: Particle[] = [];
-      for (let i = 0; i < 80; i++) {
+      const count = Math.max(0, particleDensity);
+      const sizeMul = particleSize || 1;
+      for (let i = 0; i < count; i++) {
         particles.push({
           x: Math.random(),
           y: Math.random(),
           vy: -(0.0005 + Math.random() * 0.001),
-          size: 0.8 + Math.random() * 1.2,
+          size: (0.8 + Math.random() * 1.2) * sizeMul,
           opacity: 0.15 + Math.random() * 0.25,
         });
       }
@@ -368,19 +372,19 @@ export default function MusicVisualizerPanel() {
       };
 
       // 7. Prepare audio for FFmpeg
-      const ffmpeg = await ensureFFmpeg();
+      ffmpeg = await ensureFFmpeg();
       const wavBytes = audioBufferToWav(processedBuffer);
-      const audioFSName = "processed_audio.wav";
       await ffmpeg.writeFile(audioFSName, wavBytes);
 
       // 8. Render frames — try hardware-accelerated WebCodecs first, fallback to JPEG
       const useWebCodecs = typeof VideoEncoder !== "undefined";
       let h264Chunks: Uint8Array[] | null = null;
+      let encoderFailed = false;
 
       if (useWebCodecs) {
         /* ─── FAST PATH: WebCodecs H.264 encoder ─── */
         h264Chunks = [];
-        const chunks = h264Chunks; // closure ref
+        const chunks = h264Chunks;
 
         const encoder = new VideoEncoder({
           output: (chunk) => {
@@ -388,10 +392,12 @@ export default function MusicVisualizerPanel() {
             chunk.copyTo(buf);
             chunks.push(buf);
           },
-          error: (e) => console.error("VideoEncoder error:", e),
+          error: (e) => {
+            encoderFailed = true;
+            console.error("VideoEncoder error:", e);
+          },
         });
 
-        // Try High profile first, fall back to Baseline
         const codecCandidates = [
           "avc1.640028", // High L4.0
           "avc1.4d0028", // Main L4.0
@@ -424,12 +430,12 @@ export default function MusicVisualizerPanel() {
 
         if (!configured) {
           encoder.close();
-          h264Chunks = null; // fall through to JPEG path
+          h264Chunks = null;
         } else {
           const YIELD_INTERVAL = 60;
 
           for (let f = 0; f < totalFrames; f++) {
-            if (cancelledRef.current) break;
+            if (cancelledRef.current || encoderFailed) break;
 
             const timeSec = startSec + f / EXPORT_FPS;
             const freqData = getFrequencyDataAtTime(processedBuffer, timeSec, 2048);
@@ -441,9 +447,8 @@ export default function MusicVisualizerPanel() {
               rotating, title, artist, bgImg, thumbImg,
             }, renderState);
 
-            // Create VideoFrame directly from canvas (no JPEG encoding!)
             const frame = new VideoFrame(offCanvas, {
-              timestamp: f * (1_000_000 / EXPORT_FPS), // microseconds
+              timestamp: f * (1_000_000 / EXPORT_FPS),
             });
             encoder.encode(frame, { keyFrame: f % 150 === 0 });
             frame.close();
@@ -451,20 +456,24 @@ export default function MusicVisualizerPanel() {
             setExportProgress(Math.round(((f + 1) / totalFrames) * 90));
 
             if ((f + 1) % YIELD_INTERVAL === 0) {
-              await encoder.flush(); // drain encoded chunks
+              await encoder.flush();
               await new Promise((r) => setTimeout(r, 0));
             }
           }
 
-          await encoder.flush();
-          encoder.close();
+          if (!encoderFailed && encoder.state !== "closed") {
+            await encoder.flush();
+          }
+          if (encoder.state !== "closed") {
+            encoder.close();
+          }
+          if (encoderFailed) {
+            throw new Error("Hardware video encoder failed during frame export.");
+          }
         }
       }
 
       if (cancelledRef.current) {
-        try { await ffmpeg.deleteFile(audioFSName); } catch {}
-        setIsExporting(false);
-        setIsPreviewMode(false);
         return;
       }
 
@@ -473,7 +482,6 @@ export default function MusicVisualizerPanel() {
       setExportProgress(92);
 
       if (h264Chunks && h264Chunks.length > 0) {
-        /* ─── WebCodecs path: mux pre-encoded H.264 + audio ─── */
         const totalH264Size = h264Chunks.reduce((s, c) => s + c.byteLength, 0);
         const h264Stream = new Uint8Array(totalH264Size);
         let offset = 0;
@@ -481,32 +489,33 @@ export default function MusicVisualizerPanel() {
           h264Stream.set(c, offset);
           offset += c.byteLength;
         }
-        h264Chunks = null; // free memory
+        h264Chunks = null;
 
         await ffmpeg.writeFile("video.h264", h264Stream);
 
-        await ffmpeg.exec([
-          "-f", "h264",
-          "-framerate", String(EXPORT_FPS),
-          "-i", "video.h264",
-          "-ss", String(startSec),
-          "-t", String(endSec - startSec),
-          "-i", audioFSName,
-          "-c:v", "copy",          // just copy — already H.264!
-          "-c:a", "aac",
-          "-b:a", "192k",
-          "-ar", "48000",
-          "-ac", "2",
-          "-shortest",
-          "-brand", "mp42",
-          "-tag:v", "avc1",
-          "-movflags", "+faststart",
-          "output.mp4",
-        ]);
-
-        try { await ffmpeg.deleteFile("video.h264"); } catch {}
+        await execFFmpeg(
+          ffmpeg,
+          [
+            "-f", "h264",
+            "-framerate", String(EXPORT_FPS),
+            "-i", "video.h264",
+            "-ss", String(startSec),
+            "-t", String(endSec - startSec),
+            "-i", audioFSName,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-ar", "48000",
+            "-ac", "2",
+            "-shortest",
+            "-brand", "mp42",
+            "-tag:v", "avc1",
+            "-movflags", "+faststart",
+            "output.mp4",
+          ],
+          "WebCodecs MP4 muxing"
+        );
       } else {
-        /* ─── Fallback: JPEG frames (browsers without WebCodecs) ─── */
         const YIELD_INTERVAL = 90;
 
         for (let f = 0; f < totalFrames; f++) {
@@ -522,11 +531,13 @@ export default function MusicVisualizerPanel() {
             rotating, title, artist, bgImg, thumbImg,
           }, renderState);
 
-          const blob = await new Promise<Blob>((res) =>
-            offCanvas.toBlob((b) => res(b!), "image/jpeg", 0.82)
+          const blob = await new Promise<Blob>((res, rej) =>
+            offCanvas!.toBlob((b) => (b ? res(b) : rej(new Error("Canvas frame encode failed"))), "image/jpeg", 0.82)
           );
+          const frameName = `frame_${String(f).padStart(6, "0")}.jpg`;
+          tempFrameFiles.push(frameName);
           const frameBuf = new Uint8Array(await blob.arrayBuffer());
-          await ffmpeg.writeFile(`frame_${String(f).padStart(6, "0")}.jpg`, frameBuf);
+          await ffmpeg.writeFile(frameName, frameBuf);
 
           setExportProgress(Math.round(((f + 1) / totalFrames) * 90));
           if ((f + 1) % YIELD_INTERVAL === 0) {
@@ -535,51 +546,46 @@ export default function MusicVisualizerPanel() {
         }
 
         if (cancelledRef.current) {
-          for (let f = 0; f < totalFrames; f++) {
-            try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
-          }
-          try { await ffmpeg.deleteFile(audioFSName); } catch {}
-          setIsExporting(false);
-          setIsPreviewMode(false);
           return;
         }
 
         setIsRemuxing(true);
         setExportProgress(92);
 
-        await ffmpeg.exec([
-          "-framerate", String(EXPORT_FPS),
-          "-i", "frame_%06d.jpg",
-          "-ss", String(startSec),
-          "-t", String(endSec - startSec),
-          "-i", audioFSName,
-          "-c:v", "libx264",
-          "-preset", "ultrafast",
-          "-crf", "23",
-          "-pix_fmt", "yuv420p",
-          "-c:a", "aac",
-          "-b:a", "192k",
-          "-ar", "48000",
-          "-ac", "2",
-          "-shortest",
-          "-brand", "mp42",
-          "-tag:v", "avc1",
-          "-movflags", "+faststart",
-          "output.mp4",
-        ]);
-
-        // Cleanup JPEG frames
-        for (let f = 0; f < totalFrames; f++) {
-          try { await ffmpeg.deleteFile(`frame_${String(f).padStart(6, "0")}.jpg`); } catch {}
-        }
+        await execFFmpeg(
+          ffmpeg,
+          [
+            "-framerate", String(EXPORT_FPS),
+            "-i", "frame_%06d.jpg",
+            "-ss", String(startSec),
+            "-t", String(endSec - startSec),
+            "-i", audioFSName,
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-ar", "48000",
+            "-ac", "2",
+            "-shortest",
+            "-brand", "mp42",
+            "-tag:v", "avc1",
+            "-movflags", "+faststart",
+            "output.mp4",
+          ],
+          "JPEG frame MP4 encoding"
+        );
       }
 
       setExportProgress(98);
 
-      // 10. Read result
       const data = await ffmpeg.readFile("output.mp4");
-      const finalBlob = new Blob([data], { type: "video/mp4" });
-      const url = URL.createObjectURL(finalBlob);
+      if (!(data instanceof Uint8Array)) {
+        throw new Error("Unexpected MP4 output buffer.");
+      }
+      const finalBlob = new Blob([new Uint8Array(data)], { type: "video/mp4" });
+      const url = replaceUrl(mode === "preview" ? "preview" : "export", URL.createObjectURL(finalBlob));
 
       if (mode === "preview") {
         setPreviewUrl(url);
@@ -587,15 +593,17 @@ export default function MusicVisualizerPanel() {
         setExportUrl(url);
       }
 
-      // 11. Cleanup FFmpeg FS
-      try { await ffmpeg.deleteFile(audioFSName); } catch {}
-      try { await ffmpeg.deleteFile("output.mp4"); } catch {}
-
       setExportProgress(100);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export failed:", err);
-      setErrorMsg(err.message || "Export failed.");
+      setErrorMsg(err instanceof Error ? err.message : "Export failed.");
     } finally {
+      audioCtx?.close().catch(() => {});
+      if (offCanvas) {
+        offCanvas.width = 0;
+        offCanvas.height = 0;
+      }
+      await cleanupFFmpegFiles(ffmpeg, [audioFSName, "video.h264", "output.mp4", ...tempFrameFiles]);
       setIsExporting(false);
       setIsRemuxing(false);
       setIsPreviewMode(false);
@@ -604,10 +612,11 @@ export default function MusicVisualizerPanel() {
     audioFile, engine, previewStart, aspectCfg,
     bgImageUrl, thumbImageUrl, ensureFFmpeg,
     visStyle, visColor, showSeekBar, showParticles,
-    particleSpeed, reactivity, glowLevel, rotating,
+    particleDensity, particleSize, particleSpeed, reactivity, glowLevel, rotating,
     title, artist,
     audioEffect, preservePitch, customSpeed, customBassGain, customReverbMix,
     customPitchSemitones, customGain,
+    replaceUrl, revokeUrl,
   ]);
 
   const handleExport = useCallback(() => offlineRender("full"), [offlineRender]);
@@ -815,7 +824,6 @@ export default function MusicVisualizerPanel() {
                   {thumbFile ? (
                     <div className="space-y-2">
                       <div className="w-full aspect-square border-4 border-black bg-[var(--bg-panel-muted)] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={thumbImageUrl!} alt="Thumb" className="w-full h-full object-cover" />
                       </div>
                       <button
@@ -849,7 +857,6 @@ export default function MusicVisualizerPanel() {
                   {bgFile ? (
                     <div className="space-y-2">
                       <div className="w-full aspect-square border-4 border-black bg-[var(--bg-panel-muted)] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={bgImageUrl!} alt="BG" className="w-full h-full object-cover" />
                       </div>
                       <button

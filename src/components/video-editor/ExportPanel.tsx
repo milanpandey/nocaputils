@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
 import type { EnrichedClip } from "./TimelinePanel";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import {
+  attachFFmpegProgress,
+  cleanupFFmpegFiles,
+  execFFmpeg,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
 
 type ExportState = "idle" | "loading" | "processing" | "done" | "error";
 
@@ -47,14 +55,13 @@ export default function ExportPanel({
   const [progress, setProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const cleanup = useCallback(() => {
-    if (downloadUrl) {
-      URL.revokeObjectURL(downloadUrl);
-      setDownloadUrl("");
-    }
-  }, [downloadUrl]);
+    revokeUrl("export");
+    setDownloadUrl("");
+  }, [revokeUrl]);
 
   const handleExport = useCallback(async () => {
     if (!videoSrc || !videoSegments.length) return;
@@ -63,25 +70,24 @@ export default function ExportPanel({
     setProgress(0);
     setErrorMsg("");
 
+    const tempFiles: string[] = [
+      "input.mp4",
+      "font.ttf",
+      "concat.txt",
+      "video_only.mp4",
+      "input_audio.mp3",
+      "audio_concat.txt",
+      "audio_trimmed.mp3",
+      "output.mp4",
+    ];
+    let ffmpeg: FFmpeg | null = null;
+    let detachProgress: (() => void) | null = null;
+
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
-
-      if (!ffmpegRef.current) {
-        const ffmpeg = new FFmpeg();
-        ffmpeg.on("progress", ({ progress: p }) => {
-          setProgress(Math.round(Math.min(p, 1) * 100));
-        });
-
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        });
-        ffmpegRef.current = ffmpeg;
-      }
-
-      const ffmpeg = ffmpegRef.current;
+      ffmpeg = await getOrCreateFFmpeg(ffmpegRef);
+      detachProgress = attachFFmpegProgress(ffmpeg, (p) => {
+        setProgress(Math.round(p * 100));
+      });
       setState("processing");
 
       // Fetch source video
@@ -123,10 +129,8 @@ export default function ExportPanel({
         if (ratio) {
           const [rw, rh] = ratio;
           if (cropMode === "crop") {
-            // Crop: cut video to target aspect ratio (center crop)
             filters.push(`crop='if(gt(iw/ih,${rw}/${rh}),ih*${rw}/${rh},iw)':'if(gt(iw/ih,${rw}/${rh}),ih,iw*${rh}/${rw})'`);
           } else {
-            // Letterbox: add black bars to fit target aspect ratio
             filters.push(`scale=iw:ih,setsar=1`);
             filters.push(`pad='if(gt(iw/ih,${rw}/${rh}),iw,ih*${rw}/${rh})':'if(gt(iw/ih,${rw}/${rh}),iw*${rh}/${rw},ih)':(ow-iw)/2:(oh-ih)/2:black`);
           }
@@ -134,28 +138,29 @@ export default function ExportPanel({
       }
 
       if (textOverlay) {
-        try {
-          // Download font for FFmpeg to use
-          const fontRes = await fetch("https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf");
-          if (!fontRes.ok) throw new Error("Failed to fetch font for text overlay");
-          const fontBuf = await fontRes.arrayBuffer();
-          await ffmpeg.writeFile("font.ttf", new Uint8Array(fontBuf));
-
-          // Compute realistic font size based on original exported resolution
-          let videoHeight = 720;
-          try {
-            const v = document.createElement("video");
-            v.src = videoSrc;
-            await new Promise((resolve) => { v.onloadedmetadata = resolve; v.onerror = resolve; });
-            if (v.videoHeight) videoHeight = (r === 90 || r === 270) ? v.videoWidth : v.videoHeight;
-          } catch (e) {}
-
-          const finalFontSize = Math.max(10, Math.round(videoHeight * (textSize / 500)));
-          const escapedText = textOverlay.replace(/'/g, "'\\''").replace(/:/g, "\\:");
-          filters.push(`drawtext=fontfile=font.ttf:text='${escapedText}':fontcolor=white:fontsize=${finalFontSize}:x=(w-text_w)/2:y=(h-text_h)*${textY}/100:shadowcolor=black@0.7:shadowx=2:shadowy=2`);
-        } catch (e) {
-          console.error("Text overlay failed", e);
+        const fontRes = await fetch("https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf");
+        if (!fontRes.ok) {
+          throw new Error("Could not load overlay font while exporting text.");
         }
+        const fontBuf = await fontRes.arrayBuffer();
+        await ffmpeg.writeFile("font.ttf", new Uint8Array(fontBuf));
+
+        let videoHeight = 720;
+        try {
+          const v = document.createElement("video");
+          v.src = videoSrc;
+          await new Promise((resolve) => {
+            v.onloadedmetadata = resolve;
+            v.onerror = resolve;
+          });
+          if (v.videoHeight) videoHeight = (r === 90 || r === 270) ? v.videoWidth : v.videoHeight;
+        } catch {
+          // Fall back to default height
+        }
+
+        const finalFontSize = Math.max(10, Math.round(videoHeight * (textSize / 500)));
+        const escapedText = textOverlay.replace(/'/g, "'\\''").replace(/:/g, "\\:");
+        filters.push(`drawtext=fontfile=font.ttf:text='${escapedText}':fontcolor=white:fontsize=${finalFontSize}:x=(w-text_w)/2:y=(h-text_h)*${textY}/100:shadowcolor=black@0.7:shadowx=2:shadowy=2`);
       }
 
       const hasCustomAudio = Boolean(audioSrc && audioSegments.length > 0);
@@ -167,7 +172,7 @@ export default function ExportPanel({
         const args = [
           "-ss", seg.sourceStart.toFixed(3),
           "-t", duration.toFixed(3),
-          "-i", "input.mp4"
+          "-i", "input.mp4",
         ];
         if (filters.length > 0) {
           args.push("-vf", filters.join(","));
@@ -177,12 +182,14 @@ export default function ExportPanel({
         }
         if (hasCustomAudio) args.push("-an");
         args.push("-y", "video_only.mp4");
-        await ffmpeg.exec(args);
+        await execFFmpeg(ffmpeg, args, "Video segment export");
       } else {
         const concatList: string[] = [];
         for (let i = 0; i < videoSegments.length; i++) {
           const seg = videoSegments[i];
           const duration = seg.sourceEnd - seg.sourceStart;
+          const segName = `seg${i}.mp4`;
+          tempFiles.push(segName);
           const segArgs = [
             "-ss", seg.sourceStart.toFixed(3),
             "-t", duration.toFixed(3),
@@ -195,64 +202,81 @@ export default function ExportPanel({
             segArgs.push("-c:v", "copy");
           }
           if (hasCustomAudio) segArgs.push("-an");
-          segArgs.push("-y", `seg${i}.mp4`);
-          await ffmpeg.exec(segArgs);
-          concatList.push(`file 'seg${i}.mp4'`);
+          segArgs.push("-y", segName);
+          await execFFmpeg(ffmpeg, segArgs, `Video segment ${i + 1}`);
+          concatList.push(`file '${segName}'`);
         }
         await ffmpeg.writeFile("concat.txt", concatList.join("\n"));
-        await ffmpeg.exec([
-          "-f", "concat", "-safe", "0", "-i", "concat.txt",
-          "-c", "copy", "-y", "video_only.mp4",
-        ]);
+        await execFFmpeg(
+          ffmpeg,
+          ["-f", "concat", "-safe", "0", "-i", "concat.txt", "-c", "copy", "-y", "video_only.mp4"],
+          "Video concatenation"
+        );
       }
 
-      // Step 2: If audio exists, fetch and trim it, then mux with video
+      // Step 2: If audio exists, fetch and trim/concat segments, then mux with video
       if (hasCustomAudio) {
         const audioResponse = await fetch(audioSrc);
         const audioBuffer = await audioResponse.arrayBuffer();
         await ffmpeg.writeFile("input_audio.mp3", new Uint8Array(audioBuffer));
 
-        // Trim audio to first segment bounds
-        const aSeg = audioSegments[0];
-        const aDuration = aSeg.sourceEnd - aSeg.sourceStart;
-        await ffmpeg.exec([
-          "-ss", aSeg.sourceStart.toFixed(3),
-          "-t", aDuration.toFixed(3),
-          "-i", "input_audio.mp3",
-          "-y", "audio_trimmed.mp3",
-        ]);
+        if (audioSegments.length === 1) {
+          const aSeg = audioSegments[0];
+          const aDuration = aSeg.sourceEnd - aSeg.sourceStart;
+          await execFFmpeg(
+            ffmpeg,
+            ["-ss", aSeg.sourceStart.toFixed(3), "-t", aDuration.toFixed(3), "-i", "input_audio.mp3", "-y", "audio_trimmed.mp3"],
+            "Audio trim"
+          );
+        } else {
+          const audioConcatList: string[] = [];
+          for (let i = 0; i < audioSegments.length; i++) {
+            const aSeg = audioSegments[i];
+            const aDuration = aSeg.sourceEnd - aSeg.sourceStart;
+            const aSegName = `aud_seg_${i}.mp3`;
+            tempFiles.push(aSegName);
+            await execFFmpeg(
+              ffmpeg,
+              ["-ss", aSeg.sourceStart.toFixed(3), "-t", aDuration.toFixed(3), "-i", "input_audio.mp3", "-y", aSegName],
+              `Audio segment ${i + 1}`
+            );
+            audioConcatList.push(`file '${aSegName}'`);
+          }
+          await ffmpeg.writeFile("audio_concat.txt", audioConcatList.join("\n"));
+          await execFFmpeg(
+            ffmpeg,
+            ["-f", "concat", "-safe", "0", "-i", "audio_concat.txt", "-c", "copy", "-y", "audio_trimmed.mp3"],
+            "Audio concatenation"
+          );
+        }
 
-        // Mux video + audio: use shortest stream to avoid desync
-        await ffmpeg.exec([
-          "-i", "video_only.mp4",
-          "-i", "audio_trimmed.mp3",
-          "-c:v", "copy",
-          "-c:a", "aac",
-          "-shortest",
-          "-brand", "mp42",
-          "-y", "output.mp4",
-        ]);
+        await execFFmpeg(
+          ffmpeg,
+          ["-i", "video_only.mp4", "-i", "audio_trimmed.mp3", "-c:v", "copy", "-c:a", "aac", "-shortest", "-brand", "mp42", "-y", "output.mp4"],
+          "Video and audio mux"
+        );
       } else {
-        // No audio — just rename
-        await ffmpeg.exec([
-          "-i", "video_only.mp4",
-          "-c", "copy",
-          "-brand", "mp42",
-          "-y", "output.mp4",
-        ]);
+        await execFFmpeg(
+          ffmpeg,
+          ["-i", "video_only.mp4", "-c", "copy", "-brand", "mp42", "-y", "output.mp4"],
+          "MP4 container finalize"
+        );
       }
 
       const data = await ffmpeg.readFile("output.mp4");
       const uint8 = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string);
       const blob = new Blob([new Uint8Array(uint8)], { type: "video/mp4" });
-      setDownloadUrl(URL.createObjectURL(blob));
+      setDownloadUrl(replaceUrl("export", URL.createObjectURL(blob)));
       setState("done");
     } catch (err) {
       console.error("Export failed:", err);
       setErrorMsg(err instanceof Error ? err.message : "Export failed");
       setState("error");
+    } finally {
+      detachProgress?.();
+      await cleanupFFmpegFiles(ffmpeg, tempFiles);
     }
-  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, rotation, flipH, flipV, textOverlay, textSize, textY, cleanup]);
+  }, [videoSrc, audioSrc, videoSegments, audioSegments, brightness, contrast, saturation, filterPreset, cropPreset, cropMode, rotation, flipH, flipV, textOverlay, textSize, textY, cleanup, replaceUrl]);
 
   if (!open) {
     return (

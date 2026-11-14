@@ -80,7 +80,7 @@ export function getBrowserLocaleCurrency(): CurrencyInfo {
     if (tz.includes("Shanghai") || lang.includes("CN")) return CURRENCY_MAP.CNY;
     if (tz.includes("Sydney") || tz.includes("Melbourne") || lang.includes("AU")) return CURRENCY_MAP.AUD;
     if (tz.includes("Toronto") || tz.includes("Vancouver") || lang.includes("CA")) return CURRENCY_MAP.CAD;
-  } catch (e) {
+  } catch {
     // fallback
   }
   return CURRENCY_MAP.USD;

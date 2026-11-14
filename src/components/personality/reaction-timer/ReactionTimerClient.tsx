@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import {
@@ -268,9 +269,14 @@ export default function ReactionTimerClient({
   }, [clearWaitTimer]);
 
   const copyResult = useCallback(() => {
-    const text = `⚡ My Reaction Time is ${stats.averageMs} ms (${stats.benchmark.badge} - ${stats.benchmark.title})!\n` +
+    const shareUrl =
+      typeof window !== "undefined"
+        ? window.location.href
+        : "https://nocaputils.com/personality/reaction-timer";
+    const text =
+      `⚡ My Reaction Time is ${stats.averageMs} ms (${stats.benchmark.badge} - ${stats.benchmark.title})!\n` +
       `Best Round: ${stats.bestMs} ms | Consistency: Grade ${stats.consistencyGrade}\n` +
-      `Test your reflexes free & private on nocaputils: https://nocaputils.com/personality/reaction-timer`;
+      `Test your reflexes free & private on nocaputils: ${shareUrl}`;
 
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
@@ -283,12 +289,12 @@ export default function ReactionTimerClient({
       <div className="mx-auto flex w-full max-w-5xl flex-col px-4 pb-12 pt-6 md:px-8 md:pt-10">
         {/* Top Navigation */}
         <div className="mb-6 flex items-center justify-between">
-          <a
+          <Link
             href={backHref}
             className="neo-button neo-button-theme flex items-center gap-2 px-4 py-2 text-[11px] font-black uppercase tracking-widest transition-all"
           >
             ← {backLabel}
-          </a>
+          </Link>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSoundEnabled((prev) => !prev)}

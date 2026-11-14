@@ -53,7 +53,7 @@ export default function AudioToMp4Page() {
                 </h2>
                 <div className="mt-6 space-y-5 text-base leading-8 text-[var(--text-soft)]">
                   <p>
-                    Need to upload a podcast, music track, or voiceover to YouTube or Instagram? They don't accept audio files directly. 
+                    Need to upload a podcast, music track, or voiceover to YouTube or Instagram? They don&apos;t accept audio files directly. 
                     Whether you are looking to convert <span className="font-black text-[var(--text-main)]">MP3 to MP4</span> or <span className="font-black text-[var(--text-main)]">WAV to MP4</span>, <span className="font-black text-[var(--text-main)]">nocaputils</span> uses client-side processing to convert your audio to video instantly, without uploading your data to slow servers. This makes it perfect for quickly creating videos for YouTube.
                   </p>
                   <p>
@@ -61,8 +61,8 @@ export default function AudioToMp4Page() {
                     This makes the conversion process incredibly fast and maintains high audio quality.
                   </p>
                   <p>
-                    Simply select your audio file, optionally provide a background image (we provide a default one if you don't), and hit convert. 
-                    Since there's no upload step, the process takes only seconds.
+                    Simply select your audio file, optionally provide a background image (we provide a default one if you don&apos;t), and hit convert. 
+                    Since there&apos;s no upload step, the process takes only seconds.
                   </p>
                 </div>
               </div>
@@ -77,7 +77,7 @@ export default function AudioToMp4Page() {
                       Why is it so much faster than other tools?
                     </p>
                     <p className="mt-2">
-                      We use a technique called "stream copying" where we skip re-encoding the audio and simply package the existing MP3 data into an MP4 container. For formats like WAV, we use ultra-fast AAC encoding. This saves massive amounts of processing time.
+                      We use a technique called &quot;stream copying&quot; where we skip re-encoding the audio and simply package the existing MP3 data into an MP4 container. For formats like WAV, we use ultra-fast AAC encoding. This saves massive amounts of processing time.
                     </p>
                   </div>
                   <div>
@@ -85,15 +85,15 @@ export default function AudioToMp4Page() {
                       Is my data safe?
                     </p>
                     <p className="mt-2">
-                      Yes. Unlike other converters, we don't store or even see your files. The conversion happens entirely within your browser's memory using WebAssembly.
+                      Yes. Unlike other converters, we don&apos;t store or even see your files. The conversion happens entirely within your browser&apos;s memory using WebAssembly.
                     </p>
                   </div>
                   <div>
                     <p className="font-black uppercase tracking-[0.14em] text-[var(--text-main)]">
-                      What if I don't add an image?
+                      What if I don&apos;t add an image?
                     </p>
                     <p className="mt-2">
-                      If you don't provide an image, we will generate a simple black background frame for your video automatically.
+                      If you don&apos;t provide an image, we will generate a simple black background frame for your video automatically.
                     </p>
                   </div>
                 </div>

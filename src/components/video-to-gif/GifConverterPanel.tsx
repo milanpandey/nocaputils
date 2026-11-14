@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import { getTripTeaLink } from "@/lib/constants";
+import { useState, useRef } from "react";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import TripTeaBanner from "@/components/TripTeaBanner";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import {
+  attachFFmpegProgress,
+  cleanupFFmpegFiles,
+  execFFmpeg,
+  getOrCreateFFmpeg,
+} from "@/lib/ffmpeg";
 
 export default function GifConverterPanel() {
   const [videoSrc, setVideoSrc] = useState<string>("");
@@ -20,18 +28,13 @@ export default function GifConverterPanel() {
   const [errorMsg, setErrorMsg] = useState("");
   const [gifUrl, setGifUrl] = useState("");
 
-  const ffmpegRef = useRef<import("@ffmpeg/ffmpeg").FFmpeg | null>(null);
-
-  useEffect(() => {
-    // If we loaded a new video or its duration updated, we cap the endTime initial state at duration or 15
-    if (duration > 0) {
-      setEndTime(Math.min(15, duration));
-    }
-  }, [duration]);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   const handleFile = (file: File) => {
     if (file.type.startsWith("video/")) {
-      const url = URL.createObjectURL(file);
+      const url = replaceUrl("source", URL.createObjectURL(file));
+      revokeUrl("result");
       setVideoSrc(url);
       setVideoFile(file);
       setGifUrl("");
@@ -76,58 +79,51 @@ export default function GifConverterPanel() {
 
     setIsProcessing(true);
     setProgress(0);
+    revokeUrl("result");
+
+    let ffmpeg: FFmpeg | null = null;
+    let detachProgress: (() => void) | null = null;
 
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
+      ffmpeg = await getOrCreateFFmpeg(ffmpegRef);
+      detachProgress = attachFFmpegProgress(ffmpeg, (p) => {
+        setProgress(Math.round(p * 100));
+      });
 
-      if (!ffmpegRef.current) {
-        const ffmpeg = new FFmpeg();
-        ffmpeg.on("progress", ({ progress: p }) => {
-          setProgress(Math.round(Math.min(p, 1) * 100));
-        });
-
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        });
-        ffmpegRef.current = ffmpeg;
-      }
-
-      const ffmpeg = ffmpegRef.current;
-
-      // fetch source
-      const videoResponse = await fetch(videoSrc);
-      const videoBuffer = await videoResponse.arrayBuffer();
+      await cleanupFFmpegFiles(ffmpeg, ["input.mp4", "output.gif"]);
+      const videoBuffer = await videoFile.arrayBuffer();
       await ffmpeg.writeFile("input.mp4", new Uint8Array(videoBuffer));
 
-      // FFmpeg command to trim, scale, and generate GIF using a custom palette for high quality
-      // We use ss and t for accurate seeking
       const filterGraph = `fps=${targetFps},scale=${targetWidth}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
-      
-      await ffmpeg.exec([
-        "-ss", startTime.toString(),
-        "-t", trimDuration.toString(),
-        "-i", "input.mp4",
-        "-vf", filterGraph,
-        "-loop", "0",
-        "output.gif"
-      ]);
+
+      await execFFmpeg(
+        ffmpeg,
+        [
+          "-ss", startTime.toString(),
+          "-t", trimDuration.toString(),
+          "-i", "input.mp4",
+          "-vf", filterGraph,
+          "-loop", "0",
+          "output.gif",
+        ],
+        "GIF conversion"
+      );
 
       const data = await ffmpeg.readFile("output.gif");
-      const gifBlob = new Blob([data as any], { type: "image/gif" });
-      const newGifUrl = URL.createObjectURL(gifBlob);
+      if (!(data instanceof Uint8Array)) {
+        throw new Error("Unexpected GIF output buffer.");
+      }
+      const gifBlob = new Blob([new Uint8Array(data)], { type: "image/gif" });
+      const newGifUrl = replaceUrl("result", URL.createObjectURL(gifBlob));
       setGifUrl(newGifUrl);
-
-      // Cleanup
-      await ffmpeg.deleteFile("input.mp4");
-      await ffmpeg.deleteFile("output.gif");
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg("An error occurred during GIF generation.");
+      setErrorMsg(
+        err instanceof Error ? err.message : "An error occurred during GIF generation."
+      );
     } finally {
+      detachProgress?.();
+      await cleanupFFmpegFiles(ffmpeg, ["input.mp4", "output.gif"]);
       setIsProcessing(false);
     }
   };
@@ -169,7 +165,10 @@ export default function GifConverterPanel() {
                 </div>
                 <button
                   onClick={() => {
+                    revokeUrl("source");
+                    revokeUrl("result");
                     setVideoSrc("");
+                    setVideoFile(null);
                     setGifUrl("");
                   }}
                   className="bg-[#ff7b61] text-black border-2 border-black px-4 py-1 text-xs font-black uppercase pointer-events-auto hover:bg-[#ff947d] transition-colors shadow-[3px_3px_0_0_#000] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_#000]"
@@ -185,9 +184,13 @@ export default function GifConverterPanel() {
                   className="w-full h-full object-contain"
                   controls
                   onLoadedMetadata={(e) => {
-                    setDuration(e.currentTarget.duration);
+                    const dur = e.currentTarget.duration;
+                    setDuration(dur);
+                    if (dur > 0) {
+                      setEndTime(Math.min(15, dur));
+                    }
                   }}
-                  onTimeUpdate={(e) => {
+                  onTimeUpdate={() => {
                     // Could sync exact time if desired.
                   }}
                 />
@@ -211,37 +214,7 @@ export default function GifConverterPanel() {
             </div>
 
             {/* TripTea Promoted App Card */}
-            <div className="mt-8 bg-[#111111] border-4 border-black p-6 shadow-[8px_8px_0_0_#000] flex flex-col md:flex-row gap-6 md:items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-2xl font-black uppercase italic leading-none tracking-[-0.04em] mb-3 text-white">
-                  Meet{" "}
-                  <span className="inline-block border-2 border-black bg-[#d7fc70] px-2 py-0.5 text-black not-italic shadow-[3px_3px_0_0_#000]">
-                    TripTea
-                  </span>
-                </h3>
-                <p className="text-sm font-bold uppercase leading-relaxed text-[#9ca3af] mb-4 xl:max-w-md">
-                  Simply describe your dream vacation in plain language, and our AI creates a complete, day-by-day itinerary tailored to your preferences.
-                </p>
-                <a
-                  href={getTripTeaLink("video_to_gif")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-[#ff33ff] text-black border-2 border-black px-4 py-2 text-xs font-black uppercase inline-block hover:bg-[#ff66ff] transition-colors shadow-[4px_4px_0_0_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#000]"
-                >
-                  Download on Google Play
-                </a>
-              </div>
-              <div className="hidden lg:flex items-center justify-center shrink-0 w-32 h-32 rotate-[3deg] border-4 border-black bg-[#d7fc70] p-2 shadow-[6px_6px_0_0_#000]">
-                <div className="w-full h-full bg-black border-2 border-black overflow-hidden relative">
-                  <img
-                    src="/media/app_screen.jpg"
-                    alt="TripTea app screen"
-                    className="w-full h-full object-cover object-top opacity-80"
-                  />
-                  <div className="absolute inset-0 border-4 border-[#ff33ff] z-10 pointer-events-none mix-blend-screen opacity-50"></div>
-                </div>
-              </div>
-            </div>
+            <TripTeaBanner source="video_to_gif" />
           </div>
 
           {/* Right Column: Control Panels */}

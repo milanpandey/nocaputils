@@ -11,27 +11,15 @@ import TimelinePanel, {
   seekMediaToTimelineTime,
   type Clip,
   type Selection,
-  type TrackType,
 } from "./TimelinePanel";
 import ExportPanel from "./ExportPanel";
 import { useUndoHistory, type UndoableState } from "./useUndoHistory";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatTimeTenths } from "@/lib/formatters";
 
 type FilterPreset = "none" | "grayscale" | "sepia" | "vintage";
 type CropPreset = "free" | "16:9" | "1:1" | "9:16";
 type CropMode = "letterbox" | "crop";
-
-function clamp(v: number, min: number, max: number) {
-  return Math.min(Math.max(v, min), max);
-}
-
-function formatTime(t: number) {
-  if (!Number.isFinite(t)) return "00:00.0";
-  const s = Math.max(t, 0);
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  const tn = Math.floor((s % 1) * 10);
-  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}.${tn}`;
-}
 
 async function buildAudioPeaks(file: File) {
   try {
@@ -102,6 +90,7 @@ export default function VideoEditor() {
   const playClockStart = useRef(0);
   const playTimelineStart = useRef(0);
   const sliderCommitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
 
   /* ---- undo / redo ---- */
   const { pushState, undo, redo, canUndo, canRedo, clearHistory } = useUndoHistory();
@@ -227,19 +216,19 @@ export default function VideoEditor() {
 
   /* ---- handlers ---- */
   const handleVideoFile = useCallback((file: File) => {
-    setVideoSrc((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    setVideoSrc(replaceUrl("video", URL.createObjectURL(file)));
     setCurrentTime(0);
     setSelection(null);
     setIsPlaying(false);
     clearHistory();
-  }, [clearHistory]);
+  }, [clearHistory, replaceUrl]);
 
   const handleAudioFile = useCallback(async (file: File) => {
-    setAudioSrc((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    setAudioSrc(replaceUrl("audio", URL.createObjectURL(file)));
     setSelection(null);
     const peaks = await buildAudioPeaks(file);
     setAudioPeaks(peaks);
-  }, []);
+  }, [replaceUrl]);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -309,8 +298,9 @@ export default function VideoEditor() {
     setAudioClips([]);
     setAudioPeaks([]);
     setSelection((s) => (s?.track === "audio" ? null : s));
-    setAudioSrc((old) => { if (old) URL.revokeObjectURL(old); return ""; });
-  }, [stopPlayback]);
+    revokeUrl("audio");
+    setAudioSrc("");
+  }, [revokeUrl, stopPlayback]);
 
   /* ---- playback loop ---- */
   // Use refs for values accessed inside the animation tick to avoid
@@ -378,13 +368,15 @@ export default function VideoEditor() {
       rafRef.current = requestAnimationFrame(tick);
     };
 
+    const preview = previewRef.current;
+    const audio = audioRef.current;
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       // Explicitly pause both on cleanup (when isPlaying becomes false)
-      previewRef.current?.getElement()?.pause();
-      audioRef.current?.pause();
+      preview?.getElement()?.pause();
+      audio?.pause();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying]);
@@ -408,19 +400,7 @@ export default function VideoEditor() {
     audioRef.current.muted = muted;
   }, [muted, playbackRate, volume]);
 
-  // Only revoke blob URLs on unmount — NOT on every audioSrc/videoSrc change.
-  // The individual handlers (handleVideoFile, handleAudioFile, clearAudio) already
-  // revoke old URLs when replacing them. This effect just handles component unmount.
-  const videoSrcRef = useRef(videoSrc);
-  const audioSrcRef = useRef(audioSrc);
-  videoSrcRef.current = videoSrc;
-  audioSrcRef.current = audioSrc;
-  useEffect(() => {
-    return () => {
-      if (videoSrcRef.current) URL.revokeObjectURL(videoSrcRef.current);
-      if (audioSrcRef.current) URL.revokeObjectURL(audioSrcRef.current);
-    };
-  }, []);
+  // URL lifecycle (replacing and unmount cleanup) is handled by useTrackedObjectUrls.
 
   /* ---- keyboard shortcuts ---- */
   useEffect(() => {
@@ -498,10 +478,10 @@ export default function VideoEditor() {
   const selectedClipInfo = selectedClip
     ? {
         track: selection!.track,
-        timelineStart: formatTime(selectedClip.timelineStart),
-        timelineEnd: formatTime(selectedClip.timelineEnd),
-        sourceStart: formatTime(selectedClip.sourceStart),
-        sourceEnd: formatTime(selectedClip.sourceEnd),
+        timelineStart: formatTimeTenths(selectedClip.timelineStart),
+        timelineEnd: formatTimeTenths(selectedClip.timelineEnd),
+        sourceStart: formatTimeTenths(selectedClip.sourceStart),
+        sourceEnd: formatTimeTenths(selectedClip.sourceEnd),
       }
     : null;
 
@@ -509,7 +489,6 @@ export default function VideoEditor() {
   if (!videoSrc) {
     return (
       <div>
-        <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
         <Dropzone onFiles={handleFiles} />
       </div>
     );
@@ -536,7 +515,7 @@ export default function VideoEditor() {
             Replace Video
           </button>
           <span className="text-sm font-bold text-[var(--text-soft)]">
-            {formatTime(currentTime)} / {formatTime(totalDuration)}
+            {formatTimeTenths(currentTime)} / {formatTimeTenths(totalDuration)}
           </span>
         </div>
 

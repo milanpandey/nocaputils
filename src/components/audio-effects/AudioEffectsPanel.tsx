@@ -8,6 +8,8 @@ import {
   audioBufferToMp3,
   type OfflineAudioEffects,
 } from "./useAudioEffectsEngine";
+import { useTrackedObjectUrls } from "@/hooks/useTrackedObjectUrls";
+import { formatClockTime } from "@/lib/formatters";
 
 /* ── Constants & presets ── */
 
@@ -68,7 +70,7 @@ function presetToCustom(id: PresetId): CustomParams {
 function customToFx(c: CustomParams): OfflineAudioEffects {
   const pitchFactor = Math.pow(2, c.pitch / 12);
   return {
-    speed: c.speed * (c.pitch !== 0 ? pitchFactor / (c.speed === 1 ? 1 : 1) : 1),
+    speed: c.speed * (c.pitch !== 0 ? pitchFactor : 1),
     bassGain: c.bass,
     trebleGain: c.treble,
     lowpassFreq: c.lowpass,
@@ -79,12 +81,6 @@ function customToFx(c: CustomParams): OfflineAudioEffects {
     preservePitch: c.pitch === 0,
     gain: c.gain,
   };
-}
-
-function resolvePreset(id: PresetId, custom: CustomParams): OfflineAudioEffects {
-  if (id === "custom") return customToFx(custom);
-  // For tweaked presets, use customToFx directly since params are in custom state
-  return customToFx(custom);
 }
 
 const SLIDER_DEFS: { key: keyof CustomParams; label: string; min: number; max: number; step: number; unit: string; format?: (v: number) => string }[] = [
@@ -99,13 +95,6 @@ const SLIDER_DEFS: { key: keyof CustomParams; label: string; min: number; max: n
   { key: "delayMix", label: "Delay Mix", min: 0, max: 1, step: 0.05, unit: "", format: v => Math.round(v * 100) + "%" },
   { key: "gain", label: "Volume", min: -12, max: 12, step: 1, unit: "dB", format: v => (v > 0 ? "+" : "") + v + " dB" },
 ];
-
-function fmtTime(s: number): string {
-  if (!isFinite(s) || s < 0) return "0:00";
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
 
 const presetInfo: Record<string, string> = {
   bass_boost: "Heavy sub-bass boost at 110Hz (+14 dB). Perfect for car speakers and bass drops.",
@@ -139,7 +128,26 @@ export default function AudioEffectsPanel() {
   const [errorMsg, setErrorMsg] = useState("");
   const waveformRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef(0);
+  const themeColorsRef = useRef({ bgMuted: "#1f2937", accent: "#f2ef13" });
   const engine = useAudioEffectsEngine();
+  const { replaceUrl, revokeUrl } = useTrackedObjectUrls();
+
+  useEffect(() => {
+    const syncColors = () => {
+      const style = getComputedStyle(document.documentElement);
+      themeColorsRef.current = {
+        bgMuted: style.getPropertyValue("--bg-panel-muted").trim() || "#1f2937",
+        accent: style.getPropertyValue("--accent").trim() || "#f2ef13",
+      };
+    };
+    syncColors();
+    const observer = new MutationObserver(syncColors);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme", "style"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   // When preset changes, set params to that preset's defaults
   const selectPreset = useCallback((id: PresetId) => {
@@ -164,10 +172,7 @@ export default function AudioEffectsPanel() {
   // Init engine on file change
   useEffect(() => {
     if (audioFile) {
-      setFileName(audioFile.name);
-      setDownloadUrl("");
-      setErrorMsg("");
-      engine.init(audioFile).catch((e) => setErrorMsg(e.message));
+      engine.init(audioFile).catch((e) => setErrorMsg(e instanceof Error ? e.message : "Failed to load audio"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioFile]);
@@ -175,40 +180,45 @@ export default function AudioEffectsPanel() {
   // Apply params to live engine
   useEffect(() => {
     if (!engine.isReady) return;
-    const fx = resolvePreset(preset, params);
+    const fx = customToFx(params);
     engine.setSpeed(fx.speed);
     engine.setBassGain(fx.bassGain);
-    engine.setTrebleGain(fx.trebleGain);
-    engine.setLowpassFreq(fx.lowpassFreq);
+    engine.setTrebleGain(fx.trebleGain ?? 0);
+    engine.setLowpassFreq(fx.lowpassFreq ?? 20000);
     engine.setReverbMix(fx.reverbMix);
-    engine.setDelay(fx.delayTime, fx.delayFeedback, fx.delayMix);
+    engine.setDelay(fx.delayTime ?? 0, fx.delayFeedback ?? 0, fx.delayMix ?? 0);
     engine.setPreservePitch(fx.preservePitch);
     engine.setMasterGain(fx.gain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset, params, engine.isReady]);
+  }, [params, engine.isReady]);
 
-  // Waveform visualiser
+  // Waveform visualiser — only animate rAF while playing
   useEffect(() => {
     const canvas = waveformRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    const draw = () => {
-      animRef.current = requestAnimationFrame(draw);
-      const W = canvas.width, H = canvas.height;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg-panel-muted").trim() || "#1f2937";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const drawFrame = () => {
+      const W = canvas.width;
+      const H = canvas.height;
+      const { bgMuted, accent } = themeColorsRef.current;
+      ctx.fillStyle = bgMuted;
       ctx.fillRect(0, 0, W, H);
       if (!engine.isPlaying) return;
+
       const freq = engine.getFrequencyData();
       const barCount = Math.min(freq.length, 128);
       const barW = W / barCount;
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#f2ef13";
+      ctx.fillStyle = accent;
       for (let i = 0; i < barCount; i++) {
         const v = freq[i] / 255;
-        ctx.fillStyle = accent;
         ctx.fillRect(i * barW, H - v * H * 0.85, barW - 1, v * H * 0.85);
       }
+      animRef.current = requestAnimationFrame(drawFrame);
     };
-    draw();
+
+    drawFrame();
     return () => cancelAnimationFrame(animRef.current);
   }, [engine.isPlaying, engine]);
 
@@ -217,9 +227,13 @@ export default function AudioEffectsPanel() {
       setErrorMsg("Please upload an audio file (MP3, WAV, OGG, FLAC, etc.)");
       return;
     }
+    revokeUrl("export");
+    setFileName(file.name);
+    setDownloadUrl("");
+    setErrorMsg("");
     setAudioFile(file);
     selectPreset("none");
-  }, [selectPreset]);
+  }, [revokeUrl, selectPreset]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -233,16 +247,17 @@ export default function AudioEffectsPanel() {
     setIsProcessing(true);
     setProgress(0);
     setErrorMsg("");
+    revokeUrl("export");
     setDownloadUrl("");
+    let ctx: AudioContext | null = null;
     try {
       setProgress(10);
       const arrayBuf = await audioFile.arrayBuffer();
-      const ctx = new AudioContext();
+      ctx = new AudioContext();
       const rawBuffer = await ctx.decodeAudioData(arrayBuf);
-      ctx.close();
       setProgress(30);
 
-      const fx = resolvePreset(preset, params);
+      const fx = customToFx(params);
       const processed = await renderAudioOffline(rawBuffer, fx);
       setProgress(60);
 
@@ -250,23 +265,24 @@ export default function AudioEffectsPanel() {
         const mp3Data = await audioBufferToMp3(processed, (p) => {
           setProgress(60 + Math.round(p * 35));
         });
-        const blob = new Blob([mp3Data as any], { type: "audio/mpeg" });
-        setDownloadUrl(URL.createObjectURL(blob));
+        const blob = new Blob([new Uint8Array(mp3Data)], { type: "audio/mpeg" });
+        setDownloadUrl(replaceUrl("export", URL.createObjectURL(blob)));
       } else {
         const wavData = audioBufferToWav(processed);
-        const blob = new Blob([wavData as any], { type: "audio/wav" });
-        setDownloadUrl(URL.createObjectURL(blob));
+        const blob = new Blob([new Uint8Array(wavData)], { type: "audio/wav" });
+        setDownloadUrl(replaceUrl("export", URL.createObjectURL(blob)));
       }
       setProgress(100);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Export failed:", err);
-      setErrorMsg(err.message || "Export failed.");
+      setErrorMsg(err instanceof Error ? err.message : "Export failed.");
     } finally {
+      ctx?.close().catch(() => {});
       setIsProcessing(false);
     }
-  }, [audioFile, preset, params, exportFormat]);
+  }, [audioFile, params, exportFormat, replaceUrl, revokeUrl]);
 
-  const fx = resolvePreset(preset, params);
+  const fx = customToFx(params);
   const processedDuration = engine.duration / (fx.speed || 1);
 
   /* ── RENDER ── */
@@ -288,11 +304,11 @@ export default function AudioEffectsPanel() {
               <div>
                 <p className="text-lg font-black uppercase tracking-wide text-[var(--text-main)] truncate max-w-md">{fileName}</p>
                 <p className="text-xs text-[var(--text-soft)] uppercase tracking-widest font-bold mt-1">
-                  {fmtTime(engine.duration)} · {(audioFile.size / (1024 * 1024)).toFixed(1)} MB
-                  {fx.speed !== 1 && <span className="ml-3">→ {fmtTime(processedDuration)} after effects</span>}
+                  {formatClockTime(engine.duration)} · {(audioFile.size / (1024 * 1024)).toFixed(1)} MB
+                  {fx.speed !== 1 && <span className="ml-3">→ {formatClockTime(processedDuration)} after effects</span>}
                 </p>
               </div>
-              <button className="neo-button bg-[var(--bg-panel-muted)] px-4 py-2 text-xs font-black uppercase tracking-widest text-[var(--text-main)]" onClick={() => { engine.pause(); setAudioFile(null); setFileName(""); setDownloadUrl(""); }}>Change</button>
+              <button className="neo-button bg-[var(--bg-panel-muted)] px-4 py-2 text-xs font-black uppercase tracking-widest text-[var(--text-main)]" onClick={() => { engine.pause(); revokeUrl("export"); setAudioFile(null); setFileName(""); setDownloadUrl(""); }}>Change</button>
             </div>
             <div className="border-4 border-black overflow-hidden">
               <canvas ref={waveformRef} width={800} height={120} className="w-full h-[120px]" />
@@ -302,9 +318,9 @@ export default function AudioEffectsPanel() {
                 {engine.isPlaying ? "⏸ Pause" : "▶ Preview"}
               </button>
               <div className="flex-1 flex items-center gap-3">
-                <span className="text-xs font-black text-[var(--text-soft)] tabular-nums w-12 text-right">{fmtTime(engine.currentTime)}</span>
+                <span className="text-xs font-black text-[var(--text-soft)] tabular-nums w-12 text-right">{formatClockTime(engine.currentTime)}</span>
                 <input type="range" min={0} max={engine.duration || 1} step={0.1} value={engine.currentTime} onChange={(e) => engine.seek(Number(e.target.value))} className="flex-1 vis-range" />
-                <span className="text-xs font-black text-[var(--text-soft)] tabular-nums w-12">{fmtTime(engine.duration)}</span>
+                <span className="text-xs font-black text-[var(--text-soft)] tabular-nums w-12">{formatClockTime(engine.duration)}</span>
               </div>
             </div>
           </div>
