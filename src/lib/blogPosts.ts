@@ -10,6 +10,36 @@ export interface BlogPostItem {
 }
 
 export const BLOG_POSTS: BlogPostItem[] = [
+    // ─── Nov 15, 2026 ────────────────────────────────────────────────────────
+    {
+        slug: "rewind-time-reverse-video-speed-changer",
+        title: "Rewind Time: Reverse Video and Audio with Speed Controller",
+        date: "Nov 15, 2026",
+        category: "Release",
+        tags: ["Video", "Effects", "Speed", "Release"],
+        toolPath: "/change-video-speed",
+        excerpt: "Play videos backward at any speed directly in your browser with our new chunked WebAssembly reversal engine and synchronized audio reversing.",
+        content: `Reversing video has always been one of the most popular effects for comedic reveals, trick-shot replays, action transitions, and creative storytelling. However, most online converters enforce heavy file uploads, watermarks, or artificial video length limits.
+
+Today, we're introducing **Video Reversal** inside our **Video Speed Controller**, bringing seamless forward and backward playback manipulation to your browser—completely offline and private.
+
+### Chunked Client-Side Reversal Engine
+Reversing high-definition video in browser memory presents unique WebAssembly challenges: loading an entire long clip's decoded frames into memory at once can crash browser tabs with Out-Of-Memory (OOM) errors.
+
+To solve this, our new engine uses an intelligent chunked processing architecture:
+- **Automatic Segmentation**: For videos longer than 20 seconds, the engine splits the video into managed 15-second segments.
+- **Individual Segment Inversion**: Each segment is reversed in isolation with hardware-friendly FFmpeg WebAssembly filters.
+- **Reverse Concatenation**: Reconnects the processed chunks in inverted chronological order into a seamless, high-framerate MP4.
+- **Zero Server Uploads**: Your footage never leaves your machine. Everything runs in your browser's local sandbox.
+
+### Combined Speed and Direction Control
+You can combine reversing with any speed modifier:
+- **Reverse Slow-Motion (0.25x – 0.75x)**: Perfect for dramatic rewinds, water droplet splashes, and skate stunts.
+- **High-Speed Rewind (1.25x – 4.0x)**: Create vintage VHS tape rewind effects and snappy transitions.
+
+### Synchronized Audio Reversing
+Don't settle for muted videos. The tool includes backward audio synchronization powered by FFmpeg's \`areverse\` and pitch-preserving tempo filters, letting you keep the reversed audio track or mute it with a single toggle.`
+    },
     // ─── Aug 16, 2026 ────────────────────────────────────────────────────────
     {
         slug: "extract-text-pdf-to-markdown",
