@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef } from "react";
  */
 export function useTrackedObjectUrls() {
   const urlsRef = useRef<Map<string, string>>(new Map());
+  const unmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createUrl = useCallback((key: string, blob: Blob | MediaSource): string => {
     const existing = urlsRef.current.get(key);
@@ -60,12 +61,19 @@ export function useTrackedObjectUrls() {
   }, []);
 
   useEffect(() => {
+    if (unmountTimerRef.current !== null) {
+      clearTimeout(unmountTimerRef.current);
+      unmountTimerRef.current = null;
+    }
     const urls = urlsRef.current;
     return () => {
-      for (const url of urls.values()) {
-        URL.revokeObjectURL(url);
-      }
-      urls.clear();
+      unmountTimerRef.current = setTimeout(() => {
+        unmountTimerRef.current = null;
+        for (const url of urls.values()) {
+          URL.revokeObjectURL(url);
+        }
+        urls.clear();
+      }, 0);
     };
   }, []);
 

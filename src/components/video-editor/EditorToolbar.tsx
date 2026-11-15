@@ -1,8 +1,10 @@
 "use client";
 
+import { memo } from "react";
+
 const tools = [
   { id: "Trim", icon: "✂", label: "Trim" },
-  { id: "Tools", icon: "⬒", label: "Tools" },
+  { id: "Tools", icon: "⬒", label: "Transform" },
   { id: "Audio", icon: "♪", label: "Audio" },
   { id: "Filters", icon: "◑", label: "Filters" },
   { id: "Text", icon: "A", label: "Text" },
@@ -15,30 +17,41 @@ type EditorToolbarProps = {
   onTabChange: (tab: ToolId) => void;
 };
 
-export default function EditorToolbar({
+const EditorToolbar = memo(function EditorToolbar({
   activeTab,
   onTabChange,
 }: EditorToolbarProps) {
   return (
-    <div className="flex flex-col gap-1">
-      {tools.map((tool) => (
-        <button
-          key={tool.id}
-          type="button"
-          onClick={() => onTabChange(tool.id)}
-          className={`flex w-16 flex-col items-center gap-1 border-4 border-[var(--border-main)] px-1 py-3 text-center transition-all ${
-            activeTab === tool.id
-              ? "bg-[var(--accent)] text-black shadow-[3px_3px_0_0_var(--border-main)]"
-              : "bg-[var(--bg-panel)] shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)]"
-          }`}
-          title={tool.label}
-        >
-          <span className="text-lg leading-none">{tool.icon}</span>
-          <span className="text-[9px] font-black uppercase tracking-wider">
-            {tool.label}
-          </span>
-        </button>
-      ))}
+    <div
+      className="flex flex-row gap-1.5 overflow-x-auto pb-1 sm:flex-col sm:gap-1.5 sm:overflow-visible sm:pb-0"
+      role="tablist"
+      aria-label="Editor tools"
+    >
+      {tools.map((tool) => {
+        const active = activeTab === tool.id;
+        return (
+          <button
+            key={tool.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onTabChange(tool.id)}
+            className={`flex shrink-0 flex-row items-center gap-1.5 border-4 border-[var(--border-main)] px-3 py-2 text-center transition-all sm:w-18 sm:flex-col sm:gap-1 sm:px-1 sm:py-2.5 ${
+              active
+                ? "bg-[var(--accent)] text-black shadow-[3px_3px_0_0_var(--border-main)]"
+                : "bg-[var(--bg-panel)] shadow-[3px_3px_0_0_var(--border-main)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_0_var(--border-main)]"
+            }`}
+            title={tool.label}
+          >
+            <span className="text-base leading-none sm:text-lg">{tool.icon}</span>
+            <span className="text-[9px] font-black uppercase tracking-wider">
+              {tool.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
-}
+});
+
+export default EditorToolbar;

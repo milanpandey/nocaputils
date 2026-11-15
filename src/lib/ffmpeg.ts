@@ -2,7 +2,10 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
 import type { MutableRefObject } from "react";
 
-const FFMPEG_CORE_BASE_URL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+const FFMPEG_CORE_BASE_URLS = [
+  "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd",
+  "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd",
+];
 
 interface CachedCoreUrls {
   coreURL: string;
@@ -14,21 +17,26 @@ let cachedCorePromise: Promise<CachedCoreUrls> | null = null;
 /**
  * Fetches and caches FFmpeg core JS & WASM blob URLs once per browser session.
  * Note: ffmpeg-core.wasm (~31 MB) exceeds Cloudflare Pages' 25 MiB static asset limit,
- * so it is loaded via unpkg CDN and cached as Blob URLs.
+ * so it is loaded via CDN and cached as Blob URLs with fallback mirrors.
  */
 export async function getFFmpegCoreUrls(): Promise<CachedCoreUrls> {
   if (!cachedCorePromise) {
     cachedCorePromise = (async () => {
-      try {
-        const [coreURL, wasmURL] = await Promise.all([
-          toBlobURL(`${FFMPEG_CORE_BASE_URL}/ffmpeg-core.js`, "text/javascript"),
-          toBlobURL(`${FFMPEG_CORE_BASE_URL}/ffmpeg-core.wasm`, "application/wasm"),
-        ]);
-        return { coreURL, wasmURL };
-      } catch (err) {
-        cachedCorePromise = null;
-        throw err;
+      for (const baseUrl of FFMPEG_CORE_BASE_URLS) {
+        try {
+          const [coreURL, wasmURL] = await Promise.all([
+            toBlobURL(`${baseUrl}/ffmpeg-core.js`, "text/javascript"),
+            toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, "application/wasm"),
+          ]);
+          return { coreURL, wasmURL };
+        } catch {
+          // Try next CDN fallback
+        }
       }
+      cachedCorePromise = null;
+      throw new Error(
+        "Failed to load FFmpeg WebAssembly core. Please check your network connection or ad-blocker settings and try again."
+      );
     })();
   }
   return cachedCorePromise;

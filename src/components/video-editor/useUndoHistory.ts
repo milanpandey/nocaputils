@@ -2,9 +2,9 @@ import { useCallback, useRef, useState } from "react";
 import type { Clip, Selection } from "./TimelinePanel";
 
 /* ---- Undoable editor state ---- */
-type FilterPreset = "none" | "grayscale" | "sepia" | "vintage";
-type CropPreset = "free" | "16:9" | "1:1" | "9:16";
-type CropMode = "letterbox" | "crop";
+export type FilterPreset = "none" | "grayscale" | "sepia" | "vintage" | "warm" | "cool" | "dramatic";
+export type CropPreset = "free" | "16:9" | "1:1" | "9:16";
+export type CropMode = "letterbox" | "crop";
 
 export type UndoableState = {
   videoClips: Clip[];
@@ -21,10 +21,16 @@ export type UndoableState = {
   filterPreset: FilterPreset;
   textOverlay: string;
   textSize: number;
+  textX: number;
   textY: number;
+  textColor: string;
+  textBg: boolean;
   playbackRate: number;
   volume: number;
   muted: boolean;
+  audioFadeIn: number;
+  audioFadeOut: number;
+  keepOriginalAudio: boolean;
 };
 
 const MAX_HISTORY = 20;

@@ -109,9 +109,13 @@ export default function OnlineVideoEditor() {
                       <li><strong>Space</strong> — Play / Pause</li>
                       <li><strong>← →</strong> — Seek ±1 second</li>
                       <li><strong>Shift + ← →</strong> — Seek ±1 frame (1/30s)</li>
+                      <li><strong>Home / End</strong> — Jump to start / end</li>
+                      <li><strong>S</strong> — Split selected clip at playhead</li>
+                      <li><strong>[ / ]</strong> (or <strong>I / O</strong>) — Trim start / end to playhead</li>
+                      <li><strong>F</strong> — Toggle editor fullscreen</li>
+                      <li><strong>Ctrl / Cmd + Scroll</strong> — Zoom timeline</li>
                       <li><strong>Delete / Backspace</strong> — Delete selected clip</li>
-                      <li><strong>Ctrl + Z</strong> — Undo last action</li>
-                      <li><strong>Ctrl + Shift + Z</strong> — Redo</li>
+                      <li><strong>Ctrl + Z / Ctrl + Shift + Z</strong> — Undo / Redo</li>
                     </ul>
                   </div>
                 </div>

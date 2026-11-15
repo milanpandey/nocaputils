@@ -12,6 +12,37 @@ export interface BlogPostItem {
 export const BLOG_POSTS: BlogPostItem[] = [
     // ─── Nov 15, 2026 ────────────────────────────────────────────────────────
     {
+        slug: "online-video-editor-studio-redesign-and-large-video-export",
+        title: "Online Video Editor 2.0: Redesigned Studio, Timeline Zoom & Large-Video Exports",
+        date: "Nov 15, 2026",
+        category: "Release",
+        tags: ["Video Editor", "FFmpeg", "Performance", "Release"],
+        toolPath: "/online-video-editor",
+        excerpt: "A redesigned studio workspace with fullscreen mode, bottom timeline zoom (0.25x–16x), faster scrubbing, zero-copy large-video exports, and custom download filenames.",
+        content: `Browser-based video editing gets painful fast when working with real-world recordings: sluggish timeline scrubbing, cramped controls, and crashes when trimming a few minutes out of a long file.
+
+Today we are rolling out a major upgrade to the **nocaputils Online Video Editor**, rebuilt for smoother timeline navigation, faster editing tools, and reliable large-file exports—still 100% locally in your browser with zero uploads.
+
+### Redesigned Studio Workspace & Fullscreen Editing
+We reorganized the editor into a focused studio layout with fewer visual jumps and quicker access to everyday cuts:
+- **Fullscreen Mode (\`F\`)**: Expand the entire editor workspace—preview, tools, and timeline—to fill your screen.
+- **Aspect-Accurate Stage**: Preview \`16:9\`, \`1:1\`, and \`9:16\` aspect ratios cleanly inside a fixed-height stage with a **Crop (Fill)** vs **Letterbox (Fit)** toggle, click-to-play, and a **Frame Snapshot** button.
+- **Direct Text Positioning**: Drag text overlays right on the video canvas with center snap guides, color swatches, and an optional background box.
+- **One-Click Trim & Effects**: Use quick **Split (\`S\`)**, **Trim In (\`[\` / \`I\`)**, and **Trim Out (\`]\` / \`O\`)** controls, audio fade-in/fade-out and track mixing, and expanded color presets (**Warm**, **Cool**, **Dramatic**, **Vintage**, **Sepia**, **Grayscale**).
+
+### Virtualized Timeline, Fit-Centered Zoom & Faster Scrubbing
+Long recordings shouldn't slow down the timeline or overload your GPU:
+- **Zoom Controls Built Into the Timeline**: Zooming now lives directly on the bottom timeline dock with a logarithmic slider centered at **Fit (\`1.00x\`)**—zoom out to \`0.25x\` or zoom in up to \`16.00x\` anchored around the playhead.
+- **Viewport-Virtualized Canvas**: Instead of allocating massive offscreen canvases for multi-minute timelines, the timeline renders through a viewport-sized sticky canvas so seeking and zooming stay crisp at any duration.
+- **Coalesced Seeking & Quick Prep**: Timeline scrubbing coalesces rapid frame seeks to prevent decoder stalls, and loading a video uses a brief bounded preparation step (under 2 seconds, with a **Skip** option) while deferring FFmpeg WebAssembly initialization until you open Export.
+
+### Zero-Copy Large-Video Exports & Custom File Names
+Extracting a clip from a long recording (even a 50-minute video) now avoids copying the entire source file into browser RAM and WebAssembly \`MEMFS\`:
+- **Direct \`WORKERFS\` Mounting**: FFmpeg mounts your local file handle directly and reads only the slices needed for your trimmed clips.
+- **Single-Pass Finalization & Same-Origin Overlay Fonts**: Simple MP4 trims write directly to output without a duplicate copy pass, alongside speed (\`0.25x\`–\`2.0x\`), audio filters, resolution presets (\`Orig\`, \`1080p\`, \`720p\`, \`480p\`), and animated **GIF** export.
+- **Custom File Naming**: Once export completes, edit the file name right in the **Export Complete** dialog (defaulting to **Edited Video**) before hitting **Download**.`
+    },
+    {
         slug: "rewind-time-reverse-video-speed-changer",
         title: "Rewind Time: Reverse Video and Audio with Speed Controller",
         date: "Nov 15, 2026",
