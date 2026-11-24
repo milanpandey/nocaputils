@@ -101,9 +101,11 @@ const PII_SHIELD_DEFAULT_CAMPAIGN = "website";
 const PII_SHIELD_STORE_WEB_BASE = `https://apps.microsoft.com/detail/${PII_SHIELD_STORE_ID}`;
 const PII_SHIELD_STORE_PROTOCOL_BASE = `ms-windows-store://pdp/?productid=${PII_SHIELD_STORE_ID}`;
 
-/** Documentation & Legal links hosted on Firebase */
+/** Documentation & Legal links */
 export const PII_SHIELD_DOCS_URL = "https://okpi-5e20b.web.app/piishield/about.html";
-export const PII_SHIELD_PRIVACY_URL = "https://okpi-5e20b.web.app/piishield/privacy-policy.html";
+export const PII_SHIELD_PRIVACY_URL = "/pii-shield/privacy";
+export const PII_SHIELD_SUPPORT_URL = "/pii-shield/support";
+export const PII_SHIELD_SUPPORT_EMAIL = "support@indieorch.dev";
 export const PII_SHIELD_TERMS_URL = "https://okpi-5e20b.web.app/piishield/terms-of-service.html";
 export const PII_SHIELD_EULA_URL = "https://okpi-5e20b.web.app/piishield/license.html";
 export const PII_SHIELD_THIRD_PARTY_LICENSES_URL = "https://okpi-5e20b.web.app/piishield/third-party-licenses.html";

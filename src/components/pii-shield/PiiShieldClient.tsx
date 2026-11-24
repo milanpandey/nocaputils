@@ -10,6 +10,8 @@ import {
   PII_SHIELD_CAMPAIGN_PAGE,
   PII_SHIELD_DOCS_URL,
   PII_SHIELD_PRIVACY_URL,
+  PII_SHIELD_SUPPORT_URL,
+  PII_SHIELD_SUPPORT_EMAIL,
   PII_SHIELD_TERMS_URL,
   PII_SHIELD_EULA_URL,
   PII_SHIELD_THIRD_PARTY_LICENSES_URL,
@@ -772,15 +774,20 @@ export default function PiiShieldClient() {
                   <span>Technical Overview</span>
                   <span aria-hidden="true">&rarr;</span>
                 </a>
-                <a
+                <Link
                   href={PII_SHIELD_PRIVACY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="neo-button neo-button-theme flex items-center justify-between p-3.5 text-xs font-black uppercase tracking-wider transition-all"
                 >
                   <span>Privacy Policy</span>
                   <span aria-hidden="true">&rarr;</span>
-                </a>
+                </Link>
+                <Link
+                  href={PII_SHIELD_SUPPORT_URL}
+                  className="neo-button neo-button-theme flex items-center justify-between p-3.5 text-xs font-black uppercase tracking-wider transition-all"
+                >
+                  <span>Support &amp; Help</span>
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
                 <a
                   href={PII_SHIELD_TERMS_URL}
                   target="_blank"
@@ -809,6 +816,15 @@ export default function PiiShieldClient() {
                   <span aria-hidden="true">&rarr;</span>
                 </a>
               </div>
+              <p className="mt-4 text-xs text-[var(--text-soft)]">
+                Need help? Contact{" "}
+                <a
+                  href={`mailto:${PII_SHIELD_SUPPORT_EMAIL}`}
+                  className="font-bold text-[var(--text-main)] underline"
+                >
+                  {PII_SHIELD_SUPPORT_EMAIL}
+                </a>
+              </p>
             </div>
           </section>
 
